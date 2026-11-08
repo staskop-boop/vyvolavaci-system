@@ -15,7 +15,7 @@ kreslí **malý počítač pripojený k TV cez HDMI**; televízor je len monitor
 
 ## Postup
 1. Skopírujte priečinok `minipc` na mini PC, napr. do `C:\AdNa\minipc`.
-2. Prvé spustenie (PowerShell): `powershell -ExecutionPolicy Bypass -File C:\AdNa\minipc\spustit-obrazovku.ps1 -Server http://IP-SERVERA:8080`
+2. Prvé spustenie (PowerShell): `powershell -ExecutionPolicy Bypass -File C:\AdNa\minipc\spustit-obrazovku.ps1` (predvolene server `https://vyvolavaci.adna.sk`; v LAN `-Server http://IP-SERVERA:8080`)
 3. Jednorazovo nainštalujte rozšírenie do profilu obrazovky: spustite skript s prepínačom `-Nastavenie`
    (otvorí `chrome://extensions` v profile obrazovky), zapnite **Režim pre vývojárov** → **Načítať rozbalené** → vyberte
    priečinok `rozsirenie-tv-ramec`. Rozšírenie platí len v tomto profile, bežné prehliadanie neovplyvní.

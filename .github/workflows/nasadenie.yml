@@ -1,0 +1,40 @@
+# Nasadenie vyvolavaci.adna.sk: Cloudflare Access (registrácia pacientov), tunel, DNS a server Hetzner.
+# Spúšťa sa ručne: Actions → Nasadenie vyvolavaci.adna.sk → Run workflow. Opakované spustenie je bezpečné.
+# Ďalšie verzie sa na server dostanú samy – server každých 5 minút skontroluje vetvu main.
+# Tajomstvá: CLOUDFLARE_API_TOKEN, HCLOUD_TOKEN, ADNA_HESLO (Settings → Secrets and variables → Actions).
+name: Nasadenie vyvolavaci.adna.sk
+on:
+  workflow_dispatch:
+    inputs:
+      emaily:
+        description: 'E-maily s prístupom k /tablet a /api/kiosk (čiarkou)'
+        default: 'stasko@adna.sk'
+      ip_ambulancie:
+        description: 'Verejná IP ambulancie – tablet/kiosk bez prihlásenia (voliteľné)'
+        default: ''
+      typ_servera:
+        description: 'Typ servera Hetzner (pri nedostupnosti sa skúsia ďalšie)'
+        default: 'cx23'
+      lokalita:
+        description: 'Lokalita Hetzner (nbg1, fsn1, hel1)'
+        default: 'nbg1'
+
+concurrency: { group: nasadenie, cancel-in-progress: false }
+permissions: { contents: read }
+
+jobs:
+  nasadenie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Nasadiť
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          ADNA_HESLO: ${{ secrets.ADNA_HESLO }}
+          EMAILY: ${{ inputs.emaily }}
+          IP_AMBULANCIE: ${{ inputs.ip_ambulancie }}
+          TYP_SERVERA: ${{ inputs.typ_servera }}
+          LOKALITA: ${{ inputs.lokalita }}
+        run: bash deploy/cloud/nasad.sh

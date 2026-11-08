@@ -18,39 +18,43 @@ Nasadenie má dve fázy, adresa `https://vyvolavaci.adna.sk` ostáva v oboch rov
 Súbory: `Dockerfile`, `deploy/docker-compose.yml`, `deploy/.env.example`, `deploy/vps/instaluj.sh`,
 `deploy/vps/aktualizuj.sh`.
 
-### 1. Cloudflare Access (najprv – kým nie je doména zverejnená)
+### Automaticky (odporúčané): workflow „Nasadenie vyvolavaci.adna.sk“
 
-Zero Trust → Access → Applications → Add → Self-hosted:
-* názov `Vyvolávací systém AdNa`, doména `vyvolavaci.adna.sk` (celá, bez cesty), session 24 h;
-* politika **„Personál“** – Allow – Emails: e-maily sestier / ambulancie (prihlásenie jednorazovým kódom);
-* politika **„Zariadenia v ambulancii“** – *Bypass* – IP ranges: verejná IP ambulancie (zistí sa napr. na
-  https://ifconfig.me z PC v ambulancii). Tablet, TV a neskôr kiosk sa tak nemusia prihlasovať.
-  Ak ambulancia nemá pevnú IP: namiesto Bypass dať zariadeniam e-mail ambulancie (Allow) a session 1 mesiac
-  – raz za mesiac sa na zariadení zadá kód.
+Jedno spustenie v GitHub Actions (`.github/workflows/nasadenie.yml` → `deploy/cloud/nasad.sh`) urobí v tomto poradí:
+1. **Cloudflare Access** len pre registráciu pacientov (`/tablet`, `/api/kiosk`) – pustí e-maily správcu
+   (predvolene stasko@adna.sk) a voliteľne verejnú IP ambulancie (tablet/kiosk bez prihlásenia).
+   Personál sa prihlasuje **len menom a heslom v aplikácii** (rozhodnutie Paliho 2026-11-08); obrazovka je verejná
+   (čísla a mená lekárov, žiadne údaje pacientov).
+2. **Tunel** `vyvolavaci` so smerovaním `vyvolavaci.adna.sk → http://adna:8080`.
+3. **DNS** CNAME `vyvolavaci` → tunel (existujúci iný záznam neprepíše).
+4. **Server Hetzner** (Ubuntu 24.04, `cx23`, pri nedostupnosti ďalšie typy) so zálohami; cloud-init spustí
+   `deploy/vps/instaluj.sh`, ktorý nastaví prvé heslo konta `personal` z tajomstva `ADNA_HESLO`.
 
-Bez Access by `/api/kiosk/*` a `/obrazovka/` boli verejné – **doménu nezverejňovať pred týmto krokom.**
+Potrebné tajomstvá (Settings → Secrets and variables → Actions):
+* `CLOUDFLARE_API_TOKEN` – vlastný token: Account › Cloudflare Tunnel › Edit, Account › Access: Apps and Policies › Edit,
+  Zone › DNS › Edit a Zone › Zone › Read pre adna.sk;
+* `HCLOUD_TOKEN` – Hetzner Cloud projekt → Security → API Tokens → Read & Write;
+* `ADNA_HESLO` – prvé heslo konta `personal` (min. 10 znakov), po prihlásení ho zmeňte v aplikácii.
 
-### 2. Tunel
+**Aktualizácie:** server každých 5 minút skontroluje vetvu `main` a novú verziu nasadí sám (pred tým urobí zálohu),
+log `/var/log/adna-aktualizacia.log`. Zlúčenie PR = nasadenie.
 
-Zero Trust → Networks → Tunnels → Create → Cloudflared → názov `vyvolavaci`. Skopírovať token (dlhý reťazec za
-`--token`). Public hostname: `vyvolavaci.adna.sk` → Service **HTTP** → `adna:8080`. Cloudflare sám vytvorí
-DNS záznam (CNAME) – web a e-mail adna.sk sa nemenia.
+### Ručne (ak nechcete Actions)
 
-### 3. VPS
-
-Hetzner Cloud → nový server: Ubuntu 24.04, najmenší typ x86 (2 vCPU, 4 GB RAM), lokalita Nemecko, zapnúť
-Backups. Prihlásiť sa (`ssh root@IP` z PowerShellu) a spustiť:
+1. Zero Trust → Networks → Tunnels → Create → Cloudflared → `vyvolavaci`, skopírovať token; Public hostname
+   `vyvolavaci.adna.sk` → HTTP → `adna:8080`. Zero Trust → Access → Applications → Self-hosted pre
+   `vyvolavaci.adna.sk/tablet` a `vyvolavaci.adna.sk/api/kiosk` (politika s e-mailom správcu).
+2. VPS s Ubuntu 24.04, prihlásiť sa `ssh root@IP` a spustiť:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/deploy/vps/instaluj.sh | bash
 ```
 
 Skript nainštaluje Docker, firewall (otvorené len SSH), stiahne kód do `/opt/adna`, vypýta token tunela,
-spustí server + cloudflared a nastaví dennú zálohu (22:30, `deploy/data/zalohy`). Na konci vypíše
+spustí server + cloudflared, nastaví dennú zálohu (22:30) a automatickú aktualizáciu. Na konci vypíše
 **inštalačný kód** pre prvé prihlásenie na `https://vyvolavaci.adna.sk/sestra/`.
 
-Aktualizácia na najnovšiu verziu z `main`: `sudo /opt/adna/deploy/vps/aktualizuj.sh` (pred aktualizáciou urobí zálohu).
-Logy: `cd /opt/adna/deploy && docker compose logs -f adna`.
+Ručná aktualizácia: `sudo /opt/adna/deploy/vps/aktualizuj.sh`. Logy: `cd /opt/adna/deploy && docker compose logs -f adna`.
 
 ### Obmedzenia fázy 1
 
@@ -62,7 +66,7 @@ Logy: `cd /opt/adna/deploy && docker compose logs -f adna`.
 ### Kiosk
 
 Kiosk (Sunmi / Mondo Novo, Android) bude používať rovnaký server ako tablet (`/tablet/` a `/api/kiosk/*`) –
-v oboch fázach cez `https://vyvolavaci.adna.sk` (politika „Zariadenia v ambulancii“), vo fáze 2 aj priamo v LAN.
+v oboch fázach cez `https://vyvolavaci.adna.sk` (Access: IP ambulancie alebo prihlásenie e-mailom), vo fáze 2 aj priamo v LAN.
 Tlač lístka bude v Android aplikácii kiosku, takže nezávisí od toho, kde beží server. Pred ostrou prevádzkou
 kiosku doplniť párovanie zariadení (kľúč zariadenia) – pozri [INTERNET-A-BEZPECNOST.md](INTERNET-A-BEZPECNOST.md).
 
