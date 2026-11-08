@@ -22,7 +22,9 @@ LOKALITA="${LOKALITA:-nbg1}"
 TYPY="${TYP_SERVERA:-cx23} cx22 cpx22 cpx21 cpx11"
 
 chyba() { echo "::error::⚠ $*" >&2; exit 1; }
-for v in CLOUDFLARE_API_TOKEN HCLOUD_TOKEN; do [ -n "${!v:-}" ] || chyba "Chýba tajomstvo $v (Settings → Secrets and variables → Actions)."; done
+# všetky tajomstvá sa overia ešte pred prvou zmenou (nič sa nevytvorí, kým niektoré chýba)
+for v in CLOUDFLARE_API_TOKEN HCLOUD_TOKEN ADNA_HESLO; do [ -n "${!v:-}" ] || chyba "Chýba tajomstvo $v (Settings → Secrets and variables → Actions)."; done
+[ "${#ADNA_HESLO}" -ge 10 ] || chyba "ADNA_HESLO musí mať aspoň 10 znakov."
 EMAILY="${EMAILY:-stasko@adna.sk}"
 
 cf() { # cf METÓDA CESTA [JSON] → výsledok (.result), pri chybe koniec
@@ -100,8 +102,6 @@ SID=$(jq -r '.servers[0].id // empty' <<<"$S")
 if [ -n "$SID" ]; then
   echo "server už existuje ($(jq -r '.servers[0].server_type.name' <<<"$S"), $(jq -r '.servers[0].public_net.ipv4.ip' <<<"$S")) – aktualizuje sa sám z main"
 else
-  [ -n "${ADNA_HESLO:-}" ] || chyba "Chýba tajomstvo ADNA_HESLO (prvé heslo konta personal, min. 10 znakov)."
-  [ "${#ADNA_HESLO}" -ge 10 ] || chyba "ADNA_HESLO musí mať aspoň 10 znakov."
   UD=$(jq -rn --arg t "$(printf %s "$TUNNEL_TOKEN" | base64 -w0)" --arg h "$(printf %s "$ADNA_HESLO" | base64 -w0)" '
 "#cloud-config
 write_files:
