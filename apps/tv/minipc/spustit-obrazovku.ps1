@@ -4,7 +4,7 @@
 #   Rezim "okna"  (záloha):     stránka AdNa na celú obrazovku + samostatné okno prehrávača presne nad TV zónou.
 param(
   [switch]$Nastavenie,
-  [string]$Server = "http://192.168.1.10:8080",
+  [string]$Server = "https://vyvolavaci.adna.sk",
   [string]$Prehravac = "https://webtv.sk/",
   [ValidateSet("ramec", "okna")] [string]$Rezim = "ramec",
   # v3.1: Microsoft Edge má slovenské hlasy pre hlásenie čísla (Viktória/Lukáš Online, offline Filip); Chrome ich na Windows spravidla nevidí

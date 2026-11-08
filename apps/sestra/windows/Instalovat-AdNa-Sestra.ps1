@@ -23,7 +23,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if (-not $ServerUrl) {
-  $ServerUrl = Read-Host 'Zadajte adresu servera AdNa (napr. http://192.168.1.10:8080)'
+  $ServerUrl = Read-Host 'Zadajte adresu servera AdNa (napr. https://vyvolavaci.adna.sk alebo http://192.168.1.10:8080)'
 }
 $ServerUrl = $ServerUrl.Trim().TrimEnd('/')
 if ($ServerUrl -notmatch '^https?://') { $ServerUrl = 'http://' + $ServerUrl }
