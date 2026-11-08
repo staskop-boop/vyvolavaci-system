@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS = {
     tvLabel: 'TV Antik',
   },
   // v3.1 – hlasové hlásenie po zvukovom signáli (Pali 2026-11-08): „Číslo dvadsaťpäť, ambulancia jedna“
-  voice: { enabled: true, rate: 0.9, room: true, style: 'prosim' },
+  voice: { enabled: true, rate: 0.9, room: true, style: 'nahodne' },
   tvSource: '',             // adresa TV prehrávača vo vloženom okne (prázdne = zónu vyplní samostatné okno / box)
   news: {
     enabled: true,
@@ -195,7 +195,7 @@ class Store extends EventEmitter {
       const v = patch.voice;
       if ('enabled' in v) next.voice.enabled = !!v.enabled;
       if ('room' in v) next.voice.room = !!v.room;
-      if ('style' in v) { if (!['prosim', 'nechsapaci', 'kratke'].includes(v.style)) throw bad('Neznáme znenie hlásenia.'); next.voice.style = v.style; }
+      if ('style' in v) { if (!['nahodne', 'kratke', 'prosimdo', 'nechsapacido', 'prosim', 'nechsapaci', 'pokracujte', 'prid', 'cakame', 'narade', 'ocakava', 'dakujeme', 'dobryden'].includes(v.style)) throw bad('Neznáme znenie hlásenia.'); next.voice.style = v.style; }
       if ('rate' in v) { const r = Number(v.rate); if (!(r >= 0.6 && r <= 1.4)) throw bad('Rýchlosť hlasu musí byť od 0,6 do 1,4.'); next.voice.rate = Math.round(r * 100) / 100; }
     }
     if ('ticketInstruction' in patch) next.ticketInstruction = str(patch.ticketInstruction, 120, 'Pokyn na lístku');
@@ -663,7 +663,7 @@ class Store extends EventEmitter {
       clinicDelayMinutes, onTimeMinutes: s.onTimeMinutes,
       ticketDisplaySeconds: s.ticketDisplaySeconds,
       tvSource: s.tvSource, newsEnabled: s.news.enabled,
-      voice: { enabled: !!(s.soundEnabled && s.voice.enabled), rate: s.voice.rate, room: s.voice.room, style: s.voice.style || 'prosim' },
+      voice: { enabled: !!(s.soundEnabled && s.voice.enabled), rate: s.voice.rate, room: s.voice.room, style: s.voice.style || 'nahodne' },
       screen: { title: s.screen.title, address: s.screen.address, phone: s.screen.phone, info: s.screen.info, theme: s.screen.theme,
         tvLabel: s.screen.tvLabel, weatherEnabled: !!s.screen.weather.enabled },
     };

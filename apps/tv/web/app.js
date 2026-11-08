@@ -150,18 +150,45 @@
     if (n && /ambulan/i.test(call.roomName || '')) return 'ambulancia ' + (FEM[n] || skNumber(Number(n)));
     return call.roomName || '';
   }
-  /** Znenie (Pali 2026-11-08): prosim = „Číslo dvadsaťpäť, prosím, môžete vstúpiť do ambulancie číslo jeden.“,
-   *  nechsapaci = „…, nech sa páči, vstúpte do ambulancie číslo jeden.“, kratke = „Číslo dvadsaťpäť, ambulancia jedna.“ */
-  const PHRASE = { prosim: 'prosím, môžete vstúpiť', nechsapaci: 'nech sa páči, vstúpte' };
+  /** Vety hlásenia (Pali 2026-11-08: náhodne striedať, krátke aj dlhšie). {k} = „Číslo dvadsaťpäť“,
+   *  {do} = „do ambulancie číslo jeden“, {amb} = „ambulancia číslo jeden“, {Amb} = s veľkým písmenom, {v} = „v ambulancii číslo jeden“.
+   *  r = s ambulanciou, n = bez ambulancie (keď je „Hlásiť aj ambulanciu“ vypnuté). */
+  const PHRASES = [
+    { id: 'kratke', r: '{k}, {amb}.', n: '{k}.' },
+    { id: 'prosimdo', r: '{k}, prosím {do}.', n: '{k}, prosím.' },
+    { id: 'nechsapacido', r: '{k}, nech sa páči {do}.', n: '{k}, nech sa páči.' },
+    { id: 'prosim', r: '{k}, prosím, môžete vstúpiť {do}.', n: '{k}, prosím, môžete vstúpiť.' },
+    { id: 'nechsapaci', r: '{k}, nech sa páči, vstúpte {do}.', n: '{k}, nech sa páči, vstúpte.' },
+    { id: 'pokracujte', r: '{k}, prosím, pokračujte {do}.', n: '{k}, prosím, pokračujte.' },
+    { id: 'prid', r: '{k}, prosím, príďte {do}.', n: '{k}, prosím, príďte.' },
+    { id: 'cakame', r: '{k}, čakáme na vás {v}.', n: '{k}, čakáme na vás.' },
+    { id: 'narade', r: '{k}, ste na rade. Prosím, vstúpte {do}.', n: '{k}, ste na rade. Prosím, vstúpte.' },
+    { id: 'ocakava', r: '{k}, ste na rade. {Amb} vás očakáva.', n: '{k}, ste na rade.' },
+    { id: 'dakujeme', r: '{k}, ďakujeme za trpezlivosť, nech sa páči {do}.', n: '{k}, ďakujeme za trpezlivosť, nech sa páči.' },
+    { id: 'dobryden', r: '{k}, dobrý deň, prosím, môžete vstúpiť {do}.', n: '{k}, dobrý deň, prosím, môžete vstúpiť.' },
+  ];
+  let lastPhrase = -1;
+  function pickPhrase(style) {
+    const fixed = PHRASES.findIndex((p) => p.id === style);
+    if (fixed >= 0) return PHRASES[fixed];
+    let i = Math.floor(Math.random() * PHRASES.length);
+    if (i === lastPhrase) i = (i + 1 + Math.floor(Math.random() * (PHRASES.length - 1))) % PHRASES.length;
+    lastPhrase = i;
+    return PHRASES[i];
+  }
+  function roomForms(call) {
+    const n = doorNo(call.roomName), name = call.roomName || '';
+    if (n && /ambulan/i.test(name)) { const w = 'číslo ' + skNumber(Number(n)); return { do: 'do ambulancie ' + w, amb: 'ambulancia ' + w, v: 'v ambulancii ' + w }; }
+    if (name) return { do: 'do miestnosti ' + name, amb: name, v: 'v miestnosti ' + name };
+    return null;
+  }
   function announcementText(call) {
     const v = (state && state.voice) || {};
-    const head = codeWords(call.code), room = v.room !== false;
-    const phrase = PHRASE[v.style || 'prosim'];
-    if (!phrase) { const r = room ? roomWords(call) : ''; return head + (r ? ', ' + r : '') + '.'; }
-    if (!room) return head + ', ' + phrase + '.';
-    const n = doorNo(call.roomName);
-    if (n && /ambulan/i.test(call.roomName || '')) return head + ', ' + phrase + ' do ambulancie číslo ' + skNumber(Number(n)) + '.';
-    return head + ', ' + phrase + '.' + (call.roomName ? ' ' + call.roomName + '.' : '');
+    const p = pickPhrase(v.style || 'nahodne');
+    const f = v.room !== false ? roomForms(call) : null;
+    const t = f ? p.r : p.n;
+    return t.replace('{k}', codeWords(call.code)).replace('{do}', f && f.do).replace('{v}', f && f.v)
+      .replace('{Amb}', f && f.amb.charAt(0).toUpperCase() + f.amb.slice(1)).replace('{amb}', f && f.amb);
   }
   /** Slovenský hlas: prednosť má ženský prirodzený (Edge: „Viktória Online (Natural)“), mužský len ak iný nie je. */
   let skVoice = null;

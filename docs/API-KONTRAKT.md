@@ -247,7 +247,7 @@ Podklad: `docs/dizajn-v3/DIZAJN-MANUAL.md` a `tokens.css`. Obrazovka je pevná p
 
 ## Verzia 3.1 – hlasové hlásenie
 
-- Nastavenie `voice` = `{ enabled, rate (0,6 – 1,4), room, style }`; `style` = `prosim` (predvolené: „Číslo dvadsaťpäť, prosím, môžete vstúpiť do ambulancie číslo jeden.“) | `nechsapaci` („…, nech sa páči, vstúpte do ambulancie číslo jeden.“) | `kratke` („Číslo dvadsaťpäť, ambulancia jedna.“); `displayState.voice` (vypnutý zvuk = vypnutý aj hlas).
+- Nastavenie `voice` = `{ enabled, rate (0,6 – 1,4), room, style }`; `style` = `nahodne` (predvolené – náhodne 1 z 12 viet v PHRASES v apps/tv/web/app.js, bez opakovania po sebe) alebo id pevnej vety (`kratke`, `prosim`, `nechsapaci`, `cakame`, `narade`, …); `displayState.voice` (vypnutý zvuk = vypnutý aj hlas).
 - TV po signáli marimba (~1,45 s) prečíta cez Web Speech API slovenským hlasom: „Číslo dvadsaťpäť, ambulancia jedna.“,
   „Písmeno bé, ambulancia dva.“, „Označenie ká dvanásť, …“. Výber hlasu: ženský sk-* „Online (Natural)“ (Viktória) → iný ženský (Laura, Google) → mužský len ako záloha.
   Bez slovenského hlasu sa nehlási a v lište TV je štítok „Chýba slovenský hlas“. `?hlas=test` = skúšobné hlásenie.
