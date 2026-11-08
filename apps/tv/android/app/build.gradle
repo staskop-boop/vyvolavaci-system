@@ -1,0 +1,45 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'sk.adna.obrazovka'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'sk.adna.obrazovka'
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    // Podpisový kľúč pre release: vytvorte súbor keystore.properties (pozri README.md).
+    def ksFile = rootProject.file('keystore.properties')
+    if (ksFile.exists()) {
+        def ks = new Properties()
+        ksFile.withInputStream { ks.load(it) }
+        signingConfigs {
+            release {
+                storeFile rootProject.file(ks['storeFile'])
+                storePassword ks['storePassword']
+                keyAlias ks['keyAlias']
+                keyPassword ks['keyPassword']
+            }
+        }
+        buildTypes.release.signingConfig signingConfigs.release
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+// Žiadne externé závislosti – iba Android SDK.

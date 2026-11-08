@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dočasná ikona (nie oficiálne logo). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#C8102E" android:pathData="M8,4h32a4,4 0,0 1,4 4v32a4,4 0,0 1,-4 4h-32a4,4 0,0 1,-4 -4v-32a4,4 0,0 1,4 -4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M14,14h20v5h-20z M14,22h20v5h-20z M14,30h12v5h-12z" />
+    <path android:fillColor="#111111" android:pathData="M4,38h40v2a4,4 0,0 1,-4 4h-32a4,4 0,0 1,-4 -4z" />
+</vector>

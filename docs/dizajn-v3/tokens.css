@@ -1,0 +1,107 @@
+/* AdNa – vyvolávací systém · dizajnové tokeny */
+:root {
+  /* Farby */
+  --adna-red: #BC1A21;
+  --adna-red-dark: #8E1219;
+  --adna-red-deep: #A3151B;
+  --adna-red-light: #D62B33;
+  --adna-red-wave: #C9242B;
+  --adna-rose: #F0A5A8;
+  --adna-blush: #FFF4F4;
+  --adna-blush-border: #F3C9CB;
+  --adna-grey: #434242;
+  --adna-black: #1A1A1A;
+  --adna-tv-black: #0B0B0C;
+  --adna-white: #FFFFFF;
+  --adna-live-coral: #FF6B70; /* ikony na tmavých kartách */
+
+  /* Písma */
+  --font-display: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --font-body: Inter, system-ui, sans-serif;
+
+  /* Typografická škála (TV 1920×1080) */
+  --fs-ticket-call: 168px;  /* číslo pri vyvolaní */
+  --fs-ticket: 76px;        /* číslo v karte „Práve vyšetrujeme" */
+  --fs-ticket-small: 60px;  /* druhá ambulancia v stave vyvolania */
+  --fs-clock: 54px;
+  --fs-h1: 30px;
+  --fs-room: 27px;
+  --fs-card-title: 22px;    /* + letter-spacing .08em, uppercase */
+  --fs-chip: 24px;
+  --fs-ticker: 24px;
+  --fs-body: 17px;
+  --fs-meta: 15px;
+  --fs-tag: 13px;           /* + letter-spacing .1em, uppercase */
+
+  /* Rádiusy */
+  --r-card: 28px;
+  --r-tile: 18px;
+  --r-chip: 14px;
+  --r-pill: 999px;
+
+  /* Rozostupy */
+  --page-margin: 48px;
+  --gap-main: 32px;
+  --gap-column: 16px;
+  --card-pad: 20px 26px 22px;
+
+  /* Rámy a tiene („pekné orámovanie" okien) */
+  --card-frame: 2px solid rgba(255,255,255,0.9);
+  --card-inner-line: inset 0 0 0 1px rgba(188,26,33,0.16);
+  --card-shadow: 0 24px 60px rgba(110,14,20,0.18);
+  --card-shadow-strong: 0 30px 70px rgba(110,14,20,0.40);
+  --dark-shadow: 0 24px 60px rgba(26,26,26,0.28);
+  --tile-shadow: 0 14px 30px rgba(188,26,33,0.28);
+
+  /* Pozadie – prechod vĺn */
+  --bg-wave-gradient: linear-gradient(180deg, #A3151B 0%, #C9242B 16%, #F0A5A8 34%, #FFFFFF 50%, #FFFFFF 100%);
+  --dark-card-glow: radial-gradient(120% 90% at 100% 0%, rgba(188,26,33,0.45) 0%, rgba(188,26,33,0) 60%);
+
+  /* Časovanie */
+  --t-call: 8s;        /* trvanie zvýraznenia vyvolania */
+  --t-pulse: 1.4s;
+  --t-ticker: 48s;
+}
+
+.adna-card {
+  background: var(--adna-white);
+  border-radius: var(--r-card);
+  border: var(--card-frame);
+  box-shadow: var(--card-shadow), var(--card-inner-line);
+  padding: var(--card-pad);
+}
+.adna-card--dark {
+  background: var(--adna-black);
+  background-image: var(--dark-card-glow);
+  color: var(--adna-white);
+  border: 2px solid rgba(255,255,255,0.08);
+  box-shadow: var(--dark-shadow);
+}
+.adna-card--call {
+  background: var(--adna-red);
+  color: var(--adna-white);
+  box-shadow: var(--card-shadow-strong), inset 0 0 0 1px rgba(255,255,255,0.25);
+}
+.adna-ticket {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  border-radius: var(--r-tile);
+  color: var(--adna-white);
+  display: flex; align-items: center; justify-content: center;
+}
+.adna-ticket--a { background: var(--adna-red); box-shadow: var(--tile-shadow); }
+.adna-ticket--b { background: var(--adna-grey); }
+.adna-chip {
+  font-family: var(--font-display); font-weight: 800; font-size: var(--fs-chip);
+  font-variant-numeric: tabular-nums;
+  padding: 8px 12px; min-width: 66px; text-align: center;
+  border-radius: var(--r-chip); border: 2px solid var(--adna-red); background: var(--adna-white);
+}
+.adna-chip--b { border-color: var(--adna-grey); }
+.adna-tag {
+  font-size: var(--fs-tag); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 8px; background: var(--adna-red); color: var(--adna-white);
+}
+.adna-pill { border-radius: var(--r-pill); }

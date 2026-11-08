@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdNa – obrazovka v čakárni</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- v3: dizajn z Claude Design (2026-11-08). Pevná plocha 1920 × 1080, ktorá sa zmenší/zväčší podľa obrazovky. -->
+<div class="stage" id="stage">
+
+  <!-- Pozadie: červený prechod + hodvábne vlny (motív M. Brycha) – statické -->
+  <svg class="bg" aria-hidden="true" viewBox="0 0 1920 1080" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="mainBg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#A3151B" id="bgStop0"></stop>
+        <stop offset="0.16" stop-color="#C9242B" id="bgStop1"></stop>
+        <stop offset="0.34" stop-color="#F0A5A8"></stop>
+        <stop offset="0.5" stop-color="#FFFFFF"></stop>
+        <stop offset="1" stop-color="#FFFFFF"></stop>
+      </linearGradient>
+      <linearGradient id="silk1" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"></stop><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.55"></stop><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"></stop></linearGradient>
+      <linearGradient id="silk2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0.1"></stop><stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.75"></stop><stop offset="1" stop-color="#FFFFFF" stop-opacity="0.15"></stop></linearGradient>
+      <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8E1219" stop-opacity="0"></stop><stop offset="0.45" stop-color="#8E1219" stop-opacity="0.45"></stop><stop offset="1" stop-color="#8E1219" stop-opacity="0"></stop></linearGradient>
+      <linearGradient id="footWave" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#F9E3E4" stop-opacity="0.9"></stop><stop offset="1" stop-color="#FBEFF0" stop-opacity="0.3"></stop></linearGradient>
+    </defs>
+    <rect x="0" y="0" width="1920" height="1080" fill="url(#mainBg)"></rect>
+    <path d="M0 150 C 420 90, 720 250, 1080 190 C 1380 140, 1640 250, 1920 170 L1920 0 L0 0 Z" fill="url(#ribbon)"></path>
+    <path d="M0 330 C 380 240, 700 420, 1060 320 C 1360 240, 1660 380, 1920 280 L1920 560 L0 560 Z" fill="url(#silk1)"></path>
+    <path d="M0 400 C 300 320, 620 470, 960 390 C 1300 310, 1600 450, 1920 360 L1920 600 L0 600 Z" fill="url(#silk2)"></path>
+    <path d="M0 290 C 480 190, 820 360, 1200 270 C 1500 200, 1720 330, 1920 240" fill="none" stroke="#FFFFFF" stroke-opacity="0.7" stroke-width="2"></path>
+    <path d="M0 365 C 420 280, 760 440, 1120 350 C 1420 275, 1680 400, 1920 320" fill="none" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="1.5"></path>
+    <path d="M0 980 C 400 920, 760 1040, 1120 980 C 1440 930, 1700 1020, 1920 960 L1920 1080 L0 1080 Z" fill="url(#footWave)"></path>
+  </svg>
+
+  <!-- Sezónna vrstva (vločky a pod.) – za oknami, nikdy cez text -->
+  <div class="deco" id="deco" aria-hidden="true"></div>
+
+  <!-- HLAVIČKA -->
+  <header class="hdr">
+    <div class="lights" id="lights" aria-hidden="true"></div>
+    <div class="hdr-brand">
+      <img class="logo" src="assets/adna-logo.png" alt="AdNa s.r.o.">
+      <div class="hdr-div"></div>
+      <div class="hdr-text">
+        <div class="hdr-title" id="hTitle">Ambulancia cievnej chirurgie</div>
+        <div class="hdr-sub">
+          <span id="hAddress">AdNa s.r.o. · Krivá 17, Košice</span>
+          <span class="phone" id="hPhoneBox"><svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"></path></svg><span id="hPhone">Call centrum 0918 216 905</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="weather hidden" id="weather" aria-label="Počasie">
+      <div class="w-now">
+        <div class="w-icon" id="wIcon"></div>
+        <div class="w-txt"><div class="w-temp" id="wTemp"></div><div class="w-desc" id="wText"></div></div>
+      </div>
+      <div class="w-sep"></div>
+      <div class="w-days" id="wDays"></div>
+    </div>
+
+    <div class="clock-box">
+      <div class="clock"><span id="clock">--:--</span><span class="sec">:<span id="clockSec">--</span></span></div>
+      <div class="date"><span id="date"></span><span id="nameday"></span></div>
+    </div>
+  </header>
+
+  <!-- TELO -->
+  <main class="body">
+    <section class="left" id="left" aria-label="Poradie pacientov">
+
+      <!-- Vyvolanie (zobrazí sa pri novom čísle) -->
+      <div class="card call-card hidden" id="callCard" aria-live="assertive">
+        <div class="cc-head">
+          <h2><svg aria-hidden="true" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9v6a6 6 0 0 0 12 0V9"></path><path d="M12 3v2M4.5 12H3M21 12h-1.5"></path><path d="M12 19v2"></path><path d="M8 5l-1.5-1.5M16 5l1.5-1.5"></path></svg>Vyvolávame</h2>
+          <span class="cc-pill">prosíme, vstúpte</span>
+        </div>
+        <div class="cc-grid" id="ccGrid">
+          <div class="cc-code pulse" id="callCode">0</div>
+          <figure class="cc-doc" id="callDoc">
+            <div class="cc-initials" id="callDocInit"></div>
+            <img class="kenburns" id="callDocImg" alt="">
+            <div class="cc-point" id="callPoint">
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12"></path><path d="M11 11.5v-2a1.5 1.5 0 0 1 3 0V12"></path><path d="M14 11.5v-1a1.5 1.5 0 0 1 3 0V13"></path><path d="M17 12.5a1.5 1.5 0 0 1 3 0V16a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-2.7L4.6 15a1.6 1.6 0 0 1 2.6-1.8L8 14.5"></path></svg>
+              <svg class="pt-arrow" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+            </div>
+            <figcaption><span class="cap-tag">Poďte ďalej</span><span id="callDocCap"></span></figcaption>
+          </figure>
+        </div>
+        <div class="cc-room" id="callRoom">—</div>
+        <div class="cc-sub" id="callSub"></div>
+        <div class="cc-bar"><div id="callBar"></div></div>
+      </div>
+
+      <!-- Práve vyšetrujeme -->
+      <div class="card rooms-card" id="roomsCard">
+        <div class="rc-head" id="rcHead">
+          <h2><span class="live-dot"></span>Práve vyšetrujeme</h2>
+          <span class="rc-count" id="rcCount"></span>
+        </div>
+        <div class="rc-rows" id="roomRows"></div>
+      </div>
+
+      <!-- Nasledujú -->
+      <div class="card next-card" id="nextCard">
+        <div class="nc-head">
+          <h2>Nasledujú</h2>
+          <span class="nc-wait" id="queueWait"></span>
+        </div>
+        <ol class="chips" id="queueList"></ol>
+        <div class="nc-empty hidden" id="queueEmpty">Momentálne nikto nečaká.</div>
+      </div>
+
+      <!-- Informácie pre pacientov -->
+      <div class="card dark info-card" id="infoCard">
+        <h2>Informácie pre pacientov</h2>
+        <ul class="info-list" id="infoList"></ul>
+      </div>
+    </section>
+
+    <!-- TV ANTIK -->
+    <section class="tv" id="tvZone" aria-label="Televízne vysielanie">
+      <div class="tv-video" id="tvVideo">
+        <div class="tv-placeholder" id="tvPlaceholder">
+          <svg aria-hidden="true" viewBox="0 0 64 64" width="72" height="72" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="12" width="52" height="34" rx="5"></rect><path d="M22 54h20M32 46v8"></path><path d="M26 22l12 7-12 7z" fill="currentColor" stroke="none"></path></svg>
+          <div class="tv-ph-title">Okno pre vysielanie TV Antik</div>
+          <div class="tv-ph-text">Sem sa umiestni okno prehrávača alebo obraz z HDMI vstupu (16 : 9).</div>
+        </div>
+      </div>
+
+      <div class="tv-banner tv-announce hidden" id="tvAnnounce" role="alert">
+        <span class="ann-tag">Oznam</span>
+        <div class="ann-text" id="tvAnnText"></div>
+      </div>
+
+      <div class="tv-banner tv-call hidden" id="tvCall" aria-hidden="true">
+        <div class="tb-code" id="tvCallCode">0</div>
+        <img class="tb-doc" id="tvCallImg" alt="">
+        <div class="tb-text">
+          <div class="tb-title" id="tvCallTitle"></div>
+          <div class="tb-sub" id="tvCallSub"></div>
+        </div>
+      </div>
+
+      <div class="tv-bar">
+        <div class="tvb-left"><span class="live">Live</span><span class="tvb-name" id="tvLabel">TV Antik</span><span class="tvb-note">· aktuálne vysielanie</span></div>
+        <div class="tvb-right">
+          <span class="greeting hidden" id="greeting"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#C9A227" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.3l5-.7z" fill="#C9A227"></path></svg><span id="greetingText"></span></span>
+          <span class="pill warn hidden" id="soundWarn">Zvuk nie je aktívny</span>
+          <span class="pill warn hidden" id="voiceWarn">Chýba slovenský hlas</span>
+          <span class="pill hidden" id="offline">offline</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- LIŠTA SPRÁV (pri mimoriadnom ozname ukáže oznam) -->
+  <footer class="ticker" id="ticker">
+    <div class="tk-label" id="tickerLabel">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12v12H6a2 2 0 0 1-2-2V6z"></path><path d="M16 9h3a1 1 0 0 1 1 1v6a2 2 0 0 1-2 2"></path><path d="M7 10h6M7 14h6"></path></svg>
+      <span id="tickerLabelText">Správy</span>
+    </div>
+    <div class="tk-track" id="tickerTrack"><div class="tk-move" id="tickerMove"></div></div>
+    <div class="tk-ann hidden" id="tickerAnn"></div>
+    <div class="tk-src" id="tickerSrc"></div>
+  </footer>
+
+  <div class="overlay hidden" id="soundOverlay" role="dialog" aria-label="Zapnutie zvuku">
+    <div class="overlay-box">
+      <div class="overlay-title">Zvuk je zablokovaný prehliadačom</div>
+      <p>Pre zvukový signál pri vyvolaní stlačte na diaľkovom ovládači <strong>OK</strong> (alebo kliknite).</p>
+      <button id="soundBtn" class="big-btn" autofocus>Zapnúť zvuk</button>
+      <button id="soundLater" class="link-btn">Teraz nie</button>
+    </div>
+  </div>
+</div>
+
+<script src="/shared/adna-client.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

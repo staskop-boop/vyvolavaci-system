@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#c8102e">
+<title>AdNa – Prihlásenie do poradia</title>
+<link rel="stylesheet" href="/shared/adna-theme.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="offline" class="offline" hidden role="status">Bez spojenia so serverom – obnovujem…</div>
+
+<main id="screen-start" class="screen" aria-live="polite">
+  <div class="brand"><span class="adna-wordmark">Ad<span class="accent">Na</span></span></div>
+  <p class="lead">Vitajte. Prihláste sa do poradia stlačením tlačidla.</p>
+  <button id="btn-register" class="big-btn" type="button">Prihlásiť sa</button>
+  <p class="hint">Nepotrebujete zadávať žiadne osobné údaje.</p>
+</main>
+
+<main id="screen-busy" class="screen" hidden aria-live="polite">
+  <div class="spinner" aria-hidden="true"></div>
+  <p class="lead" id="busy-text">Prideľujem poradové číslo…</p>
+</main>
+
+<main id="screen-result" class="screen" hidden aria-live="assertive">
+  <p class="label">Vaše poradové číslo je</p>
+  <div id="ticket-code" class="code">A000</div>
+  <p class="instruction" id="instruction">Posaďte sa, prosím, a sledujte obrazovku v čakárni.</p>
+  <p id="print-status" class="print-status"></p>
+  <button id="btn-done" class="done-btn" type="button">Hotovo</button>
+  <p class="countdown" id="countdown"></p>
+</main>
+
+<main id="screen-error" class="screen" hidden aria-live="assertive">
+  <div class="err-icon" aria-hidden="true">!</div>
+  <p class="lead" id="error-text">Registrácia sa nepodarila.</p>
+  <p class="hint" id="error-detail">Skúste to, prosím, znova. Ak problém pretrváva, obráťte sa na sestru.</p>
+  <div class="row">
+    <button id="btn-retry" class="big-btn small" type="button">Skúsiť znova</button>
+    <button id="btn-cancel" class="ghost-btn" type="button">Zrušiť</button>
+  </div>
+</main>
+
+<script src="/shared/adna-client.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

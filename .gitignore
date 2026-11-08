@@ -1,0 +1,48 @@
+# Závislosti
+node_modules/
+
+# Prevádzkové údaje servera – databáza, logy, inštalačný kód (nikdy necommitovať)
+server/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.log
+logs/
+zalohy/
+
+# Tajomstvá a lokálne nastavenia
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+cloudflared/*.json
+cert.pem
+
+# Android
+*.apk
+*.aab
+build/
+.gradle/
+local.properties
+*.keystore
+*.jks
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Testy a nástroje
+test-results/
+playwright-report/
+coverage/
+screenshots-test/
+
+# Editory a OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp

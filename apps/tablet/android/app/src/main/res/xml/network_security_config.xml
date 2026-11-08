@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Server beží v lokálnej sieti ambulancie cez HTTP. Pri prevádzke cez internet použite HTTPS
+     a nastavte cleartextTrafficPermitted="false". -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

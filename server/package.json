@@ -1,0 +1,24 @@
+{
+  "name": "adna-server",
+  "version": "1.0.0",
+  "description": "Spoločný server vyvolávacieho systému AdNa",
+  "main": "src/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning src/index.js",
+    "nastav-heslo": "node --disable-warning=ExperimentalWarning src/cli.js",
+    "test": "node --disable-warning=ExperimentalWarning --test --test-concurrency=1 test/*.test.js",
+    "zaloha": "node --disable-warning=ExperimentalWarning scripts/zaloha.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^4.22.3",
+    "ws": "^8.22.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.13"
+  }
+}

@@ -1,0 +1,28 @@
+/* Dizajnové tokeny AdNa – dočasný návrh. Oficiálne farby a logo doplňte tu (pozri docs/DIZAJN.md). */
+:root {
+  /* Farby AdNa: červená, čierna, biela */
+  --adna-primary: #c8102e;        /* červená AdNa – hlavné tlačidlá, čísla */
+  --adna-primary-dark: #9b0c23;
+  --adna-accent: #111111;         /* čierna – nadpisy, názov ambulancie, druhotné prvky */
+  --adna-accent-light: #f1f1f1;
+  --adna-bg: #ffffff;
+  --adna-surface: #f7f7f7;
+  --adna-border: #e0e0e0;
+  --adna-text: #111111;
+  --adna-muted: #5f5f5f;
+  --adna-ok: #1e7a45;
+  --adna-warn: #8a5a00;
+  --adna-warn-bg: #fff6e0;
+  /* Chyby sa neodlišujú len farbou (červená je farba značky): vždy majú ikonu ⚠ a text. */
+  --adna-danger: #8b1a1a;
+  --adna-danger-bg: #fdeeee;
+  --adna-radius: 14px;
+  --adna-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  --adna-font: "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--adna-bg); color: var(--adna-text); font-family: var(--adna-font); }
+/* Logo: kým nie je oficiálne logo, zobrazuje sa textový znak. Oficiálne logo vložte ako /shared/logo.svg
+   a v HTML nahraďte .adna-wordmark obrázkom (viď docs/DIZAJN.md). */
+.adna-wordmark { font-weight: 800; letter-spacing: 0.02em; color: var(--adna-accent); }
+.adna-wordmark .accent { color: var(--adna-primary); }

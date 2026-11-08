@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AdNa – Sestra</title>
+<meta name="theme-color" content="#c8102e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/shared/adna-theme.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar" id="topbar" hidden>
+  <div class="brand"><span class="adna-wordmark">Ad<span class="accent">Na</span></span><span class="brand-sub">Sestra</span></div>
+  <nav class="tabs" aria-label="Hlavná ponuka">
+    <button type="button" data-view="queue" class="tab">Zoznam</button>
+    <button type="button" data-view="history" class="tab">História</button>
+    <button type="button" data-view="admin" class="tab" id="tab-admin">Nastavenia</button>
+  </nav>
+  <div class="topright">
+    <span class="who" id="who"></span>
+    <span id="conn" class="conn conn-connecting" role="status" aria-live="polite">Pripája sa…</span>
+    <button type="button" class="btn btn-ghost" id="btn-logout">Odhlásiť</button>
+  </div>
+</header>
+<main id="view" tabindex="-1"><div class="center-msg">Načítava sa…</div></main>
+<div id="toasts" class="toasts" aria-live="assertive"></div>
+<div id="modal-root"></div>
+<script src="/shared/adna-client.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

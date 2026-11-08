@@ -1,0 +1,17 @@
+# systemd jednotka pre Linux (napr. mini PC / Raspberry Pi). Kopírovať do /etc/systemd/system/adna.service
+[Unit]
+Description=AdNa vyvolávací systém – server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=adna
+WorkingDirectory=/opt/adna/server
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/index.js
+Restart=always
+RestartSec=3
+Environment=ADNA_PORT=8080
+
+[Install]
+WantedBy=multi-user.target

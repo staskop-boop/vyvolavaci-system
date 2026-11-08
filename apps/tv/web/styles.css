@@ -1,0 +1,278 @@
+/* AdNa – obrazovka v čakárni, v3 podľa dizajnu z Claude Design (2026-11-08).
+   Pevná plocha 1920 × 1080 px (.stage), mierka sa nastaví v app.js. Tokeny = tokens.css z dizajnového balíka. */
+:root {
+  --adna-red: #BC1A21; --adna-red-dark: #8E1219; --adna-red-deep: #A3151B; --adna-red-light: #D62B33;
+  --adna-rose: #F0A5A8; --adna-blush: #FFF4F4; --adna-blush-border: #F3C9CB;
+  --adna-grey: #434242; --adna-black: #1A1A1A; --adna-tv-black: #0B0B0C; --adna-white: #FFFFFF; --adna-coral: #FF6B70;
+  --ok: #1E7B45; --ok-bg: #E3F4EA;
+  --font-display: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --font-body: Inter, system-ui, sans-serif;
+  --r-card: 28px; --r-tile: 18px; --r-chip: 14px;
+  --card-frame: 2px solid rgba(255,255,255,0.9);
+  --card-inner-line: inset 0 0 0 1px rgba(188,26,33,0.16);
+  --card-shadow: 0 24px 60px rgba(110,14,20,0.18);
+  --dark-card-glow: radial-gradient(120% 90% at 100% 0%, rgba(188,26,33,0.45) 0%, rgba(188,26,33,0) 60%);
+  --t-call: 15s;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--adna-black); }
+body { font-family: var(--font-body); color: var(--adna-black); -webkit-font-smoothing: antialiased; }
+h2 { margin: 0; }
+.hidden { display: none !important; }
+
+.stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; background: #fff;
+  display: flex; flex-direction: column; transform-origin: top left; }
+.bg { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+.deco { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+.card { background: var(--adna-white); border-radius: var(--r-card); border: var(--card-frame);
+  box-shadow: var(--card-shadow), var(--card-inner-line); }
+.card.dark { background: var(--adna-black); background-image: var(--dark-card-glow); color: #fff;
+  border: 2px solid rgba(255,255,255,0.08); box-shadow: 0 24px 60px rgba(26,26,26,0.28); }
+
+/* ---------- hlavička ---------- */
+.hdr { position: relative; z-index: 1; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 28px;
+  margin: 36px 48px 0; padding: 18px 36px 18px 28px; height: 112px; background: rgba(255,255,255,0.96); border: var(--card-frame);
+  border-radius: 28px; box-shadow: 0 24px 60px rgba(110,14,20,0.22), inset 0 0 0 1px rgba(188,26,33,0.14); }
+.hdr-brand { display: flex; align-items: center; gap: 24px; }
+.logo { height: 80px; width: auto; display: block; }
+.hdr-div { width: 2px; height: 56px; background: linear-gradient(180deg, rgba(188,26,33,0) 0%, #BC1A21 50%, rgba(188,26,33,0) 100%); }
+.hdr-text { display: flex; flex-direction: column; gap: 6px; }
+.hdr-title { font-family: var(--font-display); font-weight: 800; font-size: 38px; line-height: 1.05; letter-spacing: -0.015em; white-space: nowrap; }
+.hdr-sub { display: flex; align-items: center; gap: 14px; font-size: 17px; font-weight: 500; color: var(--adna-grey); white-space: nowrap; }
+.phone { display: inline-flex; align-items: center; gap: 7px; padding: 3px 12px 3px 8px; border-radius: 999px; background: var(--adna-red);
+  color: #fff; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.weather { justify-self: center; display: flex; align-items: center; gap: 24px; padding: 6px 24px 6px 14px; border-radius: 22px;
+  background: var(--adna-blush); border: 1px solid var(--adna-blush-border); }
+.w-now { display: flex; align-items: center; gap: 14px; }
+.w-icon { width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; }
+.w-txt { display: flex; flex-direction: column; line-height: 1.05; gap: 3px; }
+.w-temp { font-family: var(--font-display); font-weight: 800; font-size: 42px; line-height: 1; font-variant-numeric: tabular-nums; }
+.w-desc { font-size: 18px; font-weight: 700; white-space: nowrap; }
+.w-sep { width: 2px; height: 60px; background: var(--adna-blush-border); }
+.w-days { display: flex; gap: 22px; }
+.w-day { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 64px; }
+.w-day b { font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.w-day span { font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.w-day i { color: var(--adna-grey); font-weight: 600; font-style: normal; }
+
+.clock-box { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; min-width: 400px; padding: 0 8px; }
+.clock { display: flex; align-items: baseline; gap: 2px; font-family: var(--font-display); font-weight: 800; color: var(--adna-red);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.clock > span:first-child { font-size: 56px; line-height: 1; }
+.clock .sec { font-size: 26px; line-height: 1; color: var(--adna-red-light); }
+.date { font-size: 17px; font-weight: 600; color: var(--adna-grey); margin-top: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.date strong { color: var(--adna-black); }
+
+/* ---------- telo ---------- */
+.body { position: relative; z-index: 1; flex: 1 1 auto; display: grid; grid-template-columns: 560px minmax(0, 1fr); gap: 32px;
+  margin: 28px 48px 0; min-height: 0; }
+.left { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.left.calling { gap: 20px; }
+
+/* Práve vyšetrujeme */
+.rooms-card { padding: 18px 26px 20px; display: flex; flex-direction: column; gap: 10px; flex: none; }
+.rc-head { display: flex; align-items: center; justify-content: space-between; }
+.rc-head h2 { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 800; font-size: 24px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--adna-red); }
+.live-dot { width: 12px; height: 12px; border-radius: 999px; background: var(--adna-red); box-shadow: 0 0 0 5px rgba(188,26,33,0.15);
+  display: inline-block; animation: adnaLive 1.6s ease-in-out infinite; }
+@keyframes adnaLive { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.rc-count { font-size: 15px; font-weight: 600; color: var(--adna-grey); background: #F5F5F5; padding: 6px 14px; border-radius: 999px; }
+.rc-rows { display: flex; flex-direction: column; gap: 10px; }
+.room { display: grid; grid-template-columns: 184px minmax(0, 1fr) 76px; gap: 14px; align-items: center; padding: 8px 12px; border-radius: 22px;
+  background: linear-gradient(135deg, #FFF4F4 0%, #FFFFFF 70%); border: 1px solid var(--adna-blush-border); }
+.tile { color: #fff; border-radius: var(--r-tile); height: 84px; display: flex; align-items: center; justify-content: center; font-family: var(--font-display);
+  font-weight: 800; font-size: 64px; letter-spacing: -0.02em; box-shadow: 0 14px 30px rgba(188,26,33,0.28); font-variant-numeric: tabular-nums; }
+.tile.c0 { background: var(--adna-red); } .tile.c1 { background: var(--adna-grey); } .tile.c2 { background: var(--adna-black); }
+.tile.empty { font-size: 40px; opacity: 0.55; }
+.r-text { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.r-name { font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 1.1; white-space: nowrap; overflow: hidden; letter-spacing: -0.01em; }
+.r-doc { font-size: 16px; font-weight: 600; color: var(--adna-grey); }
+.r-door { display: inline-flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 16px; font-weight: 700; color: var(--adna-red); }
+.r-late { grid-column: 1 / -1; font-size: 15px; font-weight: 700; color: #fff; background: var(--adna-red); border-radius: 12px; padding: 7px 12px; line-height: 1.3; }
+.avatar { width: 76px; height: 76px; border-radius: 999px; object-fit: cover; object-position: 50% 12%; border: 3px solid #fff;
+  box-shadow: 0 8px 20px rgba(110,14,20,0.25); display: flex; align-items: center; justify-content: center; background: var(--adna-blush);
+  font-family: var(--font-display); font-weight: 800; font-size: 26px; color: var(--adna-red); }
+/* kompaktná karta pri vyvolaní (ostatné ambulancie) */
+.rooms-card.compact { padding: 18px 28px; gap: 12px; }
+.rooms-card.compact .rc-head { display: none; }
+.rooms-card.compact .room { grid-template-columns: 150px minmax(0, 1fr) 72px; gap: 18px; padding: 0; background: none; border: 0; border-radius: 0; }
+.rooms-card.compact .tile { height: 96px; font-size: 60px; box-shadow: none; }
+.rooms-card.compact .r-kicker { display: block; }
+.rooms-card.compact .r-door { display: none; }
+.rooms-card.compact .r-doc .door-inline { display: inline; }
+.r-kicker { display: none; font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--adna-grey); }
+.door-inline { display: none; }
+
+/* Nasledujú */
+.next-card { padding: 14px 22px 14px 26px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex: none; }
+.nc-head { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.nc-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 17px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--adna-grey); }
+.nc-wait { font-size: 13px; font-weight: 600; color: var(--adna-grey); white-space: nowrap; }
+.nc-wait b.late { color: var(--adna-red); } .nc-wait b.ok { color: var(--ok); }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: nowrap; }
+.chip { min-width: 60px; padding: 5px 6px 4px; border-radius: 12px; background: #fff; border: 2px solid var(--adna-red); text-align: center;
+  box-shadow: 0 6px 16px rgba(26,26,26,0.06); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.chip.c1 { border-color: var(--adna-grey); } .chip.c2 { border-color: var(--adna-black); }
+.c-code { font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.c-delta { font-size: 12px; font-weight: 800; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-delta.late { color: var(--adna-red); } .c-delta.early, .c-delta.ontime { color: var(--ok); } .c-delta.none { color: var(--adna-grey); font-weight: 600; }
+.nc-empty { font-size: 16px; font-weight: 600; color: var(--adna-grey); }
+.chip.cut { display: none; }
+/* pri vyvolaní: tmavá karta s veľkými čipmi */
+.left.calling .next-card { flex: 1 1 auto; min-height: 0; overflow: hidden; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 16px;
+  padding: 22px 28px 24px; background: var(--adna-black); background-image: var(--dark-card-glow); color: #fff; border: 2px solid rgba(255,255,255,0.08);
+  box-shadow: 0 24px 60px rgba(26,26,26,0.28); }
+.left.calling .nc-head { flex-direction: row; align-items: center; justify-content: space-between; }
+.left.calling .nc-head h2 { font-size: 22px; color: #fff; }
+.left.calling .nc-wait { font-size: 15px; color: rgba(255,255,255,0.75); }
+.left.calling .nc-wait b.late { color: #fff; } .left.calling .nc-wait b.ok { color: #8FE3B0; }
+.left.calling .chips { flex-wrap: wrap; gap: 12px; }
+.left.calling .chip { min-width: 86px; padding: 8px 14px; border-radius: 16px; background: rgba(255,255,255,0.08); box-shadow: none; }
+.left.calling .chip.c1, .left.calling .chip.c2 { border-color: rgba(255,255,255,0.35); }
+.left.calling .c-code { font-size: 28px; color: #fff; }
+.left.calling .c-delta.late { color: var(--adna-coral); } .left.calling .c-delta.early, .left.calling .c-delta.ontime { color: #8FE3B0; }
+.left.calling .c-delta.none { color: rgba(255,255,255,0.6); }
+.left.calling .nc-empty { color: rgba(255,255,255,0.7); }
+.left.calling .info-card { display: none; }
+
+/* Informácie pre pacientov */
+.info-card { flex: 1 1 auto; padding: 18px 26px 20px; display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: hidden; }
+.info-card h2 { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; }
+.info-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.info-list li { display: flex; gap: 14px; align-items: flex-start; font-size: 16px; line-height: 1.35; font-weight: 500; color: rgba(255,255,255,0.92); }
+.info-list li svg { flex: none; margin-top: 1px; }
+.info-list strong { color: #fff; }
+
+/* Vyvolávame */
+.call-card { position: relative; overflow: hidden; background: var(--adna-red); color: #fff; padding: 26px 28px 28px; display: flex; flex-direction: column; gap: 18px;
+  box-shadow: 0 30px 70px rgba(110,14,20,0.4), inset 0 0 0 1px rgba(255,255,255,0.25);
+  background-image: radial-gradient(120% 100% at 100% 100%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0) 60%); flex: none; }
+.cc-head { display: flex; align-items: center; justify-content: space-between; }
+.cc-head h2 { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: 0.1em; text-transform: uppercase; }
+.cc-pill { font-size: 15px; font-weight: 700; background: rgba(255,255,255,0.18); padding: 6px 14px; border-radius: 999px; }
+.cc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 14px; align-items: stretch; }
+.cc-grid.no-doc { grid-template-columns: minmax(0, 1fr); }
+.cc-code { background: #fff; color: var(--adna-red); border-radius: 24px; height: 196px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 136px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; }
+.cc-code.long { font-size: 96px; }
+.pulse { animation: adnaPulse 1.4s ease-in-out infinite; }
+@keyframes adnaPulse { 0%, 100% { transform: scale(1); box-shadow: 0 18px 40px rgba(188,26,33,0.35), 0 0 0 0 rgba(188,26,33,0.45); }
+  50% { transform: scale(1.03); box-shadow: 0 22px 50px rgba(188,26,33,0.45), 0 0 0 22px rgba(188,26,33,0); } }
+.cc-doc { margin: 0; position: relative; height: 196px; border-radius: 22px; overflow: hidden; background: #F3E9E9; border: 3px solid #fff;
+  box-shadow: 0 14px 30px rgba(110,14,20,0.35); }
+.cc-doc img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; display: block; }
+.cc-initials { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800;
+  font-size: 64px; color: var(--adna-red); padding-bottom: 40px; }
+.kenburns { animation: adnaKenburns 8s ease-in-out infinite alternate; transform-origin: 50% 20%; }
+@keyframes adnaKenburns { 0% { transform: scale(1) translate(0, 0); } 100% { transform: scale(1.1) translate(0, -3%); } }
+.cc-point { position: absolute; right: 10px; top: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 8px; border-radius: 999px;
+  background: var(--adna-red); color: #fff; box-shadow: 0 8px 18px rgba(188,26,33,0.4); animation: adnaPointRight 1.1s ease-in-out infinite; }
+.cc-point.left { right: auto; left: 10px; flex-direction: row-reverse; animation-name: adnaPointLeft; }
+.cc-point.left .pt-arrow { transform: scaleX(-1); }
+.cc-point.straight .pt-arrow { transform: rotate(-90deg); }
+.cc-point.none { display: none; }
+@keyframes adnaPointRight { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(8px); } }
+@keyframes adnaPointLeft { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-8px); } }
+.cc-doc figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 12px; background: linear-gradient(180deg, rgba(26,26,26,0) 0%, rgba(26,26,26,0.95) 55%);
+  color: #fff; display: flex; flex-direction: column; gap: 4px; }
+.cap-tag { align-self: flex-start; padding: 2px 8px; border-radius: 6px; background: var(--adna-red); font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+#callDocCap { font-size: 14px; font-weight: 700; line-height: 1.2; }
+.cc-room { font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.1; margin-bottom: -14px; }
+.cc-sub { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.85); }
+.cc-sub strong { color: #fff; }
+.cc-bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.25); overflow: hidden; }
+.cc-bar div { height: 6px; border-radius: 999px; background: #fff; width: 100%; }
+.cc-bar div.run { animation: adnaBar var(--t-call) linear forwards; }
+@keyframes adnaBar { from { width: 100%; } to { width: 0%; } }
+
+/* ---------- TV ---------- */
+.tv { position: relative; min-height: 0; border-radius: 28px; background: var(--adna-tv-black); border: var(--card-frame);
+  box-shadow: 0 30px 80px rgba(110,14,20,0.26), inset 0 0 0 1px rgba(188,26,33,0.35); overflow: hidden; display: flex; flex-direction: column; }
+.tv-video { position: relative; flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(80% 80% at 50% 40%, #202024 0%, #0B0B0C 100%); }
+.tv-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.zone-empty .tv-video { background: #000; }
+.zone-empty .tv-placeholder { display: none; }
+.tv-placeholder { display: flex; flex-direction: column; align-items: center; gap: 18px; color: rgba(255,255,255,0.55); text-align: center; }
+.tv-ph-title { font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: 0.1em; text-transform: uppercase; }
+.tv-ph-text { font-size: 16px; }
+.tv-bar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; height: 58px; background: rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(255,255,255,0.08); color: #fff; }
+.tvb-left, .tvb-right { display: flex; align-items: center; gap: 12px; }
+.live { padding: 5px 12px; border-radius: 999px; background: var(--adna-red); font-size: 13px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.tvb-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.tvb-note { font-size: 15px; color: rgba(255,255,255,0.6); }
+.pill { padding: 5px 12px; border-radius: 999px; background: #5b5b5b; color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.pill.warn { background: #8a5a00; }
+.greeting { display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 10px; border-radius: 999px; background: var(--adna-red); white-space: nowrap;
+  font-family: var(--font-display); font-weight: 700; font-size: 16px; transform-origin: top center; animation: adnaSway 4s ease-in-out infinite; }
+@keyframes adnaSway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+
+.tv-banner { position: absolute; left: 32px; right: 32px; top: 32px; z-index: 2; display: flex; align-items: center; gap: 22px; padding: 18px 28px; border-radius: 22px;
+  background: rgba(255,255,255,0.96); border: 2px solid #fff; box-shadow: 0 24px 60px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(188,26,33,0.3);
+  animation: adnaSlide 0.45s ease-out; }
+@keyframes adnaSlide { from { transform: translateY(-140%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.tb-code { flex: none; background: var(--adna-red); color: #fff; border-radius: 16px; padding: 10px 24px; font-family: var(--font-display); font-weight: 800; font-size: 56px;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tb-code.c1 { background: var(--adna-grey); } .tb-code.c2 { background: var(--adna-black); }
+.tb-doc { width: 72px; height: 72px; border-radius: 999px; object-fit: cover; object-position: 50% 12%; border: 3px solid var(--adna-red); flex: none; display: block; }
+.tb-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tb-title { font-family: var(--font-display); font-weight: 800; font-size: 30px; }
+.tb-sub { font-size: 19px; font-weight: 600; color: var(--adna-grey); }
+.ann-tag { flex: none; padding: 8px 16px; border-radius: 12px; background: var(--adna-red); color: #fff; font-family: var(--font-display); font-weight: 800;
+  font-size: 18px; letter-spacing: 0.12em; text-transform: uppercase; }
+.ann-text { font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.25; }
+
+/* ---------- lišta správ ---------- */
+.ticker { position: relative; z-index: 1; margin: 24px 48px 36px; height: 84px; flex: none; display: flex; align-items: stretch; border-radius: 22px; overflow: hidden;
+  background: var(--adna-black); border: var(--card-frame); box-shadow: 0 20px 50px rgba(26,26,26,0.3); }
+.tk-label { flex: none; display: flex; align-items: center; gap: 12px; padding: 0 28px; background: var(--adna-red); color: #fff; font-family: var(--font-display);
+  font-weight: 800; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase; }
+.tk-track { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; overflow: hidden; color: #fff; font-size: 24px; font-weight: 500; position: relative; }
+.tk-track::before, .tk-track::after { content: ''; position: absolute; top: 0; bottom: 0; width: 80px; z-index: 1; }
+.tk-track::before { left: 0; background: linear-gradient(90deg, #1A1A1A 0%, rgba(26,26,26,0) 100%); }
+.tk-track::after { right: 0; background: linear-gradient(270deg, #1A1A1A 0%, rgba(26,26,26,0) 100%); }
+.tk-move { display: inline-flex; white-space: nowrap; will-change: transform; padding-left: 28px; }
+.tk-move.run { animation: adnaTicker 48s linear infinite; }
+@keyframes adnaTicker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tk-item { display: inline-flex; align-items: center; gap: 14px; padding: 0 36px 0 0; }
+.tk-tag { padding: 4px 10px; border-radius: 8px; background: var(--adna-red); color: #fff; font-size: 13px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.tk-tag.svet { background: var(--adna-grey); } .tk-tag.zdravie { background: #fff; color: var(--adna-red); }
+.tk-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--adna-red); display: inline-block; margin-left: 22px; }
+.tk-idle { color: rgba(255,255,255,0.6); }
+.tk-ann { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; padding: 0 28px; color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 26px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-ann span { overflow: hidden; text-overflow: ellipsis; }
+.ticker.ann .tk-track, .ticker.ann .tk-src { display: none; }
+.info-list li.cut { visibility: hidden; }
+.tk-src { flex: none; display: flex; align-items: center; gap: 10px; padding: 0 24px; border-left: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.7);
+  font-size: 15px; font-weight: 600; white-space: nowrap; }
+.tk-src:empty { display: none; }
+
+/* ---------- sezónna téma: Vianoce ---------- */
+.flake { position: absolute; top: 0; color: #fff; animation: adnaSnow linear infinite; will-change: transform;
+  filter: drop-shadow(0 0 3px rgba(188,26,33,.7)) drop-shadow(0 2px 8px rgba(110,14,20,.35)); }
+@keyframes adnaSnow { 0% { transform: translate3d(0, -60px, 0) rotate(0deg); } 50% { transform: translate3d(28px, 520px, 0) rotate(180deg); }
+  100% { transform: translate3d(-10px, 1140px, 0) rotate(360deg); } }
+.lights { position: absolute; left: 36px; right: 36px; top: 0; height: 10px; display: none; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+.theme-christmas .lights { display: flex; }
+.bulb { display: block; width: 10px; height: 14px; border-radius: 0 0 8px 8px; animation: adnaTwinkle 2.2s ease-in-out infinite; }
+@keyframes adnaTwinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.8); } }
+
+/* ---------- zvuk ---------- */
+.overlay { position: absolute; inset: 0; z-index: 10; background: rgba(26,26,26,0.72); display: flex; align-items: center; justify-content: center; }
+.overlay-box { background: #fff; border-radius: 28px; padding: 40px 48px; max-width: 760px; text-align: center; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+.overlay-title { font-family: var(--font-display); font-weight: 800; font-size: 34px; margin-bottom: 8px; }
+.overlay-box p { font-size: 22px; color: var(--adna-grey); }
+.big-btn { font: 800 28px var(--font-display); background: var(--adna-red); color: #fff; border: 0; border-radius: 18px; padding: 18px 40px; cursor: pointer; }
+.big-btn:focus { outline: 4px solid var(--adna-black); outline-offset: 4px; }
+.link-btn { display: block; margin: 18px auto 0; background: none; border: 0; font: 600 20px var(--font-body); color: var(--adna-grey); text-decoration: underline; cursor: pointer; }
+.link-btn:focus { outline: 3px solid var(--adna-red); }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot, .pulse, .kenburns, .cc-point, .greeting, .bulb, .flake, .tv-banner { animation: none !important; }
+  .flake { display: none; }
+}

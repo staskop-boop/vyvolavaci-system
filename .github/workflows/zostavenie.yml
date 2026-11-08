@@ -1,0 +1,38 @@
+# Automatické zostavenie: testy servera a APK pre tablet aj TV (GitHub Actions).
+# Výsledné APK nájdete v záložke Actions → beh → Artifacts.
+name: Zostavenie AdNa
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: server
+      - run: npm test
+        working-directory: server
+
+  apk:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [tablet, tv]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.9' }
+      - name: Zostaviť debug APK
+        working-directory: apps/${{ matrix.app }}/android
+        run: gradle --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adna-${{ matrix.app }}-debug-apk
+          path: apps/${{ matrix.app }}/android/app/build/outputs/apk/debug/*.apk
