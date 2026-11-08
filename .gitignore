@@ -3,6 +3,7 @@ node_modules/
 
 # Prevádzkové údaje servera – databáza, logy, inštalačný kód (nikdy necommitovať)
 server/data/
+deploy/data/
 *.db
 *.db-journal
 *.db-wal

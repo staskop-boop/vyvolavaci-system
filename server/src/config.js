@@ -15,5 +15,7 @@ module.exports = {
   sessionHours: 12,
   // Ak beží server za HTTPS reverznou proxy, nastavte ADNA_SECURE_COOKIE=1
   secureCookie: process.env.ADNA_SECURE_COOKIE === '1',
+  // Ktorým proxy veriť hlavičku X-Forwarded-For (skutočná IP pre limity). V Dockeri za cloudflared: 'loopback, uniquelocal'
+  trustProxy: process.env.ADNA_TRUST_PROXY || 'loopback',
   quiet: process.env.ADNA_QUIET === '1',
 };

@@ -17,6 +17,19 @@ jobs:
       - run: npm test
         working-directory: server
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zostavenie obrazu a test spustenia
+        run: |
+          docker build -t adna-server .
+          docker run -d --name adna -p 8080:8080 adna-server
+          for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8080/sestra/ && break; sleep 1; done
+          for p in sestra/ tablet/ obrazovka/ shared/adna-theme.css; do curl -fsS -o /dev/null "http://127.0.0.1:8080/$p"; done
+          docker exec adna test -f /data/SETUP-KOD.txt
+          docker logs adna | tail -5
+
   apk:
     runs-on: ubuntu-latest
     strategy:
@@ -27,6 +40,9 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: android-actions/setup-android@v3
+        with:
+          # predvolený balík 'tools' už v sdkmanageri neexistuje → zostavenie padalo
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with: { gradle-version: '8.9' }
       - name: Zostaviť debug APK

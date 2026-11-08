@@ -1,0 +1,25 @@
+# Server AdNa + Cloudflare Tunnel. Žiadny port nie je otvorený do internetu:
+# cloudflared vytvorí odchádzajúce spojenie do Cloudflare a https://vyvolavaci.adna.sk smeruje na http://adna:8080.
+# Spustenie (v priečinku deploy/):  docker compose up -d --build
+services:
+  adna:
+    build: ..
+    image: adna-server
+    restart: unless-stopped
+    environment:
+      ADNA_SECURE_COOKIE: "1"              # prístup len cez https://vyvolavaci.adna.sk
+      ADNA_TRUST_PROXY: "loopback, uniquelocal"   # skutočná IP klienta z cloudflared (limity pokusov)
+    volumes:
+      - ./data:/data                       # databáza, logy, inštalačný kód, zálohy (nikdy necommitovať)
+    # Port len pre lokálny prístup na tomto počítači (napr. ssh tunel), nie do internetu:
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Doplňte TUNNEL_TOKEN do deploy/.env}
+    depends_on:
+      - adna
