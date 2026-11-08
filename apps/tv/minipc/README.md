@@ -41,7 +41,7 @@ kreslí **malý počítač pripojený k TV cez HDMI**; televízor je len monitor
 Po zvukovom signáli TV povie napr. „Číslo dvadsaťpäť, ambulancia jedna“ alebo „Písmeno bé, ambulancia dva“.
 Hlas poskytuje prehliadač na mini PC – preto skript predvolene spúšťa **Microsoft Edge** (`-Prehliadac edge`):
 
-* s internetom použije prirodzený hlas **Microsoft Viktória / Lukáš Online (Natural) – slovenčina**,
+* s internetom použije prirodzený **ženský** hlas **Microsoft Viktória Online (Natural) – slovenčina** (Pali preferuje ženský hlas; mužský Lukáš len ako záloha),
 * bez internetu lokálny hlas Windows **Microsoft Filip** – doinštalujte ho: Nastavenia → Čas a jazyk → Jazyk a oblasť →
   Pridať jazyk → Slovenčina (stačí „Rozpoznávanie a syntéza reči“).
 

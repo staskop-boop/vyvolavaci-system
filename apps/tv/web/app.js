@@ -150,18 +150,27 @@
     if (n && /ambulan/i.test(call.roomName || '')) return 'ambulancia ' + (FEM[n] || skNumber(Number(n)));
     return call.roomName || '';
   }
+  /** Znenie (Pali 2026-11-08): prosim = „Číslo dvadsaťpäť, prosím, môžete vstúpiť do ambulancie číslo jeden.“,
+   *  nechsapaci = „…, nech sa páči, vstúpte do ambulancie číslo jeden.“, kratke = „Číslo dvadsaťpäť, ambulancia jedna.“ */
+  const PHRASE = { prosim: 'prosím, môžete vstúpiť', nechsapaci: 'nech sa páči, vstúpte' };
   function announcementText(call) {
     const v = (state && state.voice) || {};
-    const parts = [codeWords(call.code)];
-    if (v.room !== false) { const r = roomWords(call); if (r) parts.push(r); }
-    return parts.join(', ') + '.';
+    const head = codeWords(call.code), room = v.room !== false;
+    const phrase = PHRASE[v.style || 'prosim'];
+    if (!phrase) { const r = room ? roomWords(call) : ''; return head + (r ? ', ' + r : '') + '.'; }
+    if (!room) return head + ', ' + phrase + '.';
+    const n = doorNo(call.roomName);
+    if (n && /ambulan/i.test(call.roomName || '')) return head + ', ' + phrase + ' do ambulancie číslo ' + skNumber(Number(n)) + '.';
+    return head + ', ' + phrase + '.' + (call.roomName ? ' ' + call.roomName + '.' : '');
   }
-  /** Slovenský hlas: prednosť má prirodzený (Edge: „Viktória/Lukáš Online (Natural)“), inak lokálny (Windows: „Filip“). */
+  /** Slovenský hlas: prednosť má ženský prirodzený (Edge: „Viktória Online (Natural)“), mužský len ak iný nie je. */
   let skVoice = null;
   function pickVoice() {
     const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || [];
     const sk = vs.filter((v) => /^sk([-_]|$)/i.test(v.lang));
-    skVoice = sk.find((v) => /natural|online/i.test(v.name) && /viktor/i.test(v.name)) || sk.find((v) => /natural|online/i.test(v.name)) || sk[0] || null;
+    // Pali chce ženský hlas (2026-11-08): Viktória (Edge, online), Laura (Apple), Google slovenčina; mužský (Lukáš, Filip) len ako záloha
+    const female = (v) => /viktor|laura|zuzana|google/i.test(v.name), male = (v) => /luk[aá]s|filip|michal/i.test(v.name);
+    skVoice = sk.find((v) => female(v) && /natural|online/i.test(v.name)) || sk.find(female) || sk.find((v) => !male(v)) || sk[0] || null;
     T.voice = skVoice ? skVoice.name : null;
     updateVoiceUi();
     return skVoice;

@@ -107,7 +107,7 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
     assert.deepEqual(await tv.evaluate(() => window.__adnaTest.shown), ['A', '1'], 'kto vyvolá prvý, ten sa zobrazí prvý');
     await tv.waitForFunction(() => window.__said.length >= 2, null, { timeout: 4000 });
     const said = await tv.evaluate(() => window.__said);
-    assert.deepEqual(said.map((x) => x[0]), ['Písmeno á, ambulancia dva.', 'Číslo jeden, ambulancia jedna.'], 'hlásenie po signáli');
+    assert.deepEqual(said.map((x) => x[0]), ['Písmeno á, prosím, môžete vstúpiť do ambulancie číslo dva.', 'Číslo jeden, prosím, môžete vstúpiť do ambulancie číslo jeden.'], 'hlásenie po signáli');
     assert.match(said[0][1], /Viktoria/, 'prirodzený slovenský hlas');
     assert.ok(!(await tv.locator('#voiceWarn').isVisible()));
     assert.equal(await tv.locator('#callRoom').innerText(), 'Ambulancia č. 1');

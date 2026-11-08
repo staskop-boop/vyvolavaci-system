@@ -657,8 +657,10 @@
         </div>
         <label class="check"><input type="checkbox" id="sc-weather" ${s.screen.weather.enabled ? 'checked' : ''}> Zobrazovať počasie v hlavičke (Open-Meteo)</label>
         <h3>Hlasové hlásenie</h3>
-        <label class="check"><input type="checkbox" id="vo-on" ${s.voice.enabled ? 'checked' : ''}> Po zvukovom signáli hlásiť číslo alebo písmeno (napr. „Číslo dvadsaťpäť, ambulancia jedna“)</label>
+        <label class="check"><input type="checkbox" id="vo-on" ${s.voice.enabled ? 'checked' : ''}> Po zvukovom signáli hlásiť číslo alebo písmeno (napr. „Číslo dvadsaťpäť, prosím, môžete vstúpiť do ambulancie číslo jeden“)</label>
         <label class="check"><input type="checkbox" id="vo-room" ${s.voice.room ? 'checked' : ''}> Hlásiť aj ambulanciu</label>
+        <div class="field"><label for="vo-style">Znenie hlásenia</label><select id="vo-style">
+          ${[['prosim', '„Číslo dvadsaťpäť, prosím, môžete vstúpiť do ambulancie číslo jeden.“'], ['nechsapaci', '„Číslo dvadsaťpäť, nech sa páči, vstúpte do ambulancie číslo jeden.“'], ['kratke', '„Číslo dvadsaťpäť, ambulancia jedna.“ (krátko)']].map(([v, t]) => `<option value="${v}" ${(s.voice.style || 'prosim') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         <div class="field" style="max-width:320px"><label for="vo-rate">Rýchlosť reči</label><select id="vo-rate">
           ${[[0.8, 'pomalšie'], [0.9, 'pokojne (odporúčané)'], [1, 'normálne'], [1.1, 'rýchlejšie']].map(([v, t]) => `<option value="${v}" ${Number(s.voice.rate) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
           <span class="hint">Hlas poskytuje prehliadač na obrazovke (Microsoft Edge: Viktória/Lukáš). Ak chýba, TV ukáže štítok „Chýba slovenský hlas“.</span></div>
@@ -743,7 +745,7 @@
         return p.length === 2 ? { name: p[0], url: p[1] } : { name: l, url: l };
       });
       saveSettings({ doctorList: val('tv-doctors').split('\n').map((l) => l.trim()).filter(Boolean), queueCount: Number(val('tv-queue')), onTimeMinutes: Number(val('tv-tol')), tvSource: val('tv-src'),
-        voice: { enabled: chk('vo-on'), room: chk('vo-room'), rate: Number(val('vo-rate')) },
+        voice: { enabled: chk('vo-on'), room: chk('vo-room'), rate: Number(val('vo-rate')), style: val('vo-style') },
         screen: { title: val('sc-title'), address: val('sc-addr'), phone: val('sc-phone'), tvLabel: val('sc-tvlabel'), theme: val('sc-theme'),
           info: val('sc-info').split('\n').map((l) => l.trim()).filter(Boolean),
           weather: { enabled: chk('sc-weather'), city: val('sc-city'), lat: Number(val('sc-lat')), lon: Number(val('sc-lon')) } },
