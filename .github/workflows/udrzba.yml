@@ -1,0 +1,31 @@
+# Údržba servera vyvolavaci.adna.sk (Hetzner) bez SSH kľúča: diagnostika a vynútená aktualizácia z main.
+# Spúšťa sa ručne: Actions → Údržba servera → Run workflow.
+name: Údržba servera
+on:
+  workflow_dispatch:
+    inputs:
+      akcia:
+        description: 'diagnostika = len vypíše stav; aktualizovat = aj nasadí main a obnoví plánovač'
+        type: choice
+        options: [aktualizovat, diagnostika]
+        default: aktualizovat
+concurrency: { group: udrzba, cancel-in-progress: false }
+permissions: { contents: read }
+jobs:
+  udrzba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get install -yq sshpass >/dev/null
+      - name: Údržba
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          AKCIA: ${{ inputs.akcia }}
+        run: bash deploy/cloud/udrzba.sh
+      - name: Kontrola verzie zvonka
+        if: inputs.akcia == 'aktualizovat'
+        run: |
+          sleep 20
+          S=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/api/display/state)
+          echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "Server slúži aktuálnu verziu." || { echo "::error::Server stále slúži starú verziu."; exit 1; }
