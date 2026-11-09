@@ -1,0 +1,24 @@
+name: Kontrola servera vyvolavaci.adna.sk
+# Overí z GitHubu, či beží server a ktorú verziu obrazovky práve slúži (bez prihlásenia, len verejné údaje).
+on:
+  workflow_dispatch:
+  pull_request:
+  schedule:
+    - cron: "17 * * * *"
+jobs:
+  kontrola:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stav servera
+        run: |
+          set -e
+          curl -fsS -m 20 https://vyvolavaci.adna.sk/api/health; echo
+          S=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/api/display/state)
+          echo "$S" | jq -c '{rooms: [.rooms[] | {name, current, calledToday}], queue: [.queue[] | {code, plannedAt, arrivedAt}]}'
+          CSS=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/obrazovka/styles.css)
+          if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$CSS" | grep -q "r-free"; then
+            echo "Server slúži aktuálnu verziu obrazovky."
+          else
+            echo "::error::Server slúži starú verziu – automatická aktualizácia z main neprebehla."
+            exit 1
+          fi
