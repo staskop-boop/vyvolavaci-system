@@ -14,6 +14,9 @@ kreslí **malý počítač pripojený k TV cez HDMI**; televízor je len monitor
 * **Súhlas Antiku s verejným premietaním v čakárni a licencie SOZA / LITA / SLOVGRAM** (pozri hlavný súhrn).
 
 ## Postup
+
+Najjednoduchšie: dvojklik na `1-NASTAVENIE.cmd` (kroky 3–5), potom `2-SPUSTIT-OBRAZOVKU.cmd`; záloha `3-ZALOHA-DVE-OKNA.cmd`.
+
 1. Skopírujte priečinok `minipc` na mini PC, napr. do `C:\AdNa\minipc`.
 2. Prvé spustenie (PowerShell): `powershell -ExecutionPolicy Bypass -File C:\AdNa\minipc\spustit-obrazovku.ps1` (predvolene server `https://vyvolavaci.adna.sk`; v LAN `-Server http://IP-SERVERA:8080`)
 3. Jednorazovo nainštalujte rozšírenie do profilu obrazovky: spustite skript s prepínačom `-Nastavenie`
