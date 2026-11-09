@@ -101,19 +101,22 @@ function createServer(opts = {}) {
     if (r.error) return res.status(400).json({ error: { code: 'BAD_REQUEST', message: r.error } });
     res.json({ ok: true });
   });
-  const setCookie = (res, token, maxAge) => {
-    res.setHeader('Set-Cookie', `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${config.secureCookie ? '; Secure' : ''}`);
+  // Secure: vždy pri ADNA_SECURE_COOKIE=1, inak automaticky pri HTTPS (napr. cez Cloudflare Tunnel na tom istom PC),
+  // takže na lokálnom serveri funguje prihlásenie cez https://vyvolavaci.adna.sk aj cez http:// v LAN.
+  const setCookie = (req, res, token, maxAge) => {
+    const secure = config.secureCookie || req.secure;
+    res.setHeader('Set-Cookie', `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? '; Secure' : ''}`);
   };
   app.post('/api/auth/login', (req, res) => {
     if (auth.setupRequired()) return res.status(409).json({ error: { code: 'SETUP_REQUIRED', message: 'Najprv dokončite prvotné nastavenie hesla.' } });
     const r = auth.login(req.body?.username || 'personal', req.body?.password, req.ip, req.body?.deviceLabel);
     if (r.error) return res.status(r.locked ? 429 : 401).json({ error: { code: r.locked ? 'RATE_LIMITED' : 'UNAUTHORIZED', message: r.error } });
-    setCookie(res, r.token, config.sessionHours * 3600 * 14); // cookie žije dlhšie, platnosť stráži server
+    setCookie(req, res, r.token, config.sessionHours * 3600 * 14); // cookie žije dlhšie, platnosť stráži server
     res.json({ user: r.user });
   });
   app.post('/api/auth/logout', (req, res) => {
     auth.logout(parseCookies(req.headers.cookie)[COOKIE]);
-    setCookie(res, '', 0);
+    setCookie(req, res, '', 0);
     res.json({ ok: true });
   });
   app.get('/api/auth/me', (req, res) => {

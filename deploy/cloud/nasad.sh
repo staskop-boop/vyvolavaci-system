@@ -20,11 +20,16 @@ POL_ZARIADENIA="Vyvolávací systém – zariadenia v ambulancii"
 SERVER_NAZOV="adna-vyvolavaci"
 LOKALITA="${LOKALITA:-nbg1}"
 TYPY="${TYP_SERVERA:-cx23} cx22 cpx22 cpx21 cpx11"
+# SERVER=hetzner (VPS v Dockeri, služba http://adna:8080) alebo SERVER=lokalny (server v ambulancii,
+# cloudflared na tom istom PC → http://localhost:8080; token tunela si Pali skopíruje v Zero Trust → Tunnels)
+SERVER="${SERVER:-hetzner}"
+case "$SERVER" in hetzner) SLUZBA="http://adna:8080";; lokalny) SLUZBA="http://localhost:8080";; *) echo "::error::⚠ SERVER musí byť hetzner alebo lokalny" >&2; exit 1;; esac
 
 chyba() { echo "::error::⚠ $*" >&2; exit 1; }
 # všetky tajomstvá sa overia ešte pred prvou zmenou (nič sa nevytvorí, kým niektoré chýba)
-for v in CLOUDFLARE_API_TOKEN HCLOUD_TOKEN ADNA_HESLO; do [ -n "${!v:-}" ] || chyba "Chýba tajomstvo $v (Settings → Secrets and variables → Actions)."; done
-[ "${#ADNA_HESLO}" -ge 10 ] || chyba "ADNA_HESLO musí mať aspoň 10 znakov."
+POTREBNE="CLOUDFLARE_API_TOKEN"; [ "$SERVER" = hetzner ] && POTREBNE="$POTREBNE HCLOUD_TOKEN ADNA_HESLO"
+for v in $POTREBNE; do [ -n "${!v:-}" ] || chyba "Chýba tajomstvo $v (Settings → Secrets and variables → Actions)."; done
+[ "$SERVER" = lokalny ] || [ "${#ADNA_HESLO}" -ge 10 ] || chyba "ADNA_HESLO musí mať aspoň 10 znakov."
 EMAILY="${EMAILY:-stasko@adna.sk}"
 
 cf() { # cf METÓDA CESTA [JSON] → výsledok (.result), pri chybe koniec
@@ -81,10 +86,10 @@ echo "== 2/4 Cloudflare Tunnel =="
 TID=$(cf GET "/accounts/$ACC/cfd_tunnel?name=$TUNEL&is_deleted=false" | jq -r '.[0].id // empty')
 if [ -z "$TID" ]; then TID=$(cf POST "/accounts/$ACC/cfd_tunnel" "$(jq -cn --arg n "$TUNEL" '{name:$n, config_src:"cloudflare"}')" | jq -r .id); echo "tunel vytvorený"; else echo "tunel existuje"; fi
 cf PUT "/accounts/$ACC/cfd_tunnel/$TID/configurations" \
-  "$(jq -cn --arg h "$HOST" '{config:{ingress:[{hostname:$h, service:"http://adna:8080", originRequest:{}}, {service:"http_status:404"}]}}')" >/dev/null
+  "$(jq -cn --arg h "$HOST" --arg s "$SLUZBA" '{config:{ingress:[{hostname:$h, service:$s, originRequest:{}}, {service:"http_status:404"}]}}')" >/dev/null
 TUNNEL_TOKEN=$(cf GET "/accounts/$ACC/cfd_tunnel/$TID/token" | jq -r .)
 echo "::add-mask::$TUNNEL_TOKEN"
-echo "smerovanie $HOST → http://adna:8080 nastavené"
+echo "smerovanie $HOST → $SLUZBA nastavené"
 
 echo "== 3/4 DNS =="
 CIEL="$TID.cfargotunnel.com"
@@ -94,6 +99,18 @@ if [ "$(jq length <<<"$REC")" -eq 0 ]; then
   echo "CNAME $HOST vytvorený"
 elif [ "$(jq -r '.[0].type + " " + .[0].content' <<<"$REC")" = "CNAME $CIEL" ]; then echo "CNAME $HOST už existuje"
 else chyba "Pre $HOST už existuje iný DNS záznam ($(jq -r '.[0].type + " " + .[0].content' <<<"$REC")) – neprepisujem, rozhodnite ručne."; fi
+
+if [ "$SERVER" = lokalny ]; then
+  ST=$(cf GET "/accounts/$ACC/cfd_tunnel/$TID" | jq -r .status)
+  {
+    echo "### Vyvolávací systém AdNa – lokálny server"
+    echo "* Tunel **$TUNEL** je pripravený (stav: **$ST**), smeruje na $SLUZBA."
+    echo "* Na serveri v ambulancii spustite príkaz z Zero Trust → Networks → Tunnels → $TUNEL → Configure (cloudflared service install …)."
+    echo "* Potom: https://$HOST/sestra/"
+  } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+  echo "Cloudflare je pripravené (tunel: $ST). Na lokálnom serveri nainštalujte cloudflared s tokenom z Zero Trust → Tunnels → $TUNEL."
+  exit 0
+fi
 
 echo "== 4/4 Server Hetzner =="
 hc GET "/servers?label_selector=app%3D$SERVER_NAZOV"; S=$HC

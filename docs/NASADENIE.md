@@ -39,6 +39,14 @@ Potrebné tajomstvá (Settings → Secrets and variables → Actions):
 **Aktualizácie:** server každých 5 minút skontroluje vetvu `main` a novú verziu nasadí sám (pred tým urobí zálohu),
 log `/var/log/adna-aktualizacia.log`. Zlúčenie PR = nasadenie.
 
+### Lokálny server v ambulancii (bez Hetzneru)
+
+Workflow s voľbou **server = lokalny** pripraví v Cloudflare len Access, tunel (`vyvolavaci.adna.sk → http://localhost:8080`)
+a DNS; tajomstvá `HCLOUD_TOKEN` a `ADNA_HESLO` netreba. Na serveri v ambulancii potom stačí server AdNa
+(Node.js 22) a `cloudflared service install <token>` – príkaz s tokenom je v Zero Trust → Networks → Tunnels →
+`vyvolavaci` → Configure. Cookie prihlásenia je pri prístupe cez HTTPS automaticky `Secure`, takže sestry sa
+prihlásia cez `https://vyvolavaci.adna.sk` aj cez `http://IP:8080` v LAN (bez `ADNA_SECURE_COOKIE`).
+
 ### Ručne (ak nechcete Actions)
 
 1. Zero Trust → Networks → Tunnels → Create → Cloudflared → `vyvolavaci`, skopírovať token; Public hostname
