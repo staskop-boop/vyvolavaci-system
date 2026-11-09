@@ -1,6 +1,8 @@
 # Súbory, ktoré si spúšťač obrazovky pri každom spustení stiahne z GitHubu (online aktualizácia).
 spustit-obrazovku.ps1
-rozsirenie-tv-ramec/manifest.json
 rozsirenie-tv-ramec/rules.json
 rozsirenie-tv-ramec/pozadie.js
 README.md
+rozsirenie-tv-ramec/cela-zona.js
+# manifest až na konci – odkazuje na súbory vyššie, musia byť stiahnuté skôr
+rozsirenie-tv-ramec/manifest.json
