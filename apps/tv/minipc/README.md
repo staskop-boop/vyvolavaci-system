@@ -24,6 +24,9 @@ Najjednoduchšie: dvojklik na `1-NASTAVENIE.cmd` (kroky 3–5), potom `2-SPUSTIT
    priečinok `rozsirenie-tv-ramec`. Rozšírenie platí len v tomto profile, bežné prehliadanie neovplyvní.
 4. V aplikácii Sestra → Nastavenia → **Obrazovka v čakárni** zadajte *Adresu TV prehrávača* `https://webtv.sk/`.
 5. Na mini PC sa raz prihláste do webtv.sk myšou priamo v TV zóne; prihlásenie ostane v profile `%LOCALAPPDATA%\AdNa`.
+   Od verzie 1.1 rozšírenie v tomto profile povolí prihlasovacie cookies prehrávača vo vloženom okne (bez neho stránka
+   hlási „chybné údaje“, lebo prehliadač cookies vo vloženom okne zahodí). Pri aktualizácii rozšírenia: `1-NASTAVENIE.cmd`
+   → pri starom rozšírení AdNa **Odstrániť** → **Načítať rozbalené** → priečinok `rozsirenie-tv-ramec` z nového balíka.
 6. Plánovač úloh → Vytvoriť úlohu → Spúšťač „Pri prihlásení“, akcia: rovnaký príkaz ako v bode 2 (bez `-Nastavenie`). Zapnite automatické
    prihlásenie Windows a vypnite uspávanie obrazovky.
 
@@ -31,11 +34,12 @@ Najjednoduchšie: dvojklik na `1-NASTAVENIE.cmd` (kroky 3–5), potom `2-SPUSTIT
 | Režim | Ako funguje | Kedy |
 |---|---|---|
 | `-Rezim ramec` (predvolený) | Jedno okno Chrome na celú obrazovku. Prehrávač je vložený v TV zóne. Rozšírenie `rozsirenie-tv-ramec` v **tomto kioskovom profile** povolí vloženie webtv.sk. Výzva s číslom sa pri vyvolaní ukáže aj cez TV obraz. | ak webtv.sk vo vloženom okne prehráva |
-| `-Rezim okna` (záloha) | Stránka AdNa na celú obrazovku s čiernou TV zónou + samostatné okno prehrávača presne nad ňou. Výzva s číslom je v ľavom paneli a na dolnej lište (TV obraz nezakrýva). | ak prehrávač vo vloženom okne nefunguje (DRM, prihlásenie) |
+| `-Rezim okna` (záloha) | Stránka AdNa na celú obrazovku s čiernou TV zónou + samostatné okno prehrávača presne nad ňou. Výzva s číslom je v ľavom paneli a na dolnej lište (TV obraz nezakrýva). | len ak prehrávač vo vloženom okne nefunguje ani s rozšírením 1.1 (napr. DRM) |
 
 ## Neoverené (treba vyskúšať na mieste – nemali sme prístup k webtv.sk)
 * či webtv.sk prehráva v Chrome na Windows a či niektoré kanály nevyžadujú DRM, ktoré vo vloženom okne nepôjde;
-* či prihlásenie do webtv.sk vydrží (alebo ho treba občas obnoviť);
+* či prihlásenie do webtv.sk vydrží (alebo ho treba občas obnoviť); oprava prihlásenia vo vloženom okne (rozšírenie 1.1)
+  je overená na napodobnenine webtv.sk (`node apps/tv/test/e2e-ramec-prihlasenie.js`), nie na skutočnom webtv.sk;
 * presné súradnice okna v režime `okna` (titulková lišta okna `--app` môže zabrať ~30 px).
 
 
