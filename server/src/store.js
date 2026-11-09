@@ -618,9 +618,12 @@ class Store extends EventEmitter {
   }
 
   displayState() {
+    // Sklz ambulancie pri vyvolaní: od termínu, ale pacient, ktorý prišiel neskoro, sa počíta až od príchodu –
+    // jeho meškanie nie je meškanie ambulancie a nesmie sa pripísať ostatným čakajúcim.
+    const callDelay = (r) => Math.round((Date.parse(r.at) - Math.max(Date.parse(r.planned_at), Date.parse(r.created_at) || 0)) / 60000);
     const s = this.getSettings();
     const day = clock.today();
-    const evs = this.db.prepare(`SELECT e.id, e.type, e.at, e.ticket_id, e.room_id, t.code, r.name AS room_name FROM ticket_events e
+    const evs = this.db.prepare(`SELECT e.id, e.type, e.at, e.ticket_id, e.room_id, t.code, t.status, r.name AS room_name FROM ticket_events e
       JOIN tickets t ON t.id = e.ticket_id LEFT JOIN rooms r ON r.id = e.room_id
       WHERE t.day = ? AND e.type IN ('call','recall','requeue','display_cleared') ORDER BY e.id DESC LIMIT 300`).all(day);
     const cancelled = new Set();
@@ -632,30 +635,31 @@ class Store extends EventEmitter {
       if (e.type === 'requeue') { cancelled.add(e.ticket_id); continue; }
       if (cancelled.has(e.ticket_id) || seen.has(e.ticket_id)) continue;
       seen.add(e.ticket_id);
-      if (e.room_id != null && !(e.room_id in roomCurrent)) roomCurrent[e.room_id] = { code: e.code, at: e.at };
+      // po „vybavený“ (alebo „neprišiel“) ambulancia nikoho nevyšetruje – staré číslo z „Práve vyšetrujeme“ zmizne
+      if (e.room_id != null && !(e.room_id in roomCurrent)) roomCurrent[e.room_id] = e.status === 'called' ? { code: e.code, at: e.at } : null;
       if (list.length <= s.recentCount) list.push({ callId: e.id, code: e.code, roomId: e.room_id, roomName: e.room_name, ...this.roomDisplay(e.room_id), at: e.at, repeat: e.type === 'recall' });
     }
     // v2: čísla na rade (len číslo a plánovaný čas – žiadne osobné údaje) a aktuálny sklz ambulancie
-    const waiting = this.db.prepare(`SELECT t.code, t.planned_at, t.home_room_id, h.name AS home FROM tickets t LEFT JOIN rooms h ON h.id = t.home_room_id
+    const waiting = this.db.prepare(`SELECT t.code, t.planned_at, t.created_at, t.home_room_id, h.name AS home FROM tickets t LEFT JOIN rooms h ON h.id = t.home_room_id
       WHERE t.day = ? AND t.status = 'waiting' ORDER BY COALESCE(t.planned_at, t.created_at), t.seq`).all(day);
-    const last = this.db.prepare(`SELECT e.at, t.planned_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
+    const last = this.db.prepare(`SELECT e.at, t.planned_at, t.created_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
       WHERE t.day = ? AND e.type = 'call' AND t.planned_at IS NOT NULL ORDER BY e.id DESC LIMIT 1`).get(day);
-    const clinicDelayMinutes = last ? Math.round((Date.parse(last.at) - Date.parse(last.planned_at)) / 60000) : 0;
+    const clinicDelayMinutes = last ? callDelay(last) : 0;
     // v2.1: sklz každého pracoviska zvlášť – podľa jeho posledného vyvolania a hlásenia sestry
     const rooms = this.listRooms({ activeOnly: true }).map((r) => {
-      const lr = this.db.prepare(`SELECT e.at, t.planned_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
+      const lr = this.db.prepare(`SELECT e.at, t.planned_at, t.created_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
         WHERE t.day = ? AND e.type = 'call' AND e.room_id = ? AND t.planned_at IS NOT NULL ORDER BY e.id DESC LIMIT 1`).get(day, r.id);
       const rd = (s.roomDelays || {})[r.id];
       return { id: r.id, name: r.name, doctorName: this.doctorsToday()[r.id] || null, direction: r.direction,
-        lastCallDelayMinutes: lr ? Math.round((Date.parse(lr.at) - Date.parse(lr.planned_at)) / 60000) : null,
+        lastCallDelayMinutes: lr ? callDelay(lr) : null,
         reported: rd ? { minutes: rd.minutes, text: rd.text || '', at: rd.at } : null,
-        current: roomCurrent[r.id] ? roomCurrent[r.id].code : null };
+        current: roomCurrent[r.id] ? roomCurrent[r.id].code : null, calledToday: r.id in roomCurrent };
     });
     return {
       clinicName: s.clinicName, soundEnabled: s.soundEnabled, recentCount: s.recentCount, day,
       current: list[0] || null, recent: list.slice(1, 1 + s.recentCount),
       serverTime: clock.nowIso(),
-      queue: waiting.slice(0, s.queueCount).map((t) => ({ code: t.code, plannedAt: t.planned_at, roomId: t.home_room_id ?? null, roomName: t.home ?? null,
+      queue: waiting.slice(0, s.queueCount).map((t) => ({ code: t.code, plannedAt: t.planned_at, arrivedAt: t.created_at, roomId: t.home_room_id ?? null, roomName: t.home ?? null,
         doctorName: t.home_room_id != null ? this.doctorsToday()[t.home_room_id] || null : null })),
       rooms, longDelayMinutes: s.longDelayMinutes,
       announcement: this.announcement(),

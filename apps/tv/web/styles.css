@@ -103,23 +103,25 @@ h2 { margin: 0; }
 .rooms-card.compact .r-kicker { display: block; }
 .rooms-card.compact .r-door { display: none; }
 .rooms-card.compact .r-doc .door-inline { display: inline; }
+.r-free { font-size: 15px; white-space: nowrap; font-weight: 700; color: var(--adna-grey); margin-top: 4px; }
+.rooms-card.compact .r-free { display: none; }
 .r-kicker { display: none; font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--adna-grey); }
 .door-inline { display: none; }
 
 /* Nasledujú */
-.next-card { padding: 14px 22px 14px 26px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex: none; }
-.nc-head { display: flex; flex-direction: column; gap: 4px; flex: none; }
-.nc-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 17px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--adna-grey); }
-.nc-wait { font-size: 13px; font-weight: 600; color: var(--adna-grey); white-space: nowrap; }
+.next-card { padding: 16px 24px 18px 26px; display: flex; flex-direction: column; align-items: stretch; gap: 12px; flex: none; }
+.nc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex: none; }
+.nc-head h2 { font-family: var(--font-display); font-weight: 800; font-size: 20px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--adna-grey); }
+.nc-wait { font-size: 16px; font-weight: 600; color: var(--adna-grey); white-space: nowrap; }
 .nc-wait b.late { color: var(--adna-red); } .nc-wait b.ok { color: var(--ok); }
-.chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; flex-wrap: nowrap; }
-.chip { min-width: 60px; padding: 5px 6px 4px; border-radius: 12px; background: #fff; border: 2px solid var(--adna-red); text-align: center;
-  box-shadow: 0 6px 16px rgba(26,26,26,0.06); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; flex-wrap: nowrap; }
+.chip { min-width: 92px; padding: 8px 10px 7px; border-radius: 14px; background: #fff; border: 2px solid var(--adna-red); text-align: center;
+  box-shadow: 0 6px 16px rgba(26,26,26,0.06); display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .chip.c1 { border-color: var(--adna-grey); } .chip.c2 { border-color: var(--adna-black); }
-.c-code { font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.c-delta { font-size: 12px; font-weight: 800; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.c-code { font-family: var(--font-display); font-weight: 800; font-size: 34px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.c-delta { font-size: 16px; font-weight: 800; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .c-delta.late { color: var(--adna-red); } .c-delta.early, .c-delta.ontime { color: var(--ok); } .c-delta.none { color: var(--adna-grey); font-weight: 600; }
-.nc-empty { font-size: 16px; font-weight: 600; color: var(--adna-grey); }
+.nc-empty { font-size: 18px; font-weight: 600; color: var(--adna-grey); }
 .chip.cut { display: none; }
 /* pri vyvolaní: tmavá karta s veľkými čipmi */
 .left.calling .next-card { flex: 1 1 auto; min-height: 0; overflow: hidden; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 16px;
@@ -132,7 +134,8 @@ h2 { margin: 0; }
 .left.calling .chips { flex-wrap: wrap; gap: 12px; }
 .left.calling .chip { min-width: 86px; padding: 8px 14px; border-radius: 16px; background: rgba(255,255,255,0.08); box-shadow: none; }
 .left.calling .chip.c1, .left.calling .chip.c2 { border-color: rgba(255,255,255,0.35); }
-.left.calling .c-code { font-size: 28px; color: #fff; }
+.left.calling .c-code { font-size: 36px; color: #fff; }
+.left.calling .c-delta { font-size: 17px; }
 .left.calling .c-delta.late { color: var(--adna-coral); } .left.calling .c-delta.early, .left.calling .c-delta.ontime { color: #8FE3B0; }
 .left.calling .c-delta.none { color: rgba(255,255,255,0.6); }
 .left.calling .nc-empty { color: rgba(255,255,255,0.7); }

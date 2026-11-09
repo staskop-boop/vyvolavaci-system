@@ -57,6 +57,16 @@ jobs:
           if ($z.Count -lt 1) { throw "Chýba záloha" }
           $z | ForEach-Object { $_.Name }
           Get-Content C:\AdNa\aktualizacia.log
+      - uses: actions/checkout@v4
+      - name: Spúšťač obrazovky – syntax a zoznam súborov pre online aktualizáciu
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $chyby = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD\apps\tv\minipc\spustit-obrazovku.ps1", [ref]$null, [ref]$chyby) | Out-Null
+          if ($chyby) { $chyby | Format-List; throw "Chyba syntaxe v spustit-obrazovku.ps1" }
+          Get-Content apps\tv\minipc\subory.txt | Where-Object { $_ -and -not $_.StartsWith("#") } | ForEach-Object {
+            if (-not (Test-Path "apps\tv\minipc\$_")) { throw "subory.txt: chýba $_" } }
 
   apk:
     runs-on: ubuntu-latest

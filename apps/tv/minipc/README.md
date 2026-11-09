@@ -30,6 +30,12 @@ Najjednoduchšie: dvojklik na `1-NASTAVENIE.cmd` (kroky 3–5), potom `2-SPUSTIT
 6. Plánovač úloh → Vytvoriť úlohu → Spúšťač „Pri prihlásení“, akcia: rovnaký príkaz ako v bode 2 (bez `-Nastavenie`). Zapnite automatické
    prihlásenie Windows a vypnite uspávanie obrazovky.
 
+## Online aktualizácia
+Spúšťač si pri každom spustení stiahne z GitHubu najnovšie súbory podľa `subory.txt` (spúšťač, rozšírenie, návod).
+Rozšírenie sa načíta z tohto priečinka, preto nová verzia platí hneď po spustení. Priečinok preto nechajte na stálom mieste
+(napr. `C:\AdNa\obrazovka`) a rozšírenie načítajte práve odtiaľ. Bez internetu sa spustí doterajšia verzia.
+Vypnutie: prepínač `-BezAktualizacie`. Aplikácie Sestra a obrazovka sú webové stránky, aktualizuje ich server sám.
+
 ## Dva režimy
 | Režim | Ako funguje | Kedy |
 |---|---|---|
