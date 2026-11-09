@@ -59,7 +59,7 @@ test('v2.1: dve pripravovne s vlastnými kontami, spoločná TV, hlásenie mešk
     assert.equal(st.recent[0].code, '1');
     assert.deepEqual(st.queue.map((q) => [q.code, q.roomName]), [['2', p1.name]]);
     const r1 = st.rooms.find((x) => x.id === p1.id);
-    assert.ok(r1.lastCallDelayMinutes > 0);
+    assert.ok(r1.lastCallDelayMinutes <= 1, 'pacient prišiel po termíne – jeho meškanie sa nepripíše pracovisku');
   });
 
   await t.test('v2.2: lekár na dnes a smer šípky pri vyvolaní', async () => {

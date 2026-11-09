@@ -86,11 +86,18 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
     await page.screenshot({ path: path.join(SHOTS, 'tv2-2-vyvolanie.png') });
   });
 
-  await step('na rade: poradie podľa termínu (bez termínu = podľa príchodu), meškanie červené', async () => {
-    const rows = await page.$$eval('#queueList li', (l) => l.map((li) => ({ code: li.querySelector('.c-code').textContent, cls: li.querySelector('.c-delta').className, d: li.dataset.delta })));
+  await step('na rade: meškanie len pri tom, kto prišiel neskoro; ostatní načas alebo zelený predstih', async () => {
+    // všetci prišli teraz: 3, 12, 7, 15 po svojom termíne (meškajú oni), 21 načas, 4 a 9 skôr.
+    // Neskorý príchod (3 o 50 min) sa nesmie pripísať ostatným ako meškanie ambulancie.
+    const rows = await page.$$eval('#queueList li', (l) => l.map((li) => ({ code: li.querySelector('.c-code').textContent, cls: li.querySelector('.c-delta').className, t: li.querySelector('.c-delta').textContent })));
     assert.deepEqual(rows.map((r) => r.code), ['7', '15', 'A', '21', '4', '9']);
-    assert.ok(rows.filter((r) => r.code !== 'A').every((r) => /late/.test(r.cls)), 'ambulancia mešká ~38 min → všetci s termínom červení');
-    assert.match(rows[2].cls, /none/);
+    const by = Object.fromEntries(rows.map((r) => [r.code, r]));
+    assert.match(by['7'].cls, /late/); assert.match(by['7'].t, /^mešká 2[01] min$/);
+    assert.match(by['15'].cls, /late/); assert.match(by['15'].t, /^mešká [67] min$/);
+    assert.match(by['A'].cls, /none/);
+    assert.match(by['21'].cls, /ontime/, JSON.stringify(rows));
+    assert.match(by['4'].cls, /early/); assert.match(by['9'].cls, /early/);
+    assert.match(await page.locator('#queueWait').innerText(), /podľa plánu/);
   });
 
   await step('ambulancia dobieha: predstih zelenou', async () => {
@@ -113,6 +120,18 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
     assert.match(r21[1], /early|ontime/, JSON.stringify(rows));
         await page.waitForFunction(() => document.getElementById('tvCall').classList.contains('hidden'), null, { timeout: 8000 });
     await page.screenshot({ path: path.join(SHOTS, 'tv2-3-na-rade-predstih.png') });
+  });
+
+  await step('po „vybavený“ zmizne číslo z „Práve vyšetrujeme“', async () => {
+    const st = await api('GET', '/api/staff/state');
+    const t4 = st.tickets.find((t) => t.code === '4');
+    await api('POST', `/api/staff/tickets/${t4.id}/done`, {});
+    const row = page.locator(`#roomRows .room[data-room="${rooms[0].id}"]`);
+    await row.locator('.r-free').waitFor({ timeout: 8000 });
+    assert.equal(await row.locator('.tile').innerText(), '–');
+    assert.match(await row.innerText(), /Pripravujeme ďalšieho pacienta/);
+    assert.equal(await page.locator(`#roomRows .room[data-room="${rooms[1].id}"] .tile`).innerText(), '12', 'druhá ambulancia ostáva');
+    await page.screenshot({ path: path.join(SHOTS, 'tv2-5-po-vybaveni.png') });
   });
 
   await step('rozloženie: obraz TV ~ 16 : 9, poloha pre okno prehrávača', async () => {

@@ -59,7 +59,7 @@ test('v2: kartička s plánovaným časom, poradie, obrazovka a správy', async 
     assert.equal(st.waitingCount, 3);
     assert.ok(st.serverTime);
     assert.equal(typeof st.clinicDelayMinutes, 'number');
-    for (const q of st.queue) assert.deepEqual(Object.keys(q).sort(), ['code', 'doctorName', 'plannedAt', 'roomId', 'roomName']);
+    for (const q of st.queue) assert.deepEqual(Object.keys(q).sort(), ['arrivedAt', 'code', 'doctorName', 'plannedAt', 'roomId', 'roomName']);
   });
 
   await t.test('vyvolať ďalšieho = najskôr plánovaný; sklz ambulancie', async () => {
@@ -69,7 +69,7 @@ test('v2: kartička s plánovaným časom, poradie, obrazovka a správy', async 
     const st = (await pub.get('/api/display/state')).data;
     assert.equal(st.current.code, 'K12');
     assert.deepEqual(st.queue.map((q) => q.code), ['B', '7']);
-    assert.ok(st.clinicDelayMinutes > 0, 'K12 bol plánovaný na 0:05, vyvolaný neskôr → meškanie');
+    assert.ok(st.clinicDelayMinutes <= 1, 'K12 (termín 0:05) prišiel po termíne → mešká on, nie ambulancia (pozri meskanie.test.js)');
   });
 
   await t.test('spárovanie času s číslom z tabletu', async () => {

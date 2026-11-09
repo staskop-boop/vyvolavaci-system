@@ -10,7 +10,9 @@ param(
   # v3.1: Microsoft Edge má slovenské hlasy pre hlásenie čísla (Viktória/Lukáš Online, offline Filip); Chrome ich na Windows spravidla nevidí
   [ValidateSet("edge", "chrome")] [string]$Prehliadac = "edge",
   # Obraz TV pri 1920×1080, dizajn v3 (vypíše ho stránka: v konzole prehliadača window.AdNaLayout.tv)
-  [int]$TvX = 642, [int]$TvY = 178, [int]$TvW = 1228, [int]$TvH = 698
+  [int]$TvX = 642, [int]$TvY = 178, [int]$TvW = 1228, [int]$TvH = 698,
+  # bez online aktualizácie spúšťača a rozšírenia (predvolene sa pri každom spustení stiahne najnovšia verzia)
+  [switch]$BezAktualizacie
 )
 $ErrorActionPreference = "Stop"
 if ($Prehliadac -eq "edge") {
@@ -27,6 +29,24 @@ New-Item -ItemType Directory -Force -Path $profil | Out-Null
 
 # počkáme na sieť a server (po zapnutí PC)
 for ($i = 0; $i -lt 60; $i++) { try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "$Server/api/health" | Out-Null; break } catch { Start-Sleep 5 } }
+
+# Online aktualizácia: pred spustením prehliadača stiahneme najnovší spúšťač a rozšírenie z GitHubu (repo je verejné).
+# Prehliadač rozbalené rozšírenie pri štarte načíta z tohto priečinka znova, takže nová verzia platí hneď.
+# Nový spúšťač platí od ďalšieho spustenia. Bez internetu ostáva doterajšia verzia.
+if (-not $BezAktualizacie) {
+  $zdroj = "https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/apps/tv/minipc"
+  try {
+    $zoznam = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 "$zdroj/subory.txt").Content -split "`r?`n" | ForEach-Object { $_.Trim() } |
+      Where-Object { $_ -and -not $_.StartsWith("#") -and $_ -notmatch '\.\.' }
+    foreach ($f in $zoznam) {
+      $ciel = Join-Path $dir $f
+      $tmp = "$ciel.novy"
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $ciel) | Out-Null
+      Invoke-WebRequest -UseBasicParsing -TimeoutSec 15 "$zdroj/$f" -OutFile $tmp
+      if ((Test-Path $ciel) -and ((Get-FileHash $tmp).Hash -eq (Get-FileHash $ciel).Hash)) { Remove-Item $tmp } else { Move-Item -Force $tmp $ciel }
+    }
+  } catch { Write-Warning "Aktualizácia sa nepodarila, spúšťam doterajšiu verziu: $($_.Exception.Message)" }
+}
 
 $spolocne = @("--user-data-dir=$profil", "--no-first-run", "--disable-session-crashed-bubble", "--disable-infobars",
               "--autoplay-policy=no-user-gesture-required", "--disable-features=Translate", "--noerrdialogs")

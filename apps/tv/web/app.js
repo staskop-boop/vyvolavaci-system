@@ -297,26 +297,37 @@
   const roundMin = (m) => (m >= 30 ? Math.round(m / 5) * 5 : m);   // pri veľkom meškaní presnosť na minútu len klame
 
   // ---------- odchýlka od termínu ----------
+  const minSince = (iso) => Math.round((now() - Date.parse(iso)) / 60000);
+  /** O koľko minút prišiel pacient po svojom termíne (záporné = prišiel skôr). */
+  const arrivalLate = (q) => (q.plannedAt && q.arrivedAt ? Math.round((Date.parse(q.arrivedAt) - Date.parse(q.plannedAt)) / 60000) : 0);
   /**
    * Sklz ambulancie = najväčšie z: meškania nahláseného sestrou, sklzu pri jej poslednom vyvolaní
-   * a času od termínu najskôr objednaného čakajúceho (ambulancia stojí → sklz rastie aj bez vyvolania).
+   * a toho, ako dlho po termíne čaká pacient, ktorý prišiel včas (ambulancia stojí → sklz rastie aj bez vyvolania).
+   * Pacient, ktorý sám prišiel neskoro, sa počíta až od príchodu – jeho meškanie sa nepripíše ostatným.
    */
   function roomDelay(roomId, s) {
     const r = (s.rooms || []).find((x) => x.id === roomId);
     if (!r) return s.clinicDelayMinutes || 0;
     let d = r.lastCallDelayMinutes ?? 0;
     if (r.reported) d = Math.max(d, r.reported.minutes);
-    const first = (s.queue || []).find((q) => q.roomId === roomId && q.plannedAt);
-    if (first) d = Math.max(d, Math.round((now() - Date.parse(first.plannedAt)) / 60000));
+    for (const q of s.queue || []) {
+      if (q.roomId !== roomId || !q.plannedAt) continue;
+      d = Math.max(d, q.arrivedAt && Date.parse(q.arrivedAt) > Date.parse(q.plannedAt) ? minSince(q.arrivedAt) : minSince(q.plannedAt));
+    }
     return d;
   }
-  function deltaFor(q, s) {
+  /** Údaj pri čísle: { late: minúty meškania pacienta } alebo odchýlka v minútach (kladná = ambulancia mešká, záporná = skôr). */
+  function deltaFor(q, s, tol) {
     if (!q.plannedAt) return null;
-    const sinceSlot = Math.round((now() - Date.parse(q.plannedAt)) / 60000);
-    return Math.max(q.roomId != null ? roomDelay(q.roomId, s) : (s.clinicDelayMinutes || 0), sinceSlot);
+    const own = arrivalLate(q);
+    const room = q.roomId != null ? roomDelay(q.roomId, s) : (s.clinicDelayMinutes || 0);
+    if (own > tol && own >= room) return { late: own };     // pacient prišiel neskoro – mešká on, nie ambulancia
+    const sinceSlot = minSince(q.plannedAt);
+    return room > tol ? Math.max(room, sinceSlot) : sinceSlot;   // ambulancia ide podľa plánu → vlastný predstih (zelený)
   }
   function deltaHtml(d, tol) {
     if (d == null) return '<span class="c-delta none">bez termínu</span>';
+    if (typeof d === 'object') return `<span class="c-delta late">mešká ${fmtShort(roundMin(d.late))}</span>`;
     if (d > tol) return `<span class="c-delta late">+${fmtShort(roundMin(d))}</span>`;
     if (d < -tol) return `<span class="c-delta early">o ${fmtShort(roundMin(-d))} skôr</span>`;
     return '<span class="c-delta ontime">načas</span>';
@@ -333,10 +344,10 @@
   }
 
   // ---------- Práve vyšetrujeme ----------
-  /** Ambulancie, ktoré dnes pracujú (lekár, vyvolané číslo alebo čakajúci); inak prvé dve. Najviac 3. */
+  /** Ambulancie, ktoré dnes pracujú (lekár, dnešné vyvolanie alebo čakajúci); inak prvé dve. Najviac 3. */
   function activeRooms(s) {
     const rooms = s.rooms || [];
-    const busy = rooms.filter((r) => r.doctorName || r.current || (s.queue || []).some((q) => q.roomId === r.id));
+    const busy = rooms.filter((r) => r.doctorName || r.current || r.calledToday || (s.queue || []).some((q) => q.roomId === r.id));
     return (busy.length ? busy : rooms.slice(0, 2)).slice(0, 3);
   }
   let callingRoomId = null;
@@ -358,6 +369,7 @@
           <div class="r-name">${esc(r.name)}</div>
           ${r.doctorName ? `<div class="r-doc">${esc(compact ? noPost(r.doctorName) : r.doctorName)}${door ? `<span class="door-inline"> · ${esc(door)}</span>` : ''}</div>` : (door ? `<div class="r-doc"><span class="door-inline">${esc(door)}</span></div>` : '')}
           ${door ? `<div class="r-door">${arrowSvg(r.direction)}<span>${esc(door)}</span></div>` : ''}
+          ${r.current ? '' : '<div class="r-free">Pripravujeme ďalšieho pacienta</div>'}
         </div>
         ${r.doctorName ? `<img class="avatar" alt="${esc(r.doctorName)}" data-doc="${esc(r.doctorName)}">` : '<div></div>'}
         ${late ? `<div class="r-late">${esc(late)}</div>` : ''}
@@ -384,14 +396,17 @@
     const tol = s.onTimeMinutes ?? 3;
     const max = callingRoomId !== null ? 8 : 5;
     el.queueList.innerHTML = s.queue.slice(0, max).map((q) => {
-      const d = deltaFor(q, s);
-      return `<li class="chip c${q.roomId != null ? roomColor(q.roomId) : 1}" data-delta="${d == null ? '' : d}" data-room="${q.roomId ?? ''}"><span class="c-code">${esc(q.code)}</span>${deltaHtml(d, tol)}</li>`;
+      const d = deltaFor(q, s, tol);
+      return `<li class="chip c${q.roomId != null ? roomColor(q.roomId) : 1}" data-delta="${d == null ? '' : (typeof d === 'object' ? 'm' + d.late : d)}" data-room="${q.roomId ?? ''}"><span class="c-code">${esc(q.code)}</span>${deltaHtml(d, tol)}</li>`;
     }).join('');
     el.queueEmpty.classList.toggle('hidden', s.queue.length > 0);
     el.queueList.classList.toggle('hidden', !s.queue.length);
     // čipy, ktoré sa nezmestia, sa skryjú (nikdy nie polovičný čip)
     const box = el.queueList.getBoundingClientRect();
-    for (const li of el.queueList.children) { const r = li.getBoundingClientRect(); li.classList.toggle('cut', r.right > box.right + 1 || r.bottom > box.bottom + 1); }
+    const bottom = Math.min(box.bottom, el.queueList.parentElement.getBoundingClientRect().bottom - 14);   // karta orezáva – nikdy nie polovičný riadok
+    for (const li of el.queueList.children) li.classList.remove('cut');
+    let cut = false;
+    for (const li of el.queueList.children) { const r = li.getBoundingClientRect(); cut = cut || r.right > box.right + 1 || r.bottom > bottom + 1; li.classList.toggle('cut', cut); }
     // súhrn: najväčší sklz ambulancie, v ktorej niekto čaká
     const withQ = (s.rooms || []).filter((r) => s.queue.some((q) => q.roomId === r.id));
     const ds = withQ.map((r) => roomDelay(r.id, s));
