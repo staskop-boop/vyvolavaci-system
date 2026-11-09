@@ -499,7 +499,7 @@
     if (!src) return;
     const f = document.createElement('iframe');
     f.src = src;
-    f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture';
+    f.allow = 'autoplay; encrypted-media; fullscreen; picture-in-picture; storage-access';
     f.referrerPolicy = 'no-referrer';
     el.tvVideo.insertBefore(f, el.tvVideo.firstChild);
   }

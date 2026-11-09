@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "AdNa – TV prehrávač v obrazovke čakárne",
-  "version": "1.0",
-  "description": "Iba pre kioskový profil obrazovky AdNa: dovolí zobraziť webový prehrávač Antik TV vo vyhradenej zóne stránky /obrazovka/.",
-  "permissions": ["declarativeNetRequest"],
-  "host_permissions": ["https://webtv.sk/*", "https://*.webtv.sk/*", "https://*.antik.sk/*", "https://*.antiktv.sk/*"],
+  "version": "1.1",
+  "description": "Iba pre kioskový profil obrazovky AdNa: dovolí zobraziť a prihlásiť webový prehrávač Antik TV vo vyhradenej zóne stránky /obrazovka/.",
+  "permissions": ["declarativeNetRequest", "webRequest", "cookies", "privacy", "contentSettings", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "pozadie.js" },
   "declarative_net_request": { "rule_resources": [{ "id": "ramec", "enabled": true, "path": "rules.json" }] }
 }
