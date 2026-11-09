@@ -47,6 +47,18 @@ a DNS; tajomstvá `HCLOUD_TOKEN` a `ADNA_HESLO` netreba. Na serveri v ambulancii
 `vyvolavaci` → Configure. Cookie prihlásenia je pri prístupe cez HTTPS automaticky `Secure`, takže sestry sa
 prihlásia cez `https://vyvolavaci.adna.sk` aj cez `http://IP:8080` v LAN (bez `ADNA_SECURE_COOKIE`).
 
+**Windows server / PC** – jeden skript (PowerShell **ako správca**):
+
+```powershell
+irm https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/deploy/windows/Instalovat-server.ps1 -OutFile $env:TEMP\adna.ps1
+powershell -ExecutionPolicy Bypass -File $env:TEMP\adna.ps1
+```
+
+Nainštaluje Node.js 22, kód do `C:\AdNa\app` (údaje v `C:\AdNa\data`), úlohy „AdNa server“ (pri štarte, aj bez
+prihlásenia), „AdNa aktualizácia“ (každých 15 min z `main`, so zálohou) a „AdNa záloha“ (22:30), firewall 8080
+pre LAN a na požiadanie `cloudflared` s tokenom tunela. Na konci vypíše inštalačný kód pre prvé prihlásenie.
+Skript sa overuje v CI na čistom Windows (job `windows`).
+
 ### Ručne (ak nechcete Actions)
 
 1. Zero Trust → Networks → Tunnels → Create → Cloudflared → `vyvolavaci`, skopírovať token; Public hostname
