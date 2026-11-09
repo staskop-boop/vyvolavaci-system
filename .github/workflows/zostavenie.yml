@@ -53,7 +53,9 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File C:\AdNa\aktualizuj.ps1 -Vetva $ref -Vynutit
           Start-Sleep 5
           Invoke-RestMethod http://localhost:8080/api/health
-          Get-ChildItem C:\AdNa\data\zalohy
+          $z = @(Get-ChildItem C:\AdNa\data\zalohy -Filter *.db)
+          if ($z.Count -lt 1) { throw "Chýba záloha" }
+          $z | ForEach-Object { $_.Name }
           Get-Content C:\AdNa\aktualizacia.log
 
   apk:

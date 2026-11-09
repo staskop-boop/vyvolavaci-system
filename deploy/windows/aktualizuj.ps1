@@ -34,7 +34,11 @@ if ($npmKod -ne 0) { Zapis "⚠ npm ci zlyhalo ($npmKod) – ostáva doterajšia
 
 if (Test-Path (Join-Path $App "server\scripts\zaloha.js")) {
   $env:ADNA_DATA_DIR = $Data
-  Push-Location (Join-Path $App "server"); & $node --disable-warning=ExperimentalWarning scripts\zaloha.js 2>&1 | Out-Null; Pop-Location
+  Push-Location (Join-Path $App "server")
+  $vystup = (& $node --disable-warning=ExperimentalWarning scripts\zaloha.js 2>&1 | Out-String).Trim()
+  $zKod = $LASTEXITCODE
+  Pop-Location
+  if ($zKod -eq 0) { Zapis $vystup } else { Zapis "⚠ Záloha zlyhala ($zKod): $vystup" }
 }
 Stop-ScheduledTask -TaskName "AdNa server" -ErrorAction SilentlyContinue
 Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -like "*src\index.js*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
