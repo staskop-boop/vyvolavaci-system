@@ -42,11 +42,15 @@ rm -f "$TOKEN_FILE"
 
 echo "== 5/6 Spustenie =="
 docker compose up -d --build
-for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 2; done
+for i in $(seq 1 60); do curl -fsS -o /dev/null http://127.0.0.1:8080/api/health 2>/dev/null && break; sleep 2; done
 
+# 2026-11-09: tento krok na Hetzneri skončil nenulovým kódom (heslo sa pritom nastavilo) a set -e ukončil
+# inštaláciu ešte pred zápisom plánovača – automatická aktualizácia potom nikdy nebežala. Chyba tu už inštaláciu nezastaví.
 if [ -s "$HESLO_FILE" ]; then
-  ADNA_NEW_PASSWORD=$(tr -d '\r\n' < "$HESLO_FILE") docker compose exec -T -e ADNA_NEW_PASSWORD adna \
-    node --disable-warning=ExperimentalWarning src/cli.js
+  if ! ADNA_NEW_PASSWORD=$(tr -d '\r\n' < "$HESLO_FILE") docker compose exec -T -e ADNA_NEW_PASSWORD adna \
+    node --disable-warning=ExperimentalWarning src/cli.js; then
+    echo "⚠ Nastavenie hesla skončilo chybou – overte prihlásenie do /sestra/ (heslo sa dá nastaviť znova: docker compose exec adna node src/cli.js)."
+  fi
 fi
 rm -f "$HESLO_FILE"
 

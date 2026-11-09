@@ -16,6 +16,8 @@ kreslí **malý počítač pripojený k TV cez HDMI**; televízor je len monitor
 ## Postup
 
 Najjednoduchšie: dvojklik na `1-NASTAVENIE.cmd` (kroky 3–5), potom `2-SPUSTIT-OBRAZOVKU.cmd`; záloha `3-ZALOHA-DVE-OKNA.cmd`.
+`4-AUTOMATICKY-START.cmd` (raz): obrazovka sa spustí sama po zapnutí PC (priečinok Po spustení), PC sa neuspí ani nevypne obraz.
+Mini PC beží nonstop, televízor sa zapína a vypína ovládačom. Automatické prihlásenie Windows: Win+R → `netplwiz`.
 
 1. Skopírujte priečinok `minipc` na mini PC, napr. do `C:\AdNa\minipc`.
 2. Prvé spustenie (PowerShell): `powershell -ExecutionPolicy Bypass -File C:\AdNa\minipc\spustit-obrazovku.ps1` (predvolene server `https://vyvolavaci.adna.sk`; v LAN `-Server http://IP-SERVERA:8080`)

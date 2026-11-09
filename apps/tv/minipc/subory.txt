@@ -3,6 +3,7 @@ spustit-obrazovku.ps1
 rozsirenie-tv-ramec/rules.json
 rozsirenie-tv-ramec/pozadie.js
 README.md
+4-AUTOMATICKY-START.cmd
 rozsirenie-tv-ramec/cela-zona.js
 # manifest až na konci – odkazuje na súbory vyššie, musia byť stiahnuté skôr
 rozsirenie-tv-ramec/manifest.json

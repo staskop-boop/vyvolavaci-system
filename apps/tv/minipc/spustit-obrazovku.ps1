@@ -12,7 +12,9 @@ param(
   # Obraz TV pri 1920×1080, dizajn v3 (vypíše ho stránka: v konzole prehliadača window.AdNaLayout.tv)
   [int]$TvX = 642, [int]$TvY = 178, [int]$TvW = 1228, [int]$TvH = 698,
   # bez online aktualizácie spúšťača a rozšírenia (predvolene sa pri každom spustení stiahne najnovšia verzia)
-  [switch]$BezAktualizacie
+  [switch]$BezAktualizacie,
+  # jednorazové nastavenie mini PC: obrazovka sa spustí sama po zapnutí PC, počítač sa neuspí ani nevypne obraz
+  [switch]$Autostart
 )
 $ErrorActionPreference = "Stop"
 if ($Prehliadac -eq "edge") {
@@ -24,6 +26,21 @@ if ($Prehliadac -eq "edge") {
 }
 if (-not $chrome) { throw "Nenašiel sa prehliadač $Prehliadac. Nainštalujte ho a skript spustite znova." }
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ($Autostart) {
+  # spúšťač v priečinku Po spustení (Startup) aktuálneho používateľa – netreba práva správcu
+  $po = [Environment]::GetFolderPath("Startup")
+  $cmd = Join-Path $dir "2-SPUSTIT-OBRAZOVKU.cmd"
+  Set-Content -Encoding ASCII -Path (Join-Path $po "AdNa-obrazovka.cmd") -Value "@echo off`r`nstart `"`" /min cmd /c `"$cmd`""
+  # bez uspávania, hibernácie a vypínania obrazovky (pri napájaní zo siete)
+  foreach ($a in @("standby-timeout-ac", "monitor-timeout-ac", "hibernate-timeout-ac", "disk-timeout-ac")) { powercfg /change $a 0 | Out-Null }
+  Write-Host ""
+  Write-Host "Hotovo: obrazovka AdNa sa spustí sama po zapnutí počítača (priečinok Po spustení)." -ForegroundColor Green
+  Write-Host "Počítač sa už neuspí a nevypne obraz."
+  Write-Host "Ešte: automatické prihlásenie Windows – Win+R, netplwiz, zrušte 'Používatelia musia zadať meno a heslo'."
+  Write-Host "Vypnutie automatického štartu: zmažte súbor $po\AdNa-obrazovka.cmd"
+  Read-Host "Stlačte Enter"
+  return
+}
 $profil = Join-Path $env:LOCALAPPDATA "AdNa\obrazovka-profil"     # tu ostáva prihlásenie do Antik TV
 New-Item -ItemType Directory -Force -Path $profil | Out-Null
 
