@@ -142,7 +142,7 @@ runcmd:
   done
   [ -n "$SID" ] || chyba "Hetzner nevytvoril žiadny server (skúste inú lokalitu: fsn1, hel1)."
   hc POST "/servers/$SID/actions/enable_backup"
-  [ "$HC_KOD" = 201 ] && echo "zálohy Hetzner zapnuté" || echo "zálohy Hetzner sa nepodarilo zapnúť (HTTP $HC_KOD) – zapnite ich v konzole"
+  case "$HC_KOD" in 20[01]) true;; *) false;; esac && echo "zálohy Hetzner zapnuté" || echo "zálohy Hetzner sa nepodarilo zapnúť (HTTP $HC_KOD) – zapnite ich v konzole"
 fi
 
 echo "== Čakám na spojenie tunela (inštalácia trvá 3 – 8 min) =="
