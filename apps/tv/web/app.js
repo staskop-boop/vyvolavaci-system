@@ -28,7 +28,9 @@
   const health = window.AdNaDisplay = { ok: false, online: false, lastMessageAt: 0 };
 
   const params = new URLSearchParams(location.search);
-  if (params.get('zona') === 'prazdna') document.body.classList.add('zone-empty');
+  // režim „okna“: prehrávač je samostatné okno nad TV zónou → vložený prehrávač sa nenačíta, aj keď je nastavený
+  const zoneEmpty = params.get('zona') === 'prazdna';
+  if (zoneEmpty) document.body.classList.add('zone-empty');
   let state = null;
   let clockOffset = 0;   // serverový čas − lokálny čas (TV nemusí mať presné hodiny)
   let tvSrc = null;
@@ -634,7 +636,7 @@
     if (s.serverTime) clockOffset = Date.parse(s.serverTime) - Date.now();
     renderHeader(s.screen);
     renderInfo(s.screen);
-    setTvSource(s.tvSource || null);
+    setTvSource(zoneEmpty ? null : (s.tvSource || null));
     renderAnnouncement(s.announcement);
     el.ticker.classList.toggle('no-news', s.newsEnabled === false);
     if (soundEnabled !== !!s.soundEnabled) { soundEnabled = !!s.soundEnabled; updateSoundUi(); }

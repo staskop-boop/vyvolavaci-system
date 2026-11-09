@@ -133,6 +133,13 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
   await step('vložený prehrávač (tvSource) sa zobrazí v TV zóne', async () => {
     await api('PUT', '/api/admin/settings', { tvSource: BASE + '/shared/index.html' });
     await page.waitForSelector('#tvVideo iframe', { timeout: 5000 });
+    // v režime „okna“ (?zona=prazdna) sa vložený prehrávač nenačíta ani pri nastavenej adrese
+    const p3 = await b.newPage({ viewport: { width: 1280, height: 720 } });
+    await p3.goto(BASE + '/obrazovka/?zona=prazdna');
+    await p3.waitForFunction(() => window.__adnaTest.states > 0);
+    await sleep(300);
+    assert.equal(await p3.locator('#tvVideo iframe').count(), 0);
+    await p3.close();
     await api('PUT', '/api/admin/settings', { tvSource: '' });
     await page.waitForFunction(() => !document.querySelector('#tvZone iframe'));
   });
