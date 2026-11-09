@@ -30,6 +30,32 @@ jobs:
           docker exec adna test -f /data/SETUP-KOD.txt
           docker logs adna | tail -5
 
+  windows:
+    # skutočný inštalačný skript pre lokálny server v ambulancii na čistom Windows (bez tunela)
+    runs-on: windows-latest
+    steps:
+      - name: Inštalácia servera na Windows a kontrola
+        shell: powershell
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $ref = "${{ github.sha }}"
+          Invoke-WebRequest "https://raw.githubusercontent.com/${{ github.repository }}/$ref/deploy/windows/Instalovat-server.ps1" -OutFile "$env:TEMP\adna.ps1"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\adna.ps1" -Vetva $ref -BezTunela
+          Invoke-RestMethod http://localhost:8080/api/health
+          if (-not (Test-Path C:\AdNa\data\SETUP-KOD.txt)) { throw "Chýba inštalačný kód" }
+          (Invoke-WebRequest -UseBasicParsing http://localhost:8080/sestra/).StatusCode
+          Get-ScheduledTask -TaskName "AdNa*" | Format-Table TaskName, State
+          # bez nového commitu aktualizácia nič nerobí a server beží ďalej
+          powershell -NoProfile -ExecutionPolicy Bypass -File C:\AdNa\aktualizuj.ps1 -Vetva $ref
+          # vynútená aktualizácia: záloha, výmena kódu, reštart
+          powershell -NoProfile -ExecutionPolicy Bypass -File C:\AdNa\aktualizuj.ps1 -Vetva $ref -Vynutit
+          Start-Sleep 5
+          Invoke-RestMethod http://localhost:8080/api/health
+          Get-ChildItem C:\AdNa\data\zalohy
+          Get-Content C:\AdNa\aktualizacia.log
+
   apk:
     runs-on: ubuntu-latest
     strategy:
