@@ -1,4 +1,4 @@
-# AdNa – spustenie obrazovky v čakárni na mini PC (Windows 10/11) pripojenom cez HDMI k televízoru Samsung.
+﻿# AdNa – spustenie obrazovky v čakárni na mini PC (Windows 10/11) pripojenom cez HDMI k televízoru Samsung.
 # Použitie: v Plánovači úloh spúšťať pri prihlásení používateľa (pozri README.md).
 #   Rezim "ramec" (odporúčaný): jedno okno na celú obrazovku, prehrávač Antik TV je vložený v TV zóne.
 #   Rezim "okna"  (záloha):     stránka AdNa na celú obrazovku + samostatné okno prehrávača presne nad TV zónou.
