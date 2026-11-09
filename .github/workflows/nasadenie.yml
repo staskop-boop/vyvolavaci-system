@@ -6,6 +6,11 @@ name: Nasadenie vyvolavaci.adna.sk
 on:
   workflow_dispatch:
     inputs:
+      server:
+        description: 'Kde beží server: hetzner (VPS) alebo lokalny (server v ambulancii)'
+        type: choice
+        options: [hetzner, lokalny]
+        default: hetzner
       emaily:
         description: 'E-maily s prístupom k /tablet a /api/kiosk (čiarkou)'
         default: 'stasko@adna.sk'
@@ -33,6 +38,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
           ADNA_HESLO: ${{ secrets.ADNA_HESLO }}
+          SERVER: ${{ inputs.server }}
           EMAILY: ${{ inputs.emaily }}
           IP_AMBULANCIE: ${{ inputs.ip_ambulancie }}
           TYP_SERVERA: ${{ inputs.typ_servera }}
