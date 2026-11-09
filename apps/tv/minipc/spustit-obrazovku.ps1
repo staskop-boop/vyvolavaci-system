@@ -37,6 +37,15 @@ if ($Rezim -eq "ramec") {
   if ($Nastavenie) { Start-Process $chrome -ArgumentList ($spolocne + @($rozsirenia, "$Server/obrazovka/?hlas=test")); return }
   Start-Process $chrome -ArgumentList ($spolocne + @("--kiosk", "$Server/obrazovka/"))
 } else {
+  # súradnice platia pre 1920×1080; pri inom rozlíšení alebo zväčšení (125 %, 150 %) ich prepočítame podľa šírky obrazovky
+  if (-not ($PSBoundParameters.ContainsKey("TvX") -or $PSBoundParameters.ContainsKey("TvW"))) {
+    Add-Type -AssemblyName System.Windows.Forms
+    $obr = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $k = $obr.Width / 1920.0
+    if ([math]::Abs($k - 1) -gt 0.01) {
+      $TvX = [int]($TvX * $k); $TvY = [int]($TvY * $k); $TvW = [int]($TvW * $k); $TvH = [int]($TvH * $k)
+    }
+  }
   Start-Process $chrome -ArgumentList ($spolocne + @("--kiosk", "$Server/obrazovka/?zona=prazdna"))
   Start-Sleep 6
   $profil2 = Join-Path $env:LOCALAPPDATA "AdNa\prehravac-profil"
