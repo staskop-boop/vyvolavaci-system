@@ -1,6 +1,6 @@
 // Service worker: ukladá do vyrovnávacej pamäte IBA súbory aplikácie (nie údaje z API).
-const CACHE = 'adna-sestra-v1';
-const SHELL = ['/sestra/', '/sestra/index.html', '/sestra/app.js', '/sestra/styles.css', '/sestra/icon.svg',
+const CACHE = 'adna-sestra-v2';
+const SHELL = ['/sestra/', '/sestra/index.html', '/sestra/app.js', '/sestra/styles.css', '/sestra/icon.svg', '/sestra/adna-logo.png',
   '/sestra/manifest.webmanifest', '/shared/adna-client.js', '/shared/adna-theme.css'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

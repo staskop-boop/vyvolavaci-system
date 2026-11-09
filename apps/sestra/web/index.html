@@ -4,21 +4,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AdNa – Sestra</title>
-<meta name="theme-color" content="#c8102e">
+<meta name="theme-color" content="#BC1A21">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/obrazovka/fonts/fonts.css">
 <link rel="stylesheet" href="/shared/adna-theme.css">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+<div class="bg-band" aria-hidden="true"></div>
 <header class="topbar" id="topbar" hidden>
-  <div class="brand"><span class="adna-wordmark">Ad<span class="accent">Na</span></span><span class="brand-sub">Sestra</span></div>
+  <div class="brand">
+    <img class="brand-logo" src="adna-logo.png" alt="AdNa s.r.o." width="360" height="340">
+    <span class="brand-div" aria-hidden="true"></span>
+    <div class="brand-text"><span class="brand-title">Sestra</span><span class="brand-sub" id="brand-sub">Vyvolávací systém</span></div>
+  </div>
   <nav class="tabs" aria-label="Hlavná ponuka">
     <button type="button" data-view="queue" class="tab">Zoznam</button>
     <button type="button" data-view="history" class="tab">História</button>
     <button type="button" data-view="admin" class="tab" id="tab-admin">Nastavenia</button>
   </nav>
   <div class="topright">
+    <div class="clock" aria-hidden="true"><b id="clock-time"></b><span id="clock-date"></span></div>
     <span class="who" id="who"></span>
     <span id="conn" class="conn conn-connecting" role="status" aria-live="polite">Pripája sa…</span>
     <button type="button" class="btn btn-ghost" id="btn-logout">Odhlásiť</button>

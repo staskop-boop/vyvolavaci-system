@@ -133,7 +133,8 @@
     stopSocket();
     $topbar.hidden = true;
     $view.innerHTML = `<form class="auth-wrap card stack" id="f">
-      <span class="adna-wordmark">Ad<span class="accent">Na</span></span>
+      <img class="auth-logo" src="adna-logo.png" alt="AdNa s.r.o.">
+      <h1>Sestra</h1>
       <div class="sub">Prvotné nastavenie hesla personálu</div>
       <p class="hint">Inštalačný kód vypísal server pri prvom spustení do konzoly a uložil do súboru
         <b>server/data/SETUP-KOD.txt</b> na počítači so serverom.</p>
@@ -165,7 +166,8 @@
     S.user = null; S.staff = null;
     $topbar.hidden = true;
     $view.innerHTML = `<form class="auth-wrap card stack" id="f">
-      <span class="adna-wordmark">Ad<span class="accent">Na</span></span>
+      <img class="auth-logo" src="adna-logo.png" alt="AdNa s.r.o.">
+      <h1>Sestra</h1>
       <div class="sub">Prihlásenie personálu</div>
       <div class="field"><label for="un">Konto</label><input type="text" id="un" autocomplete="username" autocapitalize="none" value="${esc(lsGet(LS_USER) || 'personal')}" required></div>
       <div class="field"><label for="pw">Heslo</label><input type="password" id="pw" autocomplete="current-password" required></div>
@@ -231,6 +233,14 @@
     showLogin();
   };
 
+  // hodiny v hlavičke
+  function tick() {
+    const d = new Date();
+    document.getElementById('clock-time').textContent = d.toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('clock-date').textContent = d.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  tick(); setInterval(tick, 15000);
+
   // ---------- zoznam ----------
   // v2.1: každá ambulancia vidí predvolene svojich pacientov (+ spoločných, napr. z tabletu)
   const showAll = () => lsGet(LS_ALL) === '1';
@@ -293,10 +303,10 @@
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
     const waitRows = waiting.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}${all && t.homeRoomName ? `<span class="room-tag">${esc(t.homeRoomName)}</span>` : ''}</td><td class="nw">${plannedBadge(t, now)}
+      <td class="code">${esc(t.code)}${all && t.homeRoomName ? `<span class="room-tag">${esc(t.homeRoomName)}</span>` : ''}</td><td class="nw t-plan">${plannedBadge(t, now)}
         <button class="btn btn-sm btn-ghost needs-online" data-act="plan" data-id="${t.id}" ${dis} title="Zmeniť plánovaný čas">${t.plannedAt ? 'Zmeniť' : 'Zadať čas'}</button></td>
-      <td class="nw">${esc(fmtTime(t.createdAt))}</td><td class="nw">${esc(fmtWait(t.createdAt, now))}</td>
-      <td>${t.source === 'card' ? '<span class="badge">Od sestry</span>' : printBadge(t.print)}</td>
+      <td class="nw t-arr">${esc(fmtTime(t.createdAt))}</td><td class="nw t-wait">${esc(fmtWait(t.createdAt, now))}</td>
+      <td class="t-src">${t.source === 'card' ? '<span class="badge">Od sestry</span>' : printBadge(t.print)}</td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis}>Vyvolať${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
@@ -304,11 +314,11 @@
       </div></td></tr>`).join('');
 
     const calledRows = called.map((t) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td>${esc(t.roomName || '')}</td><td>${esc(fmtTime(t.calledAt))}</td>
-      <td>${t.callCount}×</td>
+      <td class="code">${esc(t.code)}</td><td class="c-room">${esc(t.roomName || '')}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
+      <td class="c-count">${t.callCount}×</td>
       <td class="actions"><div class="acts">
+        <button class="btn btn-sm btn-primary needs-online" data-act="done" data-id="${t.id}" ${dis}>✓ Vybavený</button>
         <button class="btn btn-sm btn-dark needs-online" data-act="recall" data-id="${t.id}" ${dis}>Zopakovať</button>
-        <button class="btn btn-sm btn-primary needs-online" data-act="done" data-id="${t.id}" ${dis}>Vybavený</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis}>Vrátiť</button>
       </div></td></tr>`).join('');
@@ -318,46 +328,77 @@
       <td>${esc(t.roomName || '')}</td><td>${esc(fmtTime(t.finishedAt))}</td>
       <td class="actions"><button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">Vrátiť</button></td></tr>`).join('');
 
+    // ďalší na rade – veľká karta s hlavnou akciou
+    const next = waiting[0] || null;
+    let heroInfo;
+    if (next) {
+      const pills = [`<span class="pill">príchod ${esc(fmtTime(next.createdAt))}</span>`, `<span class="pill">čaká ${esc(fmtWait(next.createdAt, now))}</span>`];
+      if (next.plannedAt) {
+        const late = Math.round((now - Date.parse(next.plannedAt)) / 60000);
+        const tol = st.settings.onTimeMinutes || 0;
+        pills.push(late > tol ? `<span class="pill late">mešká sa ${esc(fmtMin(late))}</span>` : `<span class="pill ok">v čase</span>`);
+      }
+      heroInfo = `<div class="hero-kicker">Ďalší na rade</div>
+        <div class="hero-main">${next.plannedAt ? 'Termín ' + esc(fmtTime(next.plannedAt)) : 'Bez termínu'}${waiting.length > 1 ? ` · potom ešte ${waiting.length - 1}` : ''}</div>
+        <div class="hero-meta">${pills.join('')}</div>`;
+    } else {
+      heroInfo = `<div class="hero-kicker">Ďalší na rade</div><div class="hero-main">Nikto nečaká</div>
+        <div class="hero-meta"><span class="pill">Pacienta pridáte tlačidlom „+ Pacient“</span></div>`;
+    }
+
     // zachovanie pozície posúvania pri prekreslení
     const scroll = window.scrollY;
-    $view.innerHTML = `<div class="stack">
-      <div class="card callbar">
-        <div class="field"><label for="room">Pracovisko (kam sa vyvoláva)</label>
-          <select id="room">${active.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}${r.id === def ? ' (predvolená)' : ''}</option>`).join('')}</select>
-          <label class="check hint"><input type="checkbox" id="room-def" ${S.roomId === def ? 'checked' : ''}> Predvolená pre tento počítač</label>
-          <label class="check hint"><input type="checkbox" id="show-all" ${all ? 'checked' : ''}> Zobraziť pacientov všetkých pracovísk</label>
+    const fin = document.querySelector('.fin-wrap');
+    const finScroll = fin ? fin.scrollTop : 0;
+    $view.innerHTML = `<div class="dash">
+      <div class="a-alerts">${alerts.join('')}</div>
+
+      <section class="hero a-hero" aria-label="Ďalší na rade">
+        <div class="hero-tile ${next ? (next.code.length > 3 ? 'long' : '') : 'empty'}">${next ? esc(next.code) : '—'}</div>
+        <div class="hero-info">${heroInfo}</div>
+        <div class="hero-actions">
+          <button class="btn btn-xl btn-call needs-online" id="btn-next" ${off || !waiting.length || !S.roomId ? 'disabled' : ''}>Vyvolať ďalšieho${waiting.length ? ' (' + esc(waiting[0].code) + ')' : ''}</button>
+          <button class="btn btn-add needs-online" id="btn-card" ${dis}>+ Pacient</button>
         </div>
-        <div class="grow counts">
-          <div class="count"><b id="cnt-waiting">${waiting.length}</b><span>čaká${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
+      </section>
+
+      <section class="card now a-now"><div class="panel-title"><h2><span class="live-dot" aria-hidden="true"></span>Práve v ambulancii (${called.length})</h2></div>
+        ${called.length ? `<table id="tbl-called"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Vyvolaný</th><th>Počet</th><th></th></tr></thead><tbody>${calledRows}</tbody></table>`
+          : '<div class="empty">Momentálne nie je nikto vyvolaný.</div>'}
+      </section>
+
+      <section class="card a-waiting"><div class="section-title"><h2>Čakajúci (${waiting.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
+        ${waiting.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th>Lístok</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
+          : '<div class="empty">Nikto nečaká.</div>'}
+      </section>
+
+      <div class="stack a-side">
+        <div class="counts">
+          <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>čaká${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
           <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
-          <div class="count"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení</span></div>
+          <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení</span></div>
           <div class="count"><b>${finished.filter((t) => t.status === 'absent').length}</b><span>neprítomní</span></div>
         </div>
-        <div class="callbar-actions">
-        <button class="btn needs-online ${st.announcement ? 'btn-primary' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
-        <button class="btn needs-online" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : '⚠ Zadať lekára'}</button>
-        <button class="btn needs-online" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
-        <button class="btn btn-dark btn-xl needs-online" id="btn-card" ${dis}>+ Pacient</button>
-        <button class="btn btn-primary btn-xl needs-online" id="btn-next" ${off || !waiting.length || !S.roomId ? 'disabled' : ''}>Vyvolať ďalšieho${waiting.length ? ' (' + esc(waiting[0].code) + ')' : ''}</button>
-        </div>
-      </div>
-      ${alerts.join('')}
-      <div class="grid2">
-        <section class="card"><div class="section-title"><h2>Čakajúci (${waiting.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
-          ${waiting.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th>Lístok</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
-            : '<div class="empty">Nikto nečaká.</div>'}
+        <section class="card work"><div class="panel-title"><h2>Pracovisko</h2></div>
+          <div class="field"><label for="room">Kam sa vyvoláva</label>
+            <select id="room">${active.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}${r.id === def ? ' (predvolená)' : ''}</option>`).join('')}</select></div>
+          <div class="work-checks">
+            <label class="check hint"><input type="checkbox" id="room-def" ${S.roomId === def ? 'checked' : ''}> Predvolená pre tento počítač</label>
+            <label class="check hint"><input type="checkbox" id="show-all" ${all ? 'checked' : ''}> Zobraziť pacientov všetkých pracovísk</label>
+          </div>
+          <div class="work-btns">
+            <button class="btn needs-online ${doctor ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : '⚠ Zadať lekára'}</button>
+            <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
+            <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
+          </div>
         </section>
-        <div class="stack">
-          <section class="card"><div class="section-title"><h2>Vyvolaní (${called.length})</h2></div>
-            ${called.length ? `<table id="tbl-called"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Vyvolaný</th><th>Počet</th><th></th></tr></thead><tbody>${calledRows}</tbody></table>`
-              : '<div class="empty">Momentálne nie je nikto vyvolaný.</div>'}
-          </section>
-          <section class="card"><div class="section-title"><h2>Vybavení a neprítomní</h2></div>
-            ${finished.length ? `<table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Ambulancia</th><th>Čas</th><th></th></tr></thead><tbody>${finRows}</tbody></table>`
-              : '<div class="empty">Zatiaľ nikto.</div>'}
-          </section>
-        </div>
+        <section class="card"><div class="section-title"><h2>Vybavení a neprítomní</h2></div>
+          ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Ambulancia</th><th>Čas</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
+            : '<div class="empty">Zatiaľ nikto.</div>'}
+        </section>
       </div></div>`;
+    const fin2 = document.querySelector('.fin-wrap');
+    if (fin2) fin2.scrollTop = finScroll;
     window.scrollTo(0, scroll);
 
     const sel = document.getElementById('room');
