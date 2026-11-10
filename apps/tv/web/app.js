@@ -687,6 +687,19 @@
   applyTheme();
   loadNews(); setInterval(loadNews, 5 * 60_000);
   setInterval(loadWeather, 10 * 60_000);
+  // po aktualizácii servera (zmenil sa identifikátor spustenia) sa obrazovka obnoví – keď práve nikoho nevyvoláva
+  let bootId = null;
+  async function checkBoot() {
+    try {
+      const h = await (await fetch('/api/health', { cache: 'no-store' })).json();
+      if (!h.boot) return;
+      if (bootId && h.boot !== bootId) {
+        if (el.tvCall.classList.contains('hidden')) location.reload(); else return;   // počká na koniec vyvolania
+      }
+      bootId = h.boot;
+    } catch {}
+  }
+  checkBoot(); setInterval(checkBoot, 60_000);
 
   AdNa.connect('display', {
     onStatus: (s) => setOnline(s === 'online'),

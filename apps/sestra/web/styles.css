@@ -83,13 +83,14 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 
 /* ---------- prehľad (dashboard) ---------- */
 .dash { display: grid; gap: 16px; align-items: start; grid-template-columns: minmax(0, 1.55fr) minmax(360px, 1fr);
-  grid-template-areas: "alerts alerts" "hero now" "waiting side"; }
+  grid-template-areas: "room room" "hero now" "waiting side"; }
+.dash > .a-room { grid-area: room; }
 .dash > .a-alerts { grid-area: alerts; } .dash > .a-hero { grid-area: hero; } .dash > .a-now { grid-area: now; }
 .dash > .a-waiting { grid-area: waiting; } .dash > .a-side { grid-area: side; }
 .a-alerts:empty { display: none; }
 .dash > .a-hero, .dash > .a-now { align-self: stretch; }
 @media (max-width: 1180px) {
-  .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: "alerts" "hero" "now" "waiting" "side"; }
+  .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: "room" "hero" "now" "waiting" "side"; }
 }
 
 /* ďalší na rade + hlavné akcie: červená karta ako „Vyvolávame“ na TV */
@@ -118,7 +119,8 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 /* práve v ambulancii */
 .now h2, .panel-title h2 { display: flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-size: 16px; color: var(--red); margin: 0; }
 .live-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 4px rgba(188,26,33,0.18); }
-.now .empty { padding: 26px 6px; }
+.now { display: flex; flex-direction: column; }
+.now .empty { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px 6px; }
 #tbl-called, #tbl-called tbody { display: block; }
 #tbl-called thead { display: none; }
 #tbl-called tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "code room count" "code time count" "acts acts acts"; column-gap: 16px; row-gap: 2px; align-items: center;
@@ -145,12 +147,6 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 /* pracovisko */
 .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .panel-title h2 { color: var(--grey); }
-.work .field select { font-weight: 700; font-size: 18px; padding: 12px; }
-.work-checks { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.work-btns { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 14px; }
-.work-btns .btn { justify-content: flex-start; padding: 12px 14px; white-space: normal; text-align: left; }
-.work-btns .btn.on { border-color: var(--red); background: var(--blush); color: var(--red-dark); }
-.work-btns .btn.need { border-color: var(--adna-warn); background: var(--adna-warn-bg); color: #6b4200; }
 
 /* ---------- formuláre ---------- */
 .field { display: flex; flex-direction: column; gap: 6px; }
@@ -176,7 +172,7 @@ td.actions .btn { margin-left: 6px; }
 td.actions .acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 td.actions .acts .btn { margin: 0; }
 td.nw, td.code { white-space: nowrap; }
-.empty { color: var(--grey); padding: 22px 6px; text-align: center; }
+.empty { color: var(--grey); padding: 10px 6px 4px; text-align: center; }
 #tbl-waiting tbody tr:hover { background: var(--blush); }
 #tbl-waiting tbody tr:first-child td { background: linear-gradient(90deg, var(--blush), rgba(255,244,244,0)); }
 #tbl-waiting tbody tr:first-child td:first-child { border-radius: 14px 0 0 14px; box-shadow: inset 4px 0 0 var(--red); }
@@ -264,3 +260,24 @@ td.nw, td.code { white-space: nowrap; }
 .delta.ok { background: var(--ok-bg); color: var(--ok); }
 .delta.late { background: #fdeeee; color: var(--red-dark); }
 .room-tag { display: inline-block; font-family: var(--font-body); font-size: 12px; color: var(--grey); background: var(--blush); border-radius: 999px; padding: 1px 8px; margin-left: 6px; font-weight: 600; vertical-align: middle; }
+
+/* pracovisko – veľký a jasný názov ambulancie, kam sestra vyvoláva */
+.roombar { display: grid; grid-template-columns: auto 1fr auto; gap: 14px 22px; align-items: center; padding: 14px 18px; background: #fff;
+  border-radius: var(--r-card); border: 2px solid rgba(255,255,255,0.9); box-shadow: var(--card-shadow); }
+.rb-id { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.rb-num { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: #fff;
+  font-family: var(--font-display); font-weight: 800; font-size: 38px; background: var(--rb, var(--red)); box-shadow: 0 8px 20px rgba(26,26,26,0.18); flex: none; }
+.roombar.c1 { --rb: var(--red); } .roombar.c2 { --rb: #6B6A6A; } .roombar.c3 { --rb: var(--black); }
+.rb-kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey); }
+.rb-name { font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.1; color: var(--black); }
+.rb-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.rb-btns .btn { padding: 11px 14px; }
+.rb-btns .btn.on { border-color: var(--red); background: var(--blush); color: var(--red-dark); }
+.rb-btns .btn.need { border-color: var(--adna-warn); background: var(--adna-warn-bg); color: #6b4200; }
+.rb-pick { display: flex; flex-direction: column; gap: 4px; min-width: 230px; }
+.rb-pick select { font-weight: 700; padding: 8px 10px; }
+.rb-pick .check { font-size: 13px; gap: 8px; }
+.rb-pick .check input { width: 16px; height: 16px; }
+@media (max-width: 1180px) { .roombar { grid-template-columns: 1fr auto; } .rb-btns { grid-column: 1 / -1; justify-content: flex-start; } }
+@media (max-width: 640px) { .roombar { grid-template-columns: 1fr; } .rb-name { font-size: 26px; } .rb-num { width: 52px; height: 52px; font-size: 30px; }
+  .rb-btns .btn { flex: 1 1 auto; } }
