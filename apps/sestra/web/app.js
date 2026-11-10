@@ -350,8 +350,27 @@
     const scroll = window.scrollY;
     const fin = document.querySelector('.fin-wrap');
     const finScroll = fin ? fin.scrollTop : 0;
+    // pracovisko: veľký názov ambulancie, kam sa vyvoláva (farba ako na TV: 1. červená, 2. sivá, 3. čierna)
+    const ri = Math.max(0, active.findIndex((r) => r.id === S.roomId));
+    const roomNow = active[ri];
+    const roomNo = roomNow ? ((String(roomNow.name).match(/(\d+)/) || [])[1] || String(ri + 1)) : '–';
     $view.innerHTML = `<div class="dash">
-      <div class="a-alerts">${alerts.join('')}</div>
+      <div class="a-room stack"><section class="roombar c${(ri % 3) + 1}" aria-label="Pracovisko">
+        <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
+          <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
+        <div class="rb-btns">
+          <button class="btn needs-online ${doctor ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : '⚠ Zadať lekára'}</button>
+          <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
+          <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
+        </div>
+        <div class="rb-pick">
+          <label class="lbl" for="room">Zmeniť pracovisko</label>
+          <select id="room">${active.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}${r.id === def ? ' (predvolená)' : ''}</option>`).join('')}</select>
+          <label class="check hint"><input type="checkbox" id="room-def" ${S.roomId === def ? 'checked' : ''}> Predvolená pre tento počítač</label>
+          <label class="check hint"><input type="checkbox" id="show-all" ${all ? 'checked' : ''}> Pacienti všetkých pracovísk</label>
+        </div>
+      </section>
+      ${alerts.length ? `<div class="a-alerts">${alerts.join('')}</div>` : ''}</div>
 
       <section class="hero a-hero" aria-label="Ďalší na rade">
         <div class="hero-tile ${next ? (next.code.length > 3 ? 'long' : '') : 'empty'}">${next ? esc(next.code) : '—'}</div>
@@ -379,19 +398,6 @@
           <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení</span></div>
           <div class="count"><b>${finished.filter((t) => t.status === 'absent').length}</b><span>neprítomní</span></div>
         </div>
-        <section class="card work"><div class="panel-title"><h2>Pracovisko</h2></div>
-          <div class="field"><label for="room">Kam sa vyvoláva</label>
-            <select id="room">${active.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}${r.id === def ? ' (predvolená)' : ''}</option>`).join('')}</select></div>
-          <div class="work-checks">
-            <label class="check hint"><input type="checkbox" id="room-def" ${S.roomId === def ? 'checked' : ''}> Predvolená pre tento počítač</label>
-            <label class="check hint"><input type="checkbox" id="show-all" ${all ? 'checked' : ''}> Zobraziť pacientov všetkých pracovísk</label>
-          </div>
-          <div class="work-btns">
-            <button class="btn needs-online ${doctor ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : '⚠ Zadať lekára'}</button>
-            <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
-            <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
-          </div>
-        </section>
         <section class="card"><div class="section-title"><h2>Vybavení a neprítomní</h2></div>
           ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Ambulancia</th><th>Čas</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
             : '<div class="empty">Zatiaľ nikto.</div>'}

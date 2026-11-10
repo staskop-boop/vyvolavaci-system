@@ -3,6 +3,8 @@ const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs');
 const express = require('express');
+// identifikátor spustenia servera – po aktualizácii (reštarte) sa zmení a obrazovka v čakárni sa sama obnoví
+const BOOT_ID = Date.now().toString(36);
 const { WebSocketServer } = require('ws');
 const config = require('./config');
 const db = require('./db');
@@ -84,7 +86,7 @@ function createServer(opts = {}) {
   };
 
   // ---------- verejné ----------
-  app.get('/api/health', (req, res) => res.json({ ok: true, time: clock.nowIso(), day: clock.today() }));
+  app.get('/api/health', (req, res) => res.json({ ok: true, time: clock.nowIso(), day: clock.today(), boot: BOOT_ID }));
   app.get('/api/public/config', (req, res) => res.json(store.publicConfig()));
   app.get('/api/display/state', (req, res) => res.json(store.displayState()));
   app.get('/api/display/news', (req, res) => res.json(news.publicState()));
