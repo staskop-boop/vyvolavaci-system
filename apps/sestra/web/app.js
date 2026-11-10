@@ -488,15 +488,24 @@
       okText: cur ? 'Zmeniť oznam' : 'Zobraziť na TV',
       body: `<p class="hint">Oznam sa ihneď ukáže na obrazovke v čakárni (veľký text a namiesto lišty so správami) a zostane, kým ho niektorá sestra nezruší.</p>
         <div class="field"><label for="m-ann">Text oznamu (max. 300 znakov)</label><textarea id="m-ann" rows="4" maxlength="300" autofocus>${esc(cur ? cur.text : '')}</textarea></div>
-        <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:10px">${presets.map((p) => `<button type="button" class="btn btn-sm" style="white-space:normal;text-align:left;max-width:100%;height:auto" data-ann="${esc(p)}">${esc(p)}</button>`).join('')}</div>`,
+        <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:10px">${presets.map((p) => `<button type="button" class="btn btn-sm" style="white-space:normal;text-align:left;max-width:100%;height:auto" data-ann="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+        ${cur ? '<div class="row" style="margin-top:14px"><button type="button" class="btn btn-danger" id="m-ann-clear">✕ Odstrániť oznam z TV</button></div>' : ''}`,
       onOk: async (root) => {
         const text = root.querySelector('#m-ann').value.trim();
+        // prázdny text pri zapnutom ozname = odstrániť oznam
+        if (!text && cur) return api('/api/staff/announcement', { body: { text: null } }).then(() => 'cleared');
         if (!text) throw new Error('Napíšte text oznamu.');
         return api('/api/staff/announcement', { body: { text } });
       },
     });
-    if (res) toast('Oznam sa zobrazuje v čakárni.', 'ok');
+    if (res === 'cleared') toast('Mimoriadny oznam bol zrušený.', 'ok');
+    else if (res) toast('Oznam sa zobrazuje v čakárni.', 'ok');
   }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#m-ann-clear')) return;
+    const i = document.getElementById('m-ann'); if (i) i.value = '';
+    document.getElementById('m-ok').click();
+  });
   document.addEventListener('click', (e) => { const b = e.target.closest('button[data-ann]'); if (b) { const i = document.getElementById('m-ann'); if (i) { i.value = b.dataset.ann; i.focus(); } } });
 
   /** v2.1: oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon u pacienta v ambulancii). */

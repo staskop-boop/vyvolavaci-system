@@ -166,6 +166,24 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
     assert.ok(!(await tv.locator('#tickerAnn').isVisible()));
   });
 
+  await step('mimoriadny oznam: v okne sa dá odstrániť tlačidlom aj vymazaním textu', async () => {
+    const show = async () => {
+      await s2.click('#btn-announce'); await s2.waitForSelector('#m-ann');
+      await s2.fill('#m-ann', 'Skúšobný oznam'); await s2.click('#m-ok');
+      await tv.waitForFunction(() => !document.getElementById('tvAnnounce').classList.contains('hidden'), null, { timeout: 5000 });
+    };
+    const hidden = () => tv.waitForFunction(() => document.getElementById('tvAnnounce').classList.contains('hidden'), null, { timeout: 5000 });
+    await show();
+    await s2.click('#btn-announce'); await s2.click('#m-ann-clear'); await hidden();
+    await show();
+    await s2.click('#btn-announce'); await s2.fill('#m-ann', ''); await s2.click('#m-ok'); await hidden();
+    await s2.click('#btn-announce'); await s2.waitForSelector('#m-ann');
+    assert.equal(await s2.locator('#m-ann-clear').count(), 0, 'bez oznamu tlačidlo Odstrániť nie je');
+    await s2.click('#m-ok');
+    await s2.waitForFunction(() => /Napíšte text oznamu/.test(document.getElementById('m-err').textContent));
+    await s2.click('#m-cancel');
+  });
+
   await step('bez chýb JavaScriptu', async () => { assert.deepEqual(errors, []); });
   await b.close(); proc.kill('SIGTERM');
   console.log(`\nVýsledok: ${ok} OK`); process.exit(0);
