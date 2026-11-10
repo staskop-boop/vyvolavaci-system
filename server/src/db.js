@@ -98,6 +98,9 @@ function migrate(db) {
     db.exec("UPDATE rooms SET direction = 'right' WHERE name LIKE 'Ambulancia č. 1%'");
     db.exec("UPDATE rooms SET direction = 'left' WHERE name LIKE 'Ambulancia č. 2%'");
   }
+  // v3.2: lekár, ktorý ordinoval pri vyvolaní (pre štatistiky – zoznam lekárov v nastaveniach nie je historický)
+  const ecols = db.prepare('PRAGMA table_info(ticket_events)').all().map((c) => c.name);
+  if (!ecols.includes('doctor')) db.exec('ALTER TABLE ticket_events ADD COLUMN doctor TEXT');
   const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   // v2.1: konto sestry je priradené k pracovisku (ambulancii); null = všetky pracoviská
   if (!ucols.includes('room_id')) db.exec('ALTER TABLE users ADD COLUMN room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');

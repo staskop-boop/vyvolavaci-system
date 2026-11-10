@@ -188,7 +188,7 @@ td.nw, td.code { white-space: nowrap; }
   .topbar { margin: 8px 12px 0; top: 8px; gap: 10px; padding: 10px 14px; }
   .clock, .brand-sub { display: none; }
   .tabs { order: 3; flex-basis: 100%; }
-  .tab { flex: 1; padding: 9px 8px; }
+  .tab { flex: 1; padding: 9px 4px; font-size: 14px; min-width: 0; }
   .counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #tbl-waiting, #tbl-waiting tbody { display: block; }
   #tbl-waiting thead { display: none; }
@@ -249,7 +249,24 @@ td.nw, td.code { white-space: nowrap; }
 .error-text { color: var(--adna-danger); font-weight: 600; min-height: 1.4em; }
 .error-text:not(:empty)::before { content: "⚠ "; }
 
-.daylist button { width: 100%; text-align: left; display: flex; justify-content: space-between; margin-bottom: 6px; }
+.daylist button { width: 100%; text-align: left; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+  column-gap: 10px; row-gap: 2px; margin-bottom: 6px; white-space: normal; }
+.daylist button .hint { white-space: normal; }
+.daylist .open-badge { color: var(--adna-danger); font-weight: 700; }
+/* štatistiky lekárov (len správca) */
+.stats-filter { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.stats-filter .field { min-width: 150px; }
+.stats-scroll { overflow-x: auto; }
+.stats-table td { white-space: nowrap; }
+.stats-table th { white-space: normal; vertical-align: bottom; min-width: 64px; }
+.stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.stats-table tr.total td { font-weight: 800; border-top: 2px solid var(--blush-border); }
+.stats-table td.doc { white-space: normal; min-width: 180px; font-weight: 700; }
+.stats-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.stats-kpi { border: 1.5px solid var(--blush-border); border-radius: 14px; padding: 12px 14px; background: #fff; }
+.stats-kpi b { display: block; font-family: var(--font-display); font-size: 30px; line-height: 1.1; }
+.stats-kpi span { color: var(--grey); font-size: 14px; }
+.bad { color: var(--adna-danger); font-weight: 700; }
 .daylist button.active { border-color: var(--red); background: var(--blush); }
 .ev-note { color: var(--adna-warn); font-style: italic; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }

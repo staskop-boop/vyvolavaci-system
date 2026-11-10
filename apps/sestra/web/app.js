@@ -19,6 +19,7 @@
     socket: null,
     busy: false,         // prebieha akcia – zabráni dvojitému kliknutiu
     historyDay: null,
+    statsFrom: null, statsTo: null,
   };
 
   // ---------- pomocné ----------
@@ -200,6 +201,7 @@
   function startApp() {
     $topbar.hidden = false;
     document.getElementById('tab-admin').hidden = S.user.role !== 'admin';
+    document.getElementById('tab-stats').hidden = S.user.role !== 'admin';
     stopSocket();
     $view.innerHTML = '<div class="center-msg">Načítava sa zoznam…</div>';
     S.socket = connect('staff', {
@@ -224,6 +226,7 @@
     if (view === 'queue') renderQueue();
     if (view === 'history') renderHistory();
     if (view === 'admin') renderAdmin();
+    if (view === 'stats') renderStats();
   }
   document.querySelectorAll('.tab').forEach((t) => { t.onclick = () => go(t.dataset.view); });
   document.getElementById('btn-logout').onclick = async () => {
@@ -610,7 +613,7 @@
     if (!S.historyDay) S.historyDay = days.length ? days[0].day : (S.staff && S.staff.day);
     $view.innerHTML = `<div class="grid2" style="grid-template-columns:280px minmax(0,1fr)">
       <section class="card"><h2>Dni</h2><div class="daylist">${days.length ? days.map((d) => `<button class="btn ${d.day === S.historyDay ? 'active' : ''}" data-day="${esc(d.day)}">
-        <span>${esc(fmtDay(d.day))}</span><span class="hint">${d.total} čísel${(d.waiting + d.called) && d.day !== (S.staff && S.staff.day) ? ' · ' + (d.waiting + d.called) + ' nevybav.' : ''}</span></button>`).join('') : '<div class="empty">Žiadne záznamy.</div>'}</div></section>
+        <span>${esc(fmtDay(d.day))}</span><span class="hint">${d.total} čísel${(d.waiting + d.called) && d.day !== (S.staff && S.staff.day) ? ` · <span class="open-badge">${d.waiting + d.called} nevybavené</span>` : ''}</span></button>`).join('') : '<div class="empty">Žiadne záznamy.</div>'}</div></section>
       <section class="card" id="hist-detail"><div class="center-msg">Načítava sa…</div></section></div>`;
     $view.querySelectorAll('.daylist button').forEach((b) => { b.onclick = () => { S.historyDay = b.dataset.day; renderHistory(); }; });
     if (!S.historyDay) { document.getElementById('hist-detail').innerHTML = '<div class="empty">Žiadne záznamy.</div>'; return; }
@@ -621,11 +624,85 @@
       const rows = h.tickets.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
         <td>${esc(fmtTime(t.createdAt))}</td><td>${esc(t.roomName || '')}</td><td>${printBadge(t.print)}</td>
         <td class="hint">${(evBy[t.id] || []).map((e) => `${esc(fmtTime(e.at))} ${esc(EV_TEXT[e.type] || e.type)}${e.roomName && /call/.test(e.type) ? ' – ' + esc(e.roomName) : ''}${e.note && (e.type === 'call' || e.type === 'day_closed') ? ` <span class="ev-note">(${esc(e.note)})</span>` : ''}`).join('<br>')}</td></tr>`).join('');
+      const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${h.tickets.length} čísel</span></div>
-        ${h.day !== (S.staff && S.staff.day) && h.tickets.some((t) => t.status === 'waiting' || t.status === 'called') ? '<p class="alert alert-info">Nevybavené čísla z tohto dňa sa do nového dňa neprenášajú.</p>' : ''}
+        ${openPast ? `<div class="alert alert-warn"><div class="grow"><b>${openPast} nevybavené čísla</b> z tohto dňa ostali v stave Čaká alebo Vyvolaný.
+          Do nového dňa sa neprenášajú. Uzavretím ich označíte ako Neprítomný.</div>
+          <button class="btn btn-danger" id="btn-close-past">Uzavrieť nevybavené…</button></div>` : ''}
         ${h.tickets.length ? `<table><thead><tr><th>Číslo</th><th>Stav</th><th>Príchod</th><th>Ambulancia</th><th>Lístok</th><th>Priebeh</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">V tento deň nie sú žiadne čísla.</div>'}`;
+      const bc = document.getElementById('btn-close-past');
+      if (bc) bc.onclick = () => modal({
+        title: 'Uzavrieť nevybavené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
+        body: `<p>${openPast} čísel z ${esc(fmtDay(h.day))} bude označených ako <b>Neprítomný</b>. Záznam o uzavretí ostane v histórii.</p>`,
+        onOk: async () => {
+          const r = await api('/api/staff/close-past-day', { body: { day: h.day } });
+          toast(`Uzavretých čísel: ${r.closed} (označené ako Neprítomný).`, 'ok');
+          renderHistory();
+        },
+      });
     } catch (e) { handleError(e); }
+  }
+
+  // ---------- štatistiky lekárov (len správca) ----------
+  const isoDay = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bratislava' }).format(d);
+  const mins = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) + ' %' : '–');
+
+  async function renderStats() {
+    if (S.user.role !== 'admin') { $view.innerHTML = '<div class="center-msg">Štatistiky vidí len správca.</div>'; return; }
+    const today = (S.staff && S.staff.day) || isoDay(new Date());
+    if (!S.statsTo) S.statsTo = today;
+    if (!S.statsFrom) { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - 29); S.statsFrom = isoDay(d); }
+    $view.innerHTML = `<div class="stack">
+      <section class="card stack"><div class="section-title"><h2>Štatistiky lekárov</h2><span class="hint">Vidí len správca</span></div>
+        <form class="stats-filter" id="stats-form">
+          <div class="field"><label for="st-from">Od</label><input type="date" id="st-from" value="${esc(S.statsFrom)}" max="${esc(today)}"></div>
+          <div class="field"><label for="st-to">Do</label><input type="date" id="st-to" value="${esc(S.statsTo)}" max="${esc(today)}"></div>
+          <button class="btn btn-primary" type="submit">Zobraziť</button>
+          <button class="btn" type="button" data-range="0">Dnes</button>
+          <button class="btn" type="button" data-range="6">7 dní</button>
+          <button class="btn" type="button" data-range="29">30 dní</button>
+          <button class="btn" type="button" data-range="month">Tento mesiac</button>
+        </form></section>
+      <div id="stats-out"><div class="center-msg">Načítavajú sa štatistiky…</div></div></div>`;
+    const form = document.getElementById('stats-form');
+    form.onsubmit = (e) => { e.preventDefault(); S.statsFrom = val('st-from'); S.statsTo = val('st-to'); renderStats(); };
+    form.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => {
+      const d = new Date(today + 'T12:00:00');
+      if (b.dataset.range === 'month') d.setDate(1); else d.setDate(d.getDate() - Number(b.dataset.range));
+      S.statsFrom = isoDay(d); S.statsTo = today; renderStats();
+    }; });
+    let r;
+    try { r = await api(`/api/admin/stats?from=${encodeURIComponent(S.statsFrom)}&to=${encodeURIComponent(S.statsTo)}`); }
+    catch (e) { handleError(e); document.getElementById('stats-out').innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
+    const t = r.total;
+    const out = document.getElementById('stats-out');
+    if (!t.patients) { out.innerHTML = '<section class="card"><div class="empty">V tomto období nebol vyvolaný žiadny pacient.</div></section>'; return; }
+    const row = (d, cls = '') => `<tr class="${cls}"><td class="doc">${esc(d.doctor)}${d.rooms && d.rooms.length && !cls ? `<div class="hint">${esc(d.rooms.join(', '))}</div>` : ''}</td>
+      <td class="num">${d.days}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}${d.open ? ` <span class="hint">(+${d.open} nevyb.)</span>` : ''}</td>
+      <td class="num">${mins(d.avgWait)}</td><td class="num">${mins(d.medianWait)}</td>
+      <td class="num">${d.planned}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
+      <td class="num">${pct(d.onTime, d.planned)}</td><td class="num ${d.late15 ? 'bad' : ''}">${d.planned ? d.late15 : '–'}</td>
+      <td class="num">${mins(d.avgExam)}</td></tr>`;
+    out.innerHTML = `<div class="stack">
+      <section class="stats-kpis">
+        <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu</span></div>
+        <div class="stats-kpi"><b>${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánovanému času</span></div>
+        <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov s plánom vyvolaných načas (do 5 min)</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
+      </section>
+      <section class="card"><div class="stats-scroll"><table class="stats-table"><thead><tr>
+        <th>Lekár</th><th class="num">Dni</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th>
+        <th class="num">Ø čakanie</th><th class="num">Medián čak.</th>
+        <th class="num">S plán. časom</th><th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Mešk. &gt; 15 min</th>
+        <th class="num">Ø vyšetrenie</th></tr></thead>
+        <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
+        <p class="hint">Čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
+          Vyšetrenie = od vyvolania po „Vybavený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
+          ${r.doctorDataSince ? `Lekári sa ukladajú od ${esc(fmtDay(r.doctorDataSince))}; staršie vyvolania sú v riadku „Lekár nebol zadaný“.` : 'Pri vyvolaniach zatiaľ nebol zadaný lekár – nastavte ho v Zozname tlačidlom Lekár.'}</p>
+      </section></div>`;
   }
 
   // ---------- nastavenia ----------

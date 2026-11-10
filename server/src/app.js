@@ -144,8 +144,10 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/planned', requireStaff, (req, res) => res.json(store.setPlanned(id(req), req.body?.plannedTime, req.user.id)));
   app.get('/api/staff/days', requireStaff, (req, res) => res.json({ days: store.days() }));
   app.get('/api/staff/history', requireStaff, (req, res) => res.json(store.history(req.query.day)));
+  app.post('/api/staff/close-past-day', requireStaff, (req, res) => res.json(store.closePastDay(req.body?.day, req.user.id)));
 
   // ---------- administrácia ----------
+  app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''))));
   app.get('/api/admin/settings', requireAdmin, (req, res) => res.json(store.getSettings()));
   app.put('/api/admin/settings', requireAdmin, (req, res) => res.json(store.updateSettings(req.body)));
   app.get('/api/admin/news', requireAdmin, (req, res) => res.json({ feeds: news.status(), updatedAt: news.updatedAt, items: news.items.length }));
