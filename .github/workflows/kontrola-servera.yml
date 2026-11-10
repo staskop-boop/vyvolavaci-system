@@ -13,7 +13,8 @@ jobs:
           S=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/api/display/state)
           echo "$S" | jq -c '{rooms: [.rooms[] | {name, current, calledToday}], queue: [.queue[] | {code, plannedAt, arrivedAt}]}'
           CSS=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/obrazovka/styles.css)
-          if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$CSS" | grep -q "r-free"; then
+          SESTRA=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/sestra/app.js)
+          if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$SESTRA" | grep -q "m-ann-clear"; then
             echo "Server slúži aktuálnu verziu obrazovky."
           else
             echo "::error::Server slúži starú verziu – automatická aktualizácia z main neprebehla."
