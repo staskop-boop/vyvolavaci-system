@@ -627,7 +627,7 @@
     }
     const one = items.map((i) => `<span class="tk-item"><span class="tk-tag ${tagClass(i.tag || i.source)}">${esc(i.tag || i.source)}</span><span>${esc(i.title)}</span><span class="tk-dot"></span></span>`).join('');
     el.tickerMove.innerHTML = one + one;     // zdvojený obsah → plynulá slučka (posun o −50 %)
-    const pxPerSec = 110;                    // rýchlosť v px plochy 1920 za sekundu
+    const pxPerSec = 60;                     // rýchlosť v px plochy 1920 za sekundu (Pali 2026-11-10: pomalšie, aby sa dalo čítať)
     el.tickerMove.style.animationDuration = Math.max(20, el.tickerMove.scrollWidth / 2 / pxPerSec) + 's';
     void el.tickerMove.offsetWidth;
     el.tickerMove.classList.add('run');
