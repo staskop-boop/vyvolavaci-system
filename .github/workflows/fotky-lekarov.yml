@@ -1,20 +1,21 @@
 # Stiahne fotky lekárov z webu AdNa (mamkrcovezily.sk) do apps/tv/web/assets/doctors a pošle ich do vetvy.
-# Spúšťa sa ručne. Bez vstupu len vypíše obrázky a mená zo stránky (na výber správnych fotiek).
+# Spúšťa sa zmenou súboru deploy/fotky-lekarov.txt (riadky „subor.jpg=https://adresa-fotky“).
+# Prázdny súbor = len výpis obrázkov a mien zo stránky (na výber správnych fotiek).
 name: Fotky lekárov z webu AdNa
 on:
-  workflow_dispatch:
-    inputs:
-      fotky:
-        description: 'Riadky „subor.jpg=https://adresa-fotky“ oddelené čiarkou (prázdne = len výpis)'
-        default: ''
+  push:
+    paths: ['deploy/fotky-lekarov.txt']
 permissions: { contents: write }
 jobs:
   fotky:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Zoznam fotiek
+        id: z
+        run: echo "fotky=$(grep -v '^#' deploy/fotky-lekarov.txt | grep '=' | paste -sd, -)" >> "$GITHUB_OUTPUT"
       - name: Výpis stránok a obrázkov
-        if: inputs.fotky == ''
+        if: steps.z.outputs.fotky == ''
         run: |
           set -e
           for u in https://www.mamkrcovezily.sk/ https://mamkrcovezily.sk/; do
@@ -31,8 +32,8 @@ jobs:
           echo "== obrázky na úvodnej stránke =="; grep -oiE '<img[^>]+>' home.html | head -80
           grep -oiE '(MUDr\.|Mgr\.)[^<]{3,80}' home.html | sort -u | head -40
       - name: Stiahnutie a úprava fotiek
-        if: inputs.fotky != ''
-        env: { FOTKY: '${{ inputs.fotky }}' }
+        if: steps.z.outputs.fotky != ''
+        env: { FOTKY: '${{ steps.z.outputs.fotky }}' }
         run: |
           set -e
           sudo apt-get install -yq imagemagick >/dev/null
