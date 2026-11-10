@@ -369,7 +369,6 @@
           <div class="r-name">${esc(r.name)}</div>
           ${r.doctorName ? `<div class="r-doc">${esc(compact ? noPost(r.doctorName) : r.doctorName)}${door ? `<span class="door-inline"> · ${esc(door)}</span>` : ''}</div>` : (door ? `<div class="r-doc"><span class="door-inline">${esc(door)}</span></div>` : '')}
           ${door ? `<div class="r-door">${arrowSvg(r.direction)}<span>${esc(door)}</span></div>` : ''}
-          ${r.current ? '' : '<div class="r-free">Pripravujeme ďalšieho pacienta</div>'}
         </div>
         ${r.doctorName ? `<img class="avatar" alt="${esc(r.doctorName)}" data-doc="${esc(r.doctorName)}">` : '<div></div>'}
         ${late ? `<div class="r-late">${esc(late)}</div>` : ''}

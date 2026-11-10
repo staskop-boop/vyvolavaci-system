@@ -127,9 +127,9 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
     const t4 = st.tickets.find((t) => t.code === '4');
     await api('POST', `/api/staff/tickets/${t4.id}/done`, {});
     const row = page.locator(`#roomRows .room[data-room="${rooms[0].id}"]`);
-    await row.locator('.r-free').waitFor({ timeout: 8000 });
+    await row.locator('.tile.empty').waitFor({ timeout: 8000 });
     assert.equal(await row.locator('.tile').innerText(), '–');
-    assert.match(await row.innerText(), /Pripravujeme ďalšieho pacienta/);
+    assert.doesNotMatch(await row.innerText(), /Pripravujeme/, 'prázdne okno je bez textu');
     assert.equal(await page.locator(`#roomRows .room[data-room="${rooms[1].id}"] .tile`).innerText(), '12', 'druhá ambulancia ostáva');
     await page.screenshot({ path: path.join(SHOTS, 'tv2-5-po-vybaveni.png') });
   });

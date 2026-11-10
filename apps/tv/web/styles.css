@@ -103,8 +103,6 @@ h2 { margin: 0; }
 .rooms-card.compact .r-kicker { display: block; }
 .rooms-card.compact .r-door { display: none; }
 .rooms-card.compact .r-doc .door-inline { display: inline; }
-.r-free { font-size: 15px; white-space: nowrap; font-weight: 700; color: var(--adna-grey); margin-top: 4px; }
-.rooms-card.compact .r-free { display: none; }
 .r-kicker { display: none; font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--adna-grey); }
 .door-inline { display: none; }
 
