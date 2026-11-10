@@ -14,6 +14,9 @@ jobs:
           echo "$S" | jq -c '{rooms: [.rooms[] | {name, current, calledToday}], queue: [.queue[] | {code, plannedAt, arrivedAt}]}'
           CSS=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/obrazovka/styles.css)
           SESTRA=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/sestra/app.js)
+          for f in stasko czetoova kubikova kudela koval roskovicova; do
+            echo "fotka $f: $(curl -s -o /dev/null -w '%{http_code}' -m 20 https://vyvolavaci.adna.sk/obrazovka/assets/doctors/$f.jpg)"
+          done
           if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$SESTRA" | grep -q "m-ann-clear"; then
             echo "Server slúži aktuálnu verziu obrazovky."
           else
