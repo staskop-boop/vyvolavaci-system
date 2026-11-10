@@ -42,7 +42,7 @@ jobs:
             f=$(echo "${z%%=*}" | tr -d ' '); u=$(echo "${z#*=}" | tr -d ' ')
             [[ "$f" =~ ^[a-z0-9-]+\.jpg$ ]] || { echo "::error::Zlý názov $f"; exit 1; }
             curl -fsSL -m 60 -A 'Mozilla/5.0' "$u" -o "/tmp/$f.src"
-            convert "/tmp/$f.src" -auto-orient -resize '400x400^' -gravity north -extent 400x400 -strip -quality 85 "apps/tv/web/assets/doctors/$f"
+            convert "/tmp/$f.src" -auto-orient -resize '600x900^' -gravity north -extent 600x900 -strip -quality 85 "apps/tv/web/assets/doctors/$f"
             identify "apps/tv/web/assets/doctors/$f"
           done
           git config user.name 'github-actions[bot]'; git config user.email '41898333+github-actions[bot]@users.noreply.github.com'

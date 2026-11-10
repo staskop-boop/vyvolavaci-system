@@ -2,3 +2,4 @@
 kubikova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/MUDr.-Maria-Kubikova-lekarka-cievne-01.jpg
 kudela.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/MUDr.-Filip-Kudela-lekar-cievne-02.jpg
 koval.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/MUDr.-Dominik-Koval-lekar-cievne-03-scaled.jpg
+roskovicova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/11/web_AB_01342_Aneta_Barcova_fotograf.jpg

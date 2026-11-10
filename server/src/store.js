@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS = {
   longDelayMinutes: 30,     // od tohto meškania ukáže TV oznam „predĺžený výkon – ďakujeme za trpezlivosť“
   roomDelays: {},
   // v2.2: zoznam lekárov na výber (sestra môže zadať aj iné meno) – z mamkrcovezily.sk/nas-tim (2026-11-08)
-  doctorList: ['MUDr. Pavel Staško, PhD., MHA, MPH', 'MUDr. Adela Czetöová', 'MUDr. Mária Kubíková, PhD.', 'MUDr. Filip Kúdela', 'MUDr. Dominik Kovaľ'],           // { [roomId]: { minutes, text, at } } – hlásenie meškania od sestry; zruší sa pri ďalšom vyvolaní z pracoviska
+  doctorList: ['MUDr. Pavel Staško, PhD., MHA, MPH', 'MUDr. Adela Czetöová', 'MUDr. Mária Kubíková, PhD.', 'MUDr. Filip Kúdela', 'MUDr. Dominik Kovaľ', 'MUDr. Veronika Roškovičová, PhD.'],           // { [roomId]: { minutes, text, at } } – hlásenie meškania od sestry; zruší sa pri ďalšom vyvolaní z pracoviska
   // v3 – dizajn z Claude Design (2026-11-08): hlavička, informácie pre pacientov, počasie, sezónne témy
   screen: {
     title: 'Ambulancia cievnej chirurgie',
@@ -99,7 +99,7 @@ class Store extends EventEmitter {
 
   seed() {
     const seeded = this.db.prepare("SELECT value FROM settings WHERE key = 'seeded'").get();
-    if (seeded) return;
+    if (seeded) return this.migrate();
     tx(this.db, () => {
       if (!this.db.prepare('SELECT 1 FROM rooms LIMIT 1').get()) {
         const DIR = ['right', 'left', ''];   // AdNa: č. 1 vpravo, č. 2 vľavo
@@ -107,6 +107,26 @@ class Store extends EventEmitter {
       }
       this.db.prepare("INSERT INTO settings (key, value) VALUES ('seeded', 'true')").run();
     });
+  }
+
+  /** Jednorazové úpravy uložených nastavení (každá sa vykoná len raz). */
+  migrate() {
+    const done = (k) => this.db.prepare('SELECT 1 FROM settings WHERE key = ?').get(k);
+    const mark = (k) => this.db.prepare("INSERT INTO settings (key, value) VALUES (?, 'true')").run(k);
+    // 2026-11-10: nová lekárka v zozname na výber (ak si ho personál už upravil, meno sa doplní na koniec)
+    if (!done('mig-2026-11-10-roskovicova')) {
+      tx(this.db, () => {
+        const row = this.db.prepare("SELECT value FROM settings WHERE key = 'doctorList'").get();
+        if (row) {
+          let list = []; try { list = JSON.parse(row.value); } catch {}
+          if (Array.isArray(list) && !list.some((n) => /Roškovičov/i.test(n))) {
+            list.push('MUDr. Veronika Roškovičová, PhD.');
+            this.db.prepare("UPDATE settings SET value = ? WHERE key = 'doctorList'").run(JSON.stringify(list));
+          }
+        }
+        mark('mig-2026-11-10-roskovicova');
+      });
+    }
   }
 
   // ---------- nastavenia ----------
