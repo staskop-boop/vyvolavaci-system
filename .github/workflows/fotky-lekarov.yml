@@ -1,0 +1,50 @@
+# Stiahne fotky lekárov z webu AdNa (mamkrcovezily.sk) do apps/tv/web/assets/doctors a pošle ich do vetvy.
+# Spúšťa sa zmenou súboru deploy/fotky-lekarov.txt (riadky „subor.jpg=https://adresa-fotky“).
+# Prázdny súbor = len výpis obrázkov a mien zo stránky (na výber správnych fotiek).
+name: Fotky lekárov z webu AdNa
+on:
+  push:
+    paths: ['deploy/fotky-lekarov.txt']
+permissions: { contents: write }
+jobs:
+  fotky:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zoznam fotiek
+        id: z
+        run: echo "fotky=$(grep -v '^#' deploy/fotky-lekarov.txt | grep '=' | paste -sd, -)" >> "$GITHUB_OUTPUT"
+      - name: Výpis stránok a obrázkov
+        if: steps.z.outputs.fotky == ''
+        run: |
+          set -e
+          for u in https://www.mamkrcovezily.sk/ https://mamkrcovezily.sk/; do
+            curl -fsSL -m 30 -A 'Mozilla/5.0' "$u" -o home.html && break || true
+          done
+          echo "== odkazy =="; grep -oiE 'href="[^"]+"' home.html | sort -u | head -150
+          for p in $(grep -oiE 'href="[^"]*(tim|team|lekar|lekari|o-nas|kolektiv|personal|nas-tim|ambulancia)[^"]*"' home.html | sed 's/href="//;s/"$//' | sort -u | head -15) ; do
+            case "$p" in http*) url="$p";; /*) url="https://www.mamkrcovezily.sk$p";; *) url="https://www.mamkrcovezily.sk/$p";; esac
+            echo "== stránka $url =="
+            curl -fsSL -m 30 -A 'Mozilla/5.0' "$url" -o p.html || continue
+            grep -oiE '<img[^>]+>' p.html | head -80
+            grep -oiE '(MUDr\.|Mgr\.|Bc\.)[^<]{3,80}' p.html | sort -u | head -40
+          done
+          echo "== obrázky na úvodnej stránke =="; grep -oiE '<img[^>]+>' home.html | head -80
+          grep -oiE '(MUDr\.|Mgr\.)[^<]{3,80}' home.html | sort -u | head -40
+      - name: Stiahnutie a úprava fotiek
+        if: steps.z.outputs.fotky != ''
+        env: { FOTKY: '${{ steps.z.outputs.fotky }}' }
+        run: |
+          set -e
+          sudo apt-get install -yq imagemagick >/dev/null
+          IFS=',' read -ra ZOZ <<< "$FOTKY"
+          for z in "${ZOZ[@]}"; do
+            f=$(echo "${z%%=*}" | tr -d ' '); u=$(echo "${z#*=}" | tr -d ' ')
+            [[ "$f" =~ ^[a-z0-9-]+\.jpg$ ]] || { echo "::error::Zlý názov $f"; exit 1; }
+            curl -fsSL -m 60 -A 'Mozilla/5.0' "$u" -o "/tmp/$f.src"
+            convert "/tmp/$f.src" -auto-orient -resize '600x900^' -gravity north -extent 600x900 -strip -quality 85 "apps/tv/web/assets/doctors/$f"
+            identify "apps/tv/web/assets/doctors/$f"
+          done
+          git config user.name 'github-actions[bot]'; git config user.email '41898333+github-actions[bot]@users.noreply.github.com'
+          git add apps/tv/web/assets/doctors
+          git commit -m "TV: fotky lekárov z webu AdNa" && git push origin HEAD:${{ github.ref_name }}
