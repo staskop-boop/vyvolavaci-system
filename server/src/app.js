@@ -79,6 +79,19 @@ function createServer(opts = {}) {
     if (req.user.role !== 'admin') return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Na túto akciu nemáte oprávnenie.' } });
     next();
   });
+  // Lekárske konto vyvoláva a vybavuje pacientov, ale nepridáva ich ani nemení oznamy či plánované časy.
+  const requireNurse = (req, res, next) => requireStaff(req, res, () => {
+    if (req.user.doctorName) return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Lekárske konto túto akciu nemá – urobí ju sestra.' } });
+    next();
+  });
+  // Keď vyvoláva lekár, jeho meno sa nastaví ako dnešný lekár ambulancie (TV, štatistiky).
+  const asDoctor = (req, roomId) => {
+    const n = req.user.doctorName;
+    if (!n) return;
+    const rid = roomId ?? req.user.roomId;
+    if (rid == null) return;
+    if (store.doctorsToday()[rid] !== n) store.setDoctor(rid, n, req.user.id);
+  };
   const id = (req) => {
     const n = Number(req.params.id);
     if (!Number.isInteger(n) || n <= 0) throw new AppError(400, 'BAD_REQUEST', 'Neplatné číslo záznamu.');
@@ -129,24 +142,29 @@ function createServer(opts = {}) {
 
   // ---------- personál ----------
   app.get('/api/staff/state', requireStaff, (req, res) => res.json(store.staffState()));
-  app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => res.json(store.call(id(req), req.body?.roomId, req.user.id, req.body?.note)));
-  app.post('/api/staff/call-next', requireStaff, (req, res) => res.json(store.callNext(req.body?.roomId, req.user.id)));
+  app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId), res.json(store.call(id(req), req.body?.roomId, req.user.id, req.body?.note))));
+  app.post('/api/staff/call-next', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId), res.json(store.callNext(req.body?.roomId, req.user.id))));
   app.post('/api/staff/tickets/:id/recall', requireStaff, (req, res) => res.json(store.recall(id(req), req.body?.roomId, req.user.id)));
   app.post('/api/staff/tickets/:id/done', requireStaff, (req, res) => res.json(store.done(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/absent', requireStaff, (req, res) => res.json(store.absent(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/requeue', requireStaff, (req, res) => res.json(store.requeue(id(req), req.user.id)));
-  app.post('/api/staff/tickets/:id/reprint', requireStaff, wrap(async (req, res) => res.json(await store.reprint(id(req), req.user.id))));
-  app.post('/api/staff/cards', requireStaff, (req, res) => res.status(201).json(store.registerCard(req.body?.cardNo, req.body?.plannedTime, req.user.id,
+  app.post('/api/staff/tickets/:id/reprint', requireNurse, wrap(async (req, res) => res.json(await store.reprint(id(req), req.user.id))));
+  app.post('/api/staff/cards', requireNurse, (req, res) => res.status(201).json(store.registerCard(req.body?.cardNo, req.body?.plannedTime, req.user.id,
     req.body && 'roomId' in req.body ? req.body.roomId : req.user.roomId)));
-  app.post('/api/staff/announcement', requireStaff, (req, res) => res.json(store.setAnnouncement(req.body?.text, req.user)));
-  app.post('/api/staff/rooms/:id/doctor', requireStaff, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
+  app.post('/api/staff/announcement', requireNurse, (req, res) => res.json(store.setAnnouncement(req.body?.text, req.user)));
+  app.post('/api/staff/rooms/:id/doctor', requireNurse, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
   app.post('/api/staff/rooms/:id/delay', requireStaff, (req, res) => res.json(store.setRoomDelay(id(req), req.body?.minutes ?? null, req.body?.text)));
-  app.post('/api/staff/tickets/:id/planned', requireStaff, (req, res) => res.json(store.setPlanned(id(req), req.body?.plannedTime, req.user.id)));
+  app.post('/api/staff/tickets/:id/planned', requireNurse, (req, res) => res.json(store.setPlanned(id(req), req.body?.plannedTime, req.user.id)));
   app.get('/api/staff/days', requireStaff, (req, res) => res.json({ days: store.days() }));
   app.get('/api/staff/history', requireStaff, (req, res) => res.json(store.history(req.query.day)));
-  app.post('/api/staff/close-past-day', requireStaff, (req, res) => res.json(store.closePastDay(req.body?.day, req.user.id)));
+  app.post('/api/staff/close-past-day', requireNurse, (req, res) => res.json(store.closePastDay(req.body?.day, req.user.id)));
 
   // ---------- administrácia ----------
+  // prehľad lekára o sebe (len lekárske konto, len vlastné čísla)
+  app.get('/api/staff/my-stats', requireStaff, (req, res) => {
+    if (!req.user.doctorName) throw new AppError(403, 'FORBIDDEN', 'Prehľad je pre lekárske konto.');
+    res.json(store.doctorOwnStats(req.user.doctorName, String(req.query.from || ''), String(req.query.to || '')));
+  });
   app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''))));
   app.get('/api/admin/settings', requireAdmin, (req, res) => res.json(store.getSettings()));
   app.put('/api/admin/settings', requireAdmin, (req, res) => res.json(store.updateSettings(req.body)));
