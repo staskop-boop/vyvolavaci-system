@@ -304,3 +304,4 @@ body.is-doctor #btn-card, body.is-doctor #btn-announce, body.is-doctor [data-act
 body.is-doctor [data-act="announce-edit"], body.is-doctor [data-act="announce-clear"] { display: none !important; }
 body.is-doctor #btn-doctor { cursor: default; }
 .u-doc { min-width: 200px; }
+.stats-table tr.me-row td { background: var(--blush); font-weight: 800; }

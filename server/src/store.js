@@ -768,7 +768,7 @@ class Store extends EventEmitter {
    * Štatistiky lekárov za obdobie (len pre správcu). Lekár sa berie z posledného vyvolania čísla.
    * Čakanie = prvé vyvolanie − príchod; meškanie = prvé vyvolanie − plánovaný čas (nie skôr ako príchod), ako na TV.
    */
-  doctorStats(from, to) {
+  doctorStats(from, to, groupBy = 'doctor') {
     const D = /^\d{4}-\d{2}-\d{2}$/;
     if (!D.test(String(from || '')) || !D.test(String(to || '')) || from > to) throw bad('Neplatné obdobie.');
     const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at FROM tickets
@@ -796,7 +796,7 @@ class Store extends EventEmitter {
     for (const t of tickets) {
       const x = byT.get(t.id);
       if (!x || !x.first) continue;
-      for (const s of [g(x.doctor || UNKNOWN), all]) {
+      for (const s of [g(groupBy === 'room' ? x.room || 'Neznáma ambulancia' : x.doctor || UNKNOWN), all]) {
         s.patients++;
         if (t.status === 'done') s.done++; else if (t.status === 'absent') s.absent++; else s.open++;
         s.days.add(t.day); if (x.room) s.rooms.add(x.room);
@@ -822,6 +822,16 @@ class Store extends EventEmitter {
     return { from, to, doctors, total: out(all), doctorDataSince: since?.d || null };
   }
 
+  /** Dnešný prehľad pre sestry: celé zariadenie a jednotlivé ambulancie (bez mien lekárov a bez histórie). */
+  todayStats() {
+    const day = clock.today();
+    const r = this.doctorStats(day, day, 'room');
+    const strip = (d) => ({ name: d.doctor, patients: d.patients, done: d.done, absent: d.absent, open: d.open, avgWait: d.avgWait, maxWait: d.maxWait,
+      planned: d.planned, avgDelay: d.avgDelay, maxDelay: d.maxDelay, onTime: d.onTime, late15: d.late15, avgExam: d.avgExam });
+    const waiting = this.db.prepare("SELECT COUNT(*) AS n FROM tickets WHERE day = ? AND status = 'waiting'").get(day).n;
+    return { day, total: strip(r.total), rooms: r.doctors.map(strip).sort((a, b) => a.name.localeCompare(b.name, 'sk')), waiting };
+  }
+
   /** Prehľad jedného lekára: súhrn za obdobie a po dňoch (pre lekárske konto). */
   doctorOwnStats(name, from, to) {
     const all = this.doctorStats(from, to);
@@ -834,7 +844,14 @@ class Store extends EventEmitter {
       const d = pick(this.doctorStats(day, day));
       if (d) days.push({ day, ...d });
     }
-    return { from, to, doctor: name, summary: pick(all), days: days.reverse(), clinic: all.total };
+    // Porovnanie s ostatnými lekármi BEZ mien a ambulancií – poradie podľa meškania, aby sa z neho nedalo uhádnuť, o koho ide.
+    const anon = (d) => ({ patients: d.patients, done: d.done, avgWait: d.avgWait, planned: d.planned, avgDelay: d.avgDelay, onTime: d.onTime, avgExam: d.avgExam });
+    const me = pick(all);
+    const rows = all.doctors.filter((d) => d.doctor !== 'Lekár nebol zadaný').map((d) => ({ ...anon(d), me: d.doctor === name }))
+      .sort((a, b) => (a.avgDelay ?? 1e9) - (b.avgDelay ?? 1e9) || (a.avgWait ?? 1e9) - (b.avgWait ?? 1e9) || b.patients - a.patients);
+    let k = 0;
+    const comparison = rows.map((r, i) => ({ ...r, rank: i + 1, label: r.me ? 'Vy' : `Lekár ${String.fromCharCode(65 + k++)}` }));
+    return { from, to, doctor: name, summary: me, days: days.reverse(), clinic: all.total, comparison };
   }
 
   /** Kontrola zmeny dňa (volá sa periodicky). */

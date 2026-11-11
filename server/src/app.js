@@ -160,6 +160,8 @@ function createServer(opts = {}) {
   app.post('/api/staff/close-past-day', requireNurse, (req, res) => res.json(store.closePastDay(req.body?.day, req.user.id)));
 
   // ---------- administrácia ----------
+  // dnešné štatistiky pre sestry (lekár má Môj prehľad, správca Štatistiky)
+  app.get('/api/staff/today-stats', requireNurse, (req, res) => res.json(store.todayStats()));
   // prehľad lekára o sebe (len lekárske konto, len vlastné čísla)
   app.get('/api/staff/my-stats', requireStaff, (req, res) => {
     if (!req.user.doctorName) throw new AppError(403, 'FORBIDDEN', 'Prehľad je pre lekárske konto.');

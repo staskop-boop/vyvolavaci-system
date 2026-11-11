@@ -206,6 +206,7 @@
     document.body.classList.toggle('is-doctor', isDoc);
     document.querySelector('.brand-title').textContent = isDoc ? 'Lekár' : 'Sestra';
     document.getElementById('tab-me').hidden = !isDoc;
+    document.getElementById('tab-today').hidden = isDoc || S.user.role === 'admin';
     document.querySelector('.tab[data-view=history]').hidden = isDoc;
     stopSocket();
     $view.innerHTML = '<div class="center-msg">Načítava sa zoznam…</div>';
@@ -233,6 +234,7 @@
     if (view === 'admin') renderAdmin();
     if (view === 'stats') renderStats();
     if (view === 'me') renderMe();
+    if (view === 'today') renderToday();
   }
   document.querySelectorAll('.tab').forEach((t) => { t.onclick = () => go(t.dataset.view); });
   document.getElementById('btn-logout').onclick = async () => {
@@ -660,6 +662,34 @@
       .map((n) => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
   };
 
+  // ---------- dnešné štatistiky (sestra) ----------
+  async function renderToday() {
+    $view.innerHTML = '<div class="center-msg">Načítava sa…</div>';
+    let r;
+    try { r = await api('/api/staff/today-stats'); }
+    catch (e) { handleError(e); $view.innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
+    if (S.view !== 'today') return;
+    const t = r.total;
+    $view.innerHTML = `<div class="stack">
+      <section class="card"><div class="section-title"><h2>Dnešné štatistiky – ${esc(fmtDay(r.day))}</h2><button class="btn btn-sm" id="btn-today-refresh">Obnoviť</button></div>
+        <p class="hint">Len dnešný deň. Údaje sa počítajú z vyvolaných pacientov.</p></section>
+      <section class="stats-kpis">
+        <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (čaká ešte ${r.waiting})</span></div>
+        <div class="stats-kpi"><b>${t.done}</b><span>vybavených · ${t.absent} neprítomných</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu</span></div>
+        <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu</span></div>
+        <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>vyvolaných načas (do 5 min)</span></div>
+      </section>
+      ${r.rooms.length ? `<section class="card"><h2>Podľa ambulancie</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
+        <th>Ambulancia</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
+        <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
+        ${r.rooms.map((d) => `<tr><td class="doc">${esc(d.name)}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
+          <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td>
+          <td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td><td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}
+        </tbody></table></div></section>` : '<section class="card"><div class="empty">Dnes zatiaľ nebol vyvolaný žiadny pacient.</div></section>'}</div>`;
+    document.getElementById('btn-today-refresh').onclick = renderToday;
+  }
+
   // ---------- môj prehľad (konto lekára) ----------
   async function renderMe() {
     if (!S.user.doctorName) { $view.innerHTML = '<div class="center-msg">Prehľad je pre lekárske konto.</div>'; return; }
@@ -705,7 +735,15 @@
           <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
           <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
         <p class="hint">Čakanie = od príchodu pacienta po prvé vyvolanie. Meškanie = vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, od príchodu). Vyšetrenie = od vyvolania po „Vybavený“.</p>
-      </section></div>`;
+      </section>
+      ${r.comparison && r.comparison.length > 1 ? `<section class="card"><div class="section-title"><h2>Porovnanie s ostatnými lekármi</h2><span class="hint">Anonymne – mená ostatných lekárov nevidíte</span></div>
+        <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Poradie</th><th>Lekár</th><th class="num">Pacienti</th><th class="num">Ø čakanie</th>
+          <th class="num">Ø meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
+          ${r.comparison.map((d) => `<tr class="${d.me ? 'me-row' : ''}"><td class="num">${d.rank}.</td><td class="doc">${esc(d.label)}</td><td class="num">${d.patients}</td>
+            <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td>
+            <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="hint">Poradie je podľa priemerného meškania (najmenšie prvé). Ostatní lekári sú označení písmenami a neuvádza sa ich ambulancia.</p>
+      </section>` : ''}</div>`;
   }
 
   // ---------- štatistiky lekárov (len správca) ----------

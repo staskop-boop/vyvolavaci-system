@@ -52,6 +52,9 @@ test('môj prehľad: lekár vidí len svoje údaje, sestra/správca nie', async 
   assert.equal(r.data.days.length, 1);
   assert.equal(r.data.clinic.patients, 2, 'porovnanie s celou ambulanciou bez mien iných lekárov');
   assert.equal(JSON.stringify(r.data).includes('Iný Lekár'), false);
+  assert.equal(r.data.comparison.length, 2);
+  assert.deepEqual(r.data.comparison.map((c) => c.label).sort(), ['Lekár A', 'Vy']);
+  assert.ok(r.data.comparison.every((c) => !('doctor' in c) && !('rooms' in c)), 'bez mien a ambulancií');
   assert.equal((await admin.get(`/api/staff/my-stats?from=${st.day}&to=${st.day}`)).status, 403);
 });
 
@@ -60,4 +63,22 @@ test('zmena typu konta lekár → sestra odhlási konto', async () => {
   const r = await admin.put('/api/admin/users/' + u.id, { doctorName: null });
   assert.equal(r.status, 200); assert.equal(r.data.user.doctorName, null);
   assert.equal((await lekar.get('/api/staff/state')).status, 401);
+});
+
+test('sestra (bez správcu) nevidí štatistiky ani nespravuje kontá', async () => {
+  const u = await admin.post('/api/admin/users', { username: 'sestra2', password: 'Heslo-sestra-02', roomId: room.id });
+  assert.equal(u.status, 201);
+  const sestra = h.client(s.base);
+  await sestra.post('/api/auth/login', { username: 'sestra2', password: 'Heslo-sestra-02' });
+  const day = (await sestra.get('/api/staff/state')).data.day;
+  assert.equal((await sestra.get(`/api/admin/stats?from=${day}&to=${day}`)).status, 403);
+  assert.equal((await sestra.get(`/api/staff/my-stats?from=${day}&to=${day}`)).status, 403);
+  assert.equal((await sestra.get('/api/admin/users')).status, 403);
+  const t = await sestra.get('/api/staff/today-stats');
+  assert.equal(t.status, 200);
+  assert.equal(t.data.day, day);
+  assert.ok(t.data.total.patients >= 2);
+  assert.equal(JSON.stringify(t.data).includes('MUDr.'), false, 'denné štatistiky sestry sú bez mien lekárov');
+  assert.equal((await lekar.get('/api/staff/today-stats')).status, 401, 'lekár bol medzitým odhlásený');
+  assert.equal((await sestra.post('/api/admin/users', { username: 'nove', password: 'Heslo-nove-0001' })).status, 403);
 });
