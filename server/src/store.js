@@ -822,6 +822,21 @@ class Store extends EventEmitter {
     return { from, to, doctors, total: out(all), doctorDataSince: since?.d || null };
   }
 
+  /** Prehľad jedného lekára: súhrn za obdobie a po dňoch (pre lekárske konto). */
+  doctorOwnStats(name, from, to) {
+    const all = this.doctorStats(from, to);
+    const span = (Date.parse(to + 'T12:00:00Z') - Date.parse(from + 'T12:00:00Z')) / 86400000;
+    if (span > 92) throw bad('Obdobie môže mať najviac 3 mesiace.');
+    const pick = (r) => r.doctors.find((d) => d.doctor === name) || null;
+    const days = [];
+    for (let i = 0; i <= span; i++) {
+      const day = new Date(Date.parse(from + 'T12:00:00Z') + i * 86400000).toISOString().slice(0, 10);
+      const d = pick(this.doctorStats(day, day));
+      if (d) days.push({ day, ...d });
+    }
+    return { from, to, doctor: name, summary: pick(all), days: days.reverse(), clinic: all.total };
+  }
+
   /** Kontrola zmeny dňa (volá sa periodicky). */
   tick() {
     const d = clock.today();

@@ -104,6 +104,8 @@ function migrate(db) {
   const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   // v2.1: konto sestry je priradené k pracovisku (ambulancii); null = všetky pracoviská
   if (!ucols.includes('room_id')) db.exec('ALTER TABLE users ADD COLUMN room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');
+  // v3.3: konto lekára – vyvoláva pacientov, nepridáva ich; meno sa zhoduje s menom na TV a v štatistikách
+  if (!ucols.includes('doctor_name')) db.exec('ALTER TABLE users ADD COLUMN doctor_name TEXT');
 }
 
 /** Vykoná funkciu v transakcii BEGIN IMMEDIATE (zápisový zámok hneď na začiatku). */

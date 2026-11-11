@@ -202,6 +202,11 @@
     $topbar.hidden = false;
     document.getElementById('tab-admin').hidden = S.user.role !== 'admin';
     document.getElementById('tab-stats').hidden = S.user.role !== 'admin';
+    const isDoc = !!S.user.doctorName;
+    document.body.classList.toggle('is-doctor', isDoc);
+    document.querySelector('.brand-title').textContent = isDoc ? 'Lekár' : 'Sestra';
+    document.getElementById('tab-me').hidden = !isDoc;
+    document.querySelector('.tab[data-view=history]').hidden = isDoc;
     stopSocket();
     $view.innerHTML = '<div class="center-msg">Načítava sa zoznam…</div>';
     S.socket = connect('staff', {
@@ -227,6 +232,7 @@
     if (view === 'history') renderHistory();
     if (view === 'admin') renderAdmin();
     if (view === 'stats') renderStats();
+    if (view === 'me') renderMe();
   }
   document.querySelectorAll('.tab').forEach((t) => { t.onclick = () => go(t.dataset.view); });
   document.getElementById('btn-logout').onclick = async () => {
@@ -272,7 +278,7 @@
     const off = S.conn !== 'online';
     const dis = off ? 'disabled' : '';
     const active = roomsActive();
-    document.getElementById('who').innerHTML = `<b>${esc(S.user.username)}</b>${S.user.roomId ? ' · ' + esc(roomName(S.user.roomId)) : ''}`;
+    document.getElementById('who').innerHTML = `<b>${esc(S.user.doctorName || S.user.username)}</b>${S.user.roomId ? ' · ' + esc(roomName(S.user.roomId)) : ''}`;
     const all = showAll();
     const mine = (t) => all || mineFilter(t);
     const waiting = st.tickets.filter((t) => t.status === 'waiting' && mine(t)).sort(byOrder);
@@ -301,7 +307,7 @@
     if (delay) alerts.push(`<div class="alert alert-warn"><div class="grow"><b>${esc(roomName(S.roomId))}: v čakárni sa zobrazuje meškanie ${esc(fmtMin(delay.minutes))}.</b>
       ${delay.text ? esc(delay.text) + '. ' : ''}Oznam sa zruší sám pri vyvolaní ďalšieho pacienta.</div>
       <button class="btn btn-sm needs-online" data-act="delay-clear" ${dis}>Zrušiť oznam</button></div>`);
-    if (st.previousDayOpen) alerts.push(`<div class="alert alert-info"><div class="grow">Z dňa ${esc(fmtDay(st.previousDayOpen.day))} ostalo
+    if (st.previousDayOpen && !S.user.doctorName) alerts.push(`<div class="alert alert-info"><div class="grow">Z dňa ${esc(fmtDay(st.previousDayOpen.day))} ostalo
       ${st.previousDayOpen.count} nevybavených čísel. Do dnešného zoznamu sa neprenášajú.</div>
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
@@ -346,7 +352,7 @@
         <div class="hero-meta">${pills.join('')}</div>`;
     } else {
       heroInfo = `<div class="hero-kicker">Ďalší na rade</div><div class="hero-main">Nikto nečaká</div>
-        <div class="hero-meta"><span class="pill">Pacienta pridáte tlačidlom „+ Pacient“</span></div>`;
+        <div class="hero-meta"><span class="pill">${S.user.doctorName ? 'Pacientov zaraďuje sestra' : 'Pacienta pridáte tlačidlom „+ Pacient“'}</span></div>`;
     }
 
     // zachovanie pozície posúvania pri prekreslení
@@ -362,7 +368,7 @@
         <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
         <div class="rb-btns">
-          <button class="btn needs-online ${doctor ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : '⚠ Zadať lekára'}</button>
+          <button class="btn needs-online ${doctor || S.user.doctorName ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : S.user.doctorName ? '👩‍⚕️ ' + esc(S.user.doctorName) : '⚠ Zadať lekára'}</button>
           <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
           <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
         </div>
@@ -417,9 +423,10 @@
     document.getElementById('btn-card').onclick = () => addCard();
     document.getElementById('btn-delay').onclick = () => reportDelay();
     document.getElementById('btn-announce').onclick = () => announce();
-    document.getElementById('btn-doctor').onclick = () => askDoctor(false);
-    // povinný údaj na začiatku dňa: bez lekára sa okno nedá zavrieť
-    if (!doctor && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
+    const isDoc = !!S.user.doctorName;
+    document.getElementById('btn-doctor').onclick = isDoc ? () => toast('Vaše meno sa na TV nastaví samo pri prvom vyvolaní.', 'ok') : () => askDoctor(false);
+    // povinný údaj na začiatku dňa: bez lekára sa okno nedá zavrieť (lekárske konto sa nastaví samo)
+    if (!isDoc && !doctor && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
     document.getElementById('show-all').onchange = (e) => { lsSet(LS_ALL, e.target.checked ? '1' : null); renderQueue(); };
     document.getElementById('btn-next').onclick = () => act(
       () => api('/api/staff/call-next', { body: { roomId: S.roomId } }),
@@ -644,6 +651,63 @@
     } catch (e) { handleError(e); }
   }
 
+  const KIND_TEXT = { staff: 'Sestra', doctor: 'Lekár', admin: 'Správca' };
+  const kindSelect = (cls, cur, id) => `<select ${cls ? `class="${cls}"` : ''} ${id ? `id="${id}"` : ''} aria-label="Typ konta">${Object.entries(KIND_TEXT)
+    .map(([k, t]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
+  const docSelect = (cls, cur, list, id) => {
+    const names = [...new Set([...(list || []), ...(cur ? [cur] : [])])];
+    return `<select ${cls ? `class="${cls} u-doc"` : 'class="u-doc"'} ${id ? `id="${id}"` : ''} aria-label="Lekár">${names
+      .map((n) => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
+  };
+
+  // ---------- môj prehľad (konto lekára) ----------
+  async function renderMe() {
+    if (!S.user.doctorName) { $view.innerHTML = '<div class="center-msg">Prehľad je pre lekárske konto.</div>'; return; }
+    const today = (S.staff && S.staff.day) || isoDay(new Date());
+    if (!S.meTo) S.meTo = today;
+    if (!S.meFrom) { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - 29); S.meFrom = isoDay(d); }
+    $view.innerHTML = `<div class="stack">
+      <section class="card stack"><div class="section-title"><h2>Môj prehľad – ${esc(S.user.doctorName)}</h2><span class="hint">Vidíte len svoje údaje</span></div>
+        <form class="stats-filter" id="me-form">
+          <div class="field"><label for="me-from">Od</label><input type="date" id="me-from" value="${esc(S.meFrom)}" max="${esc(today)}"></div>
+          <div class="field"><label for="me-to">Do</label><input type="date" id="me-to" value="${esc(S.meTo)}" max="${esc(today)}"></div>
+          <button class="btn btn-primary" type="submit">Zobraziť</button>
+          <button class="btn" type="button" data-range="0">Dnes</button>
+          <button class="btn" type="button" data-range="6">7 dní</button>
+          <button class="btn" type="button" data-range="29">30 dní</button>
+        </form></section>
+      <div id="me-out"><div class="center-msg">Načítava sa…</div></div></div>`;
+    const form = document.getElementById('me-form');
+    form.onsubmit = (e) => { e.preventDefault(); S.meFrom = val('me-from'); S.meTo = val('me-to'); renderMe(); };
+    form.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => {
+      const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - Number(b.dataset.range));
+      S.meFrom = isoDay(d); S.meTo = today; renderMe();
+    }; });
+    let r;
+    try { r = await api(`/api/staff/my-stats?from=${encodeURIComponent(S.meFrom)}&to=${encodeURIComponent(S.meTo)}`); }
+    catch (e) { handleError(e); document.getElementById('me-out').innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
+    const out = document.getElementById('me-out');
+    const t = r.summary;
+    if (!t) { out.innerHTML = '<section class="card"><div class="empty">V tomto období ste zatiaľ nevyvolali žiadneho pacienta.</div></section>'; return; }
+    const c = r.clinic;
+    out.innerHTML = `<div class="stack">
+      <section class="stats-kpis">
+        <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (vybavení ${t.done})</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta<br>(celá ambulancia ${mins(c.avgWait)})</span></div>
+        <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu<br>(celá ambulancia ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
+        <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov vyvolaných načas (do 5 min)</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
+      </section>
+      <section class="card"><h2>Po dňoch</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
+        <th>Deň</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
+        <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
+        ${r.days.map((d) => `<tr><td class="doc">${esc(fmtDay(d.day))}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
+          <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
+          <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="hint">Čakanie = od príchodu pacienta po prvé vyvolanie. Meškanie = vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, od príchodu). Vyšetrenie = od vyvolania po „Vybavený“.</p>
+      </section></div>`;
+  }
+
   // ---------- štatistiky lekárov (len správca) ----------
   const isoDay = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bratislava' }).format(d);
   const mins = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
@@ -735,10 +799,13 @@
       <section class="card stack" id="sec-users"><h2>Kontá personálu</h2>
         <p class="hint">Každá ambulancia má vlastné konto. Sestra po prihlásení vidí svojich pacientov a „Vyvolať ďalšieho“ volá len z nich.
           Obrazovka v čakárni je spoločná – zobrazí toho, koho ktorá sestra vyvolá ako prvá.</p>
-        <table id="tbl-users"><thead><tr><th>Konto</th><th>Pracovisko</th><th>Nastavenia</th><th>Aktívne</th><th>Nové heslo</th><th></th></tr></thead><tbody>
+        <p class="hint"><b>Typ konta:</b> Sestra – pridáva a vyvoláva pacientov. Lekár – vyvoláva a vybavuje pacientov, nepridáva ich, vidí „Môj prehľad“ (svoje čakanie a meškanie).
+          Správca – navyše Nastavenia a Štatistiky všetkých lekárov.</p>
+        <table id="tbl-users"><thead><tr><th>Konto</th><th>Typ</th><th>Lekár</th><th>Pracovisko</th><th>Aktívne</th><th>Nové heslo</th><th></th></tr></thead><tbody>
         ${users.map((u) => `<tr data-user="${u.id}"><td><b>${esc(u.username)}</b></td>
+          <td>${kindSelect('u-kind', u.doctorName ? 'doctor' : u.role === 'admin' ? 'admin' : 'staff')}</td>
+          <td>${docSelect('u-doc', u.doctorName, s.doctorList)}</td>
           <td><select class="u-room"><option value="">všetky</option>${rooms.filter((r) => r.active).map((r) => `<option value="${r.id}" ${r.id === u.roomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></td>
-          <td><input type="checkbox" class="u-admin" ${u.role === 'admin' ? 'checked' : ''} style="width:20px;height:20px"></td>
           <td><input type="checkbox" class="u-active" ${u.active ? 'checked' : ''} style="width:20px;height:20px"></td>
           <td><input type="password" class="u-pw" placeholder="ponechať" autocomplete="new-password" style="width:150px"></td>
           <td class="actions"><button class="btn btn-sm btn-primary" data-user-save="${u.id}">Uložiť</button></td></tr>`).join('')}
@@ -747,7 +814,8 @@
           <input type="text" id="nu-name" placeholder="meno konta, napr. ambulancia1" maxlength="30" autocapitalize="none" style="min-width:220px">
           <select id="nu-room">${rooms.filter((r) => r.active).map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}<option value="">všetky pracoviská</option></select>
           <input type="password" id="nu-pw" placeholder="heslo (aspoň 10 znakov)" autocomplete="new-password">
-          <label class="check"><input type="checkbox" id="nu-admin"> aj nastavenia</label>
+          ${kindSelect('', 'staff', 'nu-kind')}
+          ${docSelect('', null, s.doctorList, 'nu-doc')}
           <button class="btn btn-primary" type="submit">Pridať konto</button></form>
       </section>
 
@@ -898,17 +966,23 @@
     document.getElementById('f-user').onsubmit = async (e) => {
       e.preventDefault();
       try {
-        await api('/api/admin/users', { body: { username: val('nu-name'), password: val('nu-pw'), roomId: val('nu-room') ? Number(val('nu-room')) : null, role: chk('nu-admin') ? 'admin' : 'staff' } });
+        await api('/api/admin/users', { body: { username: val('nu-name'), password: val('nu-pw'), roomId: val('nu-room') ? Number(val('nu-room')) : null, role: val('nu-kind') === 'admin' ? 'admin' : 'staff',
+          doctorName: val('nu-kind') === 'doctor' ? val('nu-doc') : null } });
         toast('Konto bolo vytvorené.', 'ok'); renderAdmin();
       } catch (e2) { handleError(e2); }
     };
     $view.querySelectorAll('[data-user-save]').forEach((b) => { b.onclick = async () => {
       const tr = b.closest('tr');
       const body = { roomId: tr.querySelector('.u-room').value ? Number(tr.querySelector('.u-room').value) : null,
-        role: tr.querySelector('.u-admin').checked ? 'admin' : 'staff', active: tr.querySelector('.u-active').checked };
+        role: tr.querySelector('.u-kind').value === 'admin' ? 'admin' : 'staff', active: tr.querySelector('.u-active').checked,
+        doctorName: tr.querySelector('.u-kind').value === 'doctor' ? tr.querySelector('.u-doc').value : null };
       const pw = tr.querySelector('.u-pw').value; if (pw) body.password = pw;
       try { await api('/api/admin/users/' + b.dataset.userSave, { method: 'PUT', body }); toast('Konto bolo uložené.', 'ok'); renderAdmin(); } catch (e2) { handleError(e2); }
     }; });
+    // výber lekára má zmysel len pri type „Lekár“
+    const syncDoc = (kindEl, docEl) => { const f = () => { docEl.hidden = kindEl.value !== 'doctor'; }; kindEl.onchange = f; f(); };
+    $view.querySelectorAll('#tbl-users tr[data-user]').forEach((tr) => syncDoc(tr.querySelector('.u-kind'), tr.querySelector('.u-doc')));
+    syncDoc(document.getElementById('nu-kind'), document.getElementById('nu-doc'));
     document.getElementById('f-room').onsubmit = async (e) => {
       e.preventDefault();
       const name = val('new-room');

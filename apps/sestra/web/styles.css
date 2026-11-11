@@ -298,3 +298,9 @@ td.nw, td.code { white-space: nowrap; }
 @media (max-width: 1180px) { .roombar { grid-template-columns: 1fr auto; } .rb-btns { grid-column: 1 / -1; justify-content: flex-start; } }
 @media (max-width: 640px) { .roombar { grid-template-columns: 1fr; } .rb-name { font-size: 26px; } .rb-num { width: 52px; height: 52px; font-size: 30px; }
   .rb-btns .btn { flex: 1 1 auto; } }
+
+/* konto lekára: vyvoláva a vybavuje, nepridáva pacientov ani nemení oznamy (server to tiež nedovolí) */
+body.is-doctor #btn-card, body.is-doctor #btn-announce, body.is-doctor [data-act="plan"], body.is-doctor [data-act="reprint"],
+body.is-doctor [data-act="announce-edit"], body.is-doctor [data-act="announce-clear"] { display: none !important; }
+body.is-doctor #btn-doctor { cursor: default; }
+.u-doc { min-width: 200px; }
