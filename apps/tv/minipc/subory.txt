@@ -1,5 +1,6 @@
 # Súbory, ktoré si spúšťač obrazovky pri každom spustení stiahne z GitHubu (online aktualizácia).
 spustit-obrazovku.ps1
+obrazovka-linux.sh
 rozsirenie-tv-ramec/rules.json
 rozsirenie-tv-ramec/pozadie.js
 README.md
