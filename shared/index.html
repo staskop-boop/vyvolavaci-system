@@ -3,23 +3,83 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AdNa – vyvolávací systém</title>
-<link rel="stylesheet" href="/shared/adna-theme.css">
+<link rel="stylesheet" href="/obrazovka/fonts/fonts.css">
 <style>
-  body { padding: 48px 16px; }
-  main { max-width: 720px; margin: 0 auto; }
-  h1 { font-size: 40px; margin: 0 0 8px; }
-  p { color: var(--adna-muted); font-size: 18px; }
-  a.card { display: block; padding: 22px 24px; margin: 14px 0; border: 1px solid var(--adna-border); border-radius: var(--adna-radius);
-    text-decoration: none; color: var(--adna-text); box-shadow: var(--adna-shadow); font-size: 20px; }
-  a.card:hover, a.card:focus { border-color: var(--adna-accent); outline: none; }
-  a.card small { display: block; color: var(--adna-muted); font-size: 15px; margin-top: 4px; }
+  /* Úvodná stránka servera – vzhľad podľa dizajn manuálu v3 (docs/dizajn-v3), zladený so Sestrou a obrazovkou v čakárni. */
+  :root {
+    --red: #BC1A21; --red-dark: #8E1219; --red-deep: #A3151B; --red-light: #D62B33;
+    --blush: #FFF4F4; --blush-border: #F3C9CB; --grey: #434242; --black: #1A1A1A;
+    --font-display: "Plus Jakarta Sans", Inter, "Segoe UI", system-ui, sans-serif;
+    --font-body: Inter, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { background: #f8f1f1; }
+  body { margin: 0; min-height: 100vh; font-family: var(--font-body); color: var(--black); -webkit-font-smoothing: antialiased; padding: 64px 16px 48px; }
+  .bg-band { position: fixed; inset: 0 0 auto 0; height: 340px; z-index: -1;
+    background: radial-gradient(120% 140% at 85% -20%, var(--red-light) 0%, rgba(214,43,51,0) 55%), linear-gradient(180deg, var(--red-deep) 0%, var(--red) 45%, rgba(188,26,33,0) 100%); }
+  main { max-width: 760px; margin: 0 auto; background: #fff; border: 2px solid rgba(255,255,255,0.9); border-radius: 28px; padding: 36px 40px 28px;
+    box-shadow: 0 24px 60px rgba(110,14,20,0.18), inset 0 0 0 1px rgba(188,26,33,0.16); }
+  header { display: flex; align-items: center; gap: 20px; margin-bottom: 26px; }
+  header img { height: 80px; width: auto; display: block; }
+  .div { width: 2px; align-self: stretch; background: linear-gradient(180deg, rgba(188,26,33,0) 0%, var(--red) 50%, rgba(188,26,33,0) 100%); }
+  h1 { font-family: var(--font-display); font-weight: 800; font-size: 30px; letter-spacing: -0.01em; line-height: 1.15; margin: 0; }
+  .sub { color: var(--grey); font-size: 16px; font-weight: 500; margin-top: 4px; }
+  .status { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 4px 12px; border-radius: 999px;
+    background: var(--blush); border: 1px solid var(--blush-border); color: var(--red-dark); font-size: 14px; font-weight: 600; }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .label { font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--red); margin: 0 0 12px; }
+  a.card { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 16px 20px 16px 16px; margin: 0 0 14px;
+    border-radius: 22px; background: #fff; text-decoration: none; color: var(--black); border: 2px solid transparent;
+    box-shadow: 0 14px 36px rgba(110,14,20,0.10), inset 0 0 0 1px rgba(188,26,33,0.12); transition: border-color .15s, background .15s; }
+  a.card:hover, a.card:focus-visible { border-color: var(--red); background: linear-gradient(90deg, var(--blush), #fff 70%); outline: none; }
+  .ico { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: var(--red); color: #fff; }
+  .ico.grey { background: var(--grey); }
+  .ico.dark { background: var(--black); }
+  .ico svg, .arrow svg { width: 32px; height: 32px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .t { font-family: var(--font-display); font-weight: 800; font-size: 21px; line-height: 1.2; }
+  .d { color: var(--grey); font-size: 15px; margin-top: 3px; }
+  .arrow { color: var(--red); }
+  .arrow svg { width: 26px; height: 26px; }
+  footer { color: var(--grey); font-size: 13px; text-align: center; margin-top: 18px; }
+  @media (max-width: 560px) {
+    body { padding-top: 24px; }
+    main { padding: 24px 18px 18px; }
+    header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .div { display: none; }
+    a.card { grid-template-columns: 52px minmax(0, 1fr); }
+    .ico { width: 52px; height: 52px; }
+    .arrow { display: none; }
+  }
 </style>
 </head>
-<body><main>
-  <h1 class="adna-wordmark">Ad<span class="accent">Na</span></h1>
-  <p>Vyvolávací systém – server beží. Zvoľte rozhranie:</p>
-  <a class="card" href="/sestra/">Sestra a administrácia<small>Počítač sestry (Windows – inštalovateľná aplikácia)</small></a>
-  <a class="card" href="/tablet/">Tablet pre pacientov<small>Normálne sa otvára v Android aplikácii „AdNa Tablet“</small></a>
-  <a class="card" href="/obrazovka/">Obrazovka v čakárni<small>Normálne sa otvára v Android TV aplikácii „AdNa Obrazovka“</small></a>
-</main></body>
+<body>
+<div class="bg-band" aria-hidden="true"></div>
+<main>
+  <header>
+    <img src="/obrazovka/assets/adna-logo.png" alt="AdNa s.r.o.">
+    <div class="div" aria-hidden="true"></div>
+    <div>
+      <h1>Vyvolávací systém</h1>
+      <div class="sub">Ambulancia cievnej chirurgie · AdNa s.r.o. · Krivá 17, Košice</div>
+      <div class="status">Server beží</div>
+    </div>
+  </header>
+  <p class="label">Zvoľte rozhranie</p>
+  <a class="card" href="/sestra/">
+    <span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+    <span><span class="t">Sestra a administrácia</span><span class="d" style="display:block">Počítač sestry a lekára (Windows – inštalovateľná aplikácia)</span></span>
+    <span class="arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+  <a class="card" href="/tablet/">
+    <span class="ico grey" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></svg></span>
+    <span><span class="t">Tablet pre pacientov</span><span class="d" style="display:block">Normálne sa otvára v Android aplikácii „AdNa Tablet“</span></span>
+    <span class="arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+  <a class="card" href="/obrazovka/">
+    <span class="ico dark" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M10 8.5l4 2-4 2z M8 21h8"/></svg></span>
+    <span><span class="t">Obrazovka v čakárni</span><span class="d" style="display:block">Mini PC pri televízore (Edge na celú obrazovku, s TV Antik)</span></span>
+    <span class="arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+  </a>
+</main>
+</body>
 </html>
