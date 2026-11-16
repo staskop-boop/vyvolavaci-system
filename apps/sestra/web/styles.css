@@ -107,10 +107,14 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 .hero-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 15px; font-weight: 600; }
 .hero-meta .pill { background: rgba(255,255,255,0.16); border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
 .hero-meta .pill.late { background: #fff; color: var(--red-dark); } .hero-meta .pill.ok { background: #fff; color: var(--ok); }
-.hero-actions { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.hero-actions { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
 .hero .btn-call { background: #fff; color: var(--red); border-color: #fff; box-shadow: 0 10px 24px rgba(0,0,0,0.18); min-width: 300px; }
 .hero .btn-call:hover:not(:disabled) { background: var(--blush); border-color: #fff; }
-.hero .btn-add { background: var(--black); color: #fff; border-color: rgba(255,255,255,0.25); }
+/* Neaktívne „Vyvolať“ je len obrys, aby nesplývalo s čiernym „+ Pacient“ pod ním. */
+.hero .btn-call:disabled { opacity: 1; background: transparent; color: rgba(255,255,255,0.8); border: 2px dashed rgba(255,255,255,0.6); box-shadow: none; }
+.hero .btn-add { background: var(--black); color: #fff; border: 2px solid #fff; font-family: var(--font-display); font-weight: 800; font-size: 19px; padding: 13px 22px; border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.28); }
+.hero .btn-add:disabled { opacity: .55; box-shadow: none; }
 .hero .btn-add:hover:not(:disabled) { background: #000; }
 .hero .btn:focus-visible { outline-color: #fff; }
 @media (max-width: 860px) { .hero { grid-template-columns: auto minmax(0, 1fr); } .hero-actions { grid-column: 1 / -1; } .hero .btn-call { min-width: 0; }
