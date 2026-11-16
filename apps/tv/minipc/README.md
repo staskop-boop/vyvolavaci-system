@@ -69,13 +69,20 @@ Hlas zapnete/vypnete a nastavíte rýchlosť v aplikácii Sestra → Nastavenia 
 ## Mini PC s Linuxom
 
 Na Linuxe (Ubuntu, Mint, Debian…) sa namiesto súborov `.cmd` používa jeden skript `obrazovka-linux.sh`.
-Potrebný je Microsoft Edge, Google Chrome alebo Chromium. Prvé nastavenie v termináli:
+Na mini PC beží len obrazovka; Sestra, štatistiky a nastavenia sú na `https://vyvolavaci.adna.sk` ako doteraz.
+Odporúčaný prehliadač je Microsoft Edge (slovenský ženský hlas, prehrávanie Antiku), záloha Google Chrome alebo Chromium.
+
+Prvé nastavenie v termináli (Ctrl+Alt+T):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/apps/tv/minipc/obrazovka-linux.sh | bash -s -- --instalovat
 ```
 
-Skript stiahne doplnok pre Antik do `~/AdNa-obrazovka` a otvorí stránku doplnkov: zapnúť „Režim pre vývojárov“,
-„Načítať rozbalené“ → `~/AdNa-obrazovka/rozsirenie-tv-ramec`, potom F5 na karte obrazovky a raz sa prihlásiť do Antiku.
-Ďalej: `~/AdNa-obrazovka/obrazovka-linux.sh` (celá obrazovka, Alt+F4 ukončí) a `--autostart` (spustenie po prihlásení).
-Bez doplnku v tomto profile Antik hlási „Zadali ste nesprávne údaje“, aj keď sú údaje správne.
+Skript stiahne doplnok pre Antik do `~/AdNa-obrazovka`, pridá na plochu ikony **AdNa obrazovka** a **AdNa obrazovka –
+nastavenie** a otvorí nastavenie s návodom: Režim pre vývojárov → Načítať rozbalené → `~/AdNa-obrazovka/rozsirenie-tv-ramec`,
+potom F5 na karte obrazovky a raz sa prihlásiť do Antiku. Edge a Chrome (od verzie 137) doplnok z príkazového riadku
+nenačítajú, preto tento krok raz ručne; Chromium ho načíta sám. Ak doplnok v profile chýba, ikona AdNa obrazovka sama
+otvorí nastavenie namiesto obrazovky – bez doplnku Antik hlási „Zadali ste nesprávne údaje“, aj keď sú údaje správne.
+
+* `~/AdNa-obrazovka/obrazovka-linux.sh` – obrazovka na celú obrazovku (Alt+F4 ju zavrie), pri spustení sa sama aktualizuje z GitHubu;
+* `~/AdNa-obrazovka/obrazovka-linux.sh --autostart` – spustenie po prihlásení, obraz sa nevypína (ešte zapnúť automatické prihlásenie).

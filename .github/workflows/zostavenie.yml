@@ -30,6 +30,31 @@ jobs:
           docker exec adna test -f /data/SETUP-KOD.txt
           docker logs adna | tail -5
 
+  linux-obrazovka:
+    # spúšťač obrazovky pre mini PC s Linuxom (apps/tv/minipc/obrazovka-linux.sh)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax, inštalácia a nastavenie bez doplnku
+        run: |
+          set -e
+          bash -n apps/tv/minipc/obrazovka-linux.sh
+          H=$(mktemp -d); mkdir -p $H/bin
+          printf '#!/bin/sh\necho "$@" >> %s/volania\n' $H > $H/bin/microsoft-edge; chmod +x $H/bin/microsoft-edge
+          HOME=$H PATH=$H/bin:$PATH ADNA_ZDROJ=file://$PWD/apps/tv/minipc bash apps/tv/minipc/obrazovka-linux.sh --instalovat
+          sleep 1
+          test -f $H/AdNa-obrazovka/rozsirenie-tv-ramec/manifest.json
+          test -f $H/.local/share/applications/adna-obrazovka.desktop
+          grep -q "edge://extensions" $H/volania
+          grep -q "navod.html" $H/volania
+      - name: Načíta Google Chrome doplnok sám? (len informácia)
+        run: |
+          google-chrome --version || exit 0
+          P=$(mktemp -d)
+          timeout 20 google-chrome --headless=new --no-sandbox --user-data-dir=$P --disable-features=DisableLoadExtensionCommandLineSwitch \
+            --load-extension=$PWD/apps/tv/minipc/rozsirenie-tv-ramec about:blank >/dev/null 2>&1 || true
+          if grep -qs rozsirenie-tv-ramec "$P/Default/Preferences" "$P/Default/Secure Preferences"; then echo "Chrome načítal doplnok sám."; else echo "Chrome doplnok sám nenačíta – na mini PC treba raz Načítať rozbalené (spúšťač to otvorí sám)."; fi
+
   windows:
     # skutočný inštalačný skript pre lokálny server v ambulancii na čistom Windows (bez tunela)
     runs-on: windows-latest
