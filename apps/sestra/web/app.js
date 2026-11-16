@@ -413,16 +413,14 @@
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
     const waitRows = waiting.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}${all && t.homeRoomName ? `<span class="room-tag">${esc(t.homeRoomName)}</span>` : ''}</td><td class="nw t-plan">${plannedBadge(t, now)}
-        <button class="btn btn-sm btn-ghost needs-online" data-act="plan" data-id="${t.id}" ${dis} title="Zmeniť plánovaný čas">${t.plannedAt ? 'Zmeniť' : 'Zadať čas'}</button></td>
+      <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}</td><td class="nw t-plan">${plannedBadge(t, now)}</td>
       <td class="nw t-arr">${esc(fmtTime(t.createdAt))}</td><td class="nw t-wait">${esc(fmtWait(t.createdAt, now))}</td>
-      <td class="t-src">${t.source === 'card' ? '<span class="badge">Od sestry</span>' : printBadge(t.print)}</td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis}>Vyvolať${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
+        ${nurse ? `<button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, čas objednania alebo ambulanciu (napr. pacienta prevezme druhá ambulancia)">✎ Upraviť</button>
+        <button class="btn btn-sm btn-danger needs-online" data-act="cancel" data-id="${t.id}" ${dis} title="Zmazať chybne zadaného pacienta">✕ Zmazať</button>` : ''}
         ${t.source === 'card' ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="reprint" data-id="${t.id}" ${dis} title="Znovu vytlačiť lístok">Tlač</button>`}
-        ${nurse ? `<button class="btn btn-sm needs-online" data-act="move" data-id="${t.id}" ${dis} title="Zmeniť ambulanciu – napr. pacienta prevezme druhá ambulancia">Ambulancia…</button>
-        <button class="btn btn-sm btn-danger needs-online" data-act="cancel" data-id="${t.id}" ${dis} title="Zrušiť chybne zadaného pacienta" aria-label="Zrušiť pacienta ${esc(t.code)}">✕</button>` : ''}
       </div></td></tr>`).join('');
 
     const calledRows = called.map((t) => `<tr data-ticket="${t.id}">
@@ -499,7 +497,7 @@
       </section>
 
       <section class="card a-waiting"><div class="section-title"><h2>Čakajúci (${waiting.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
-        ${waiting.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th>Lístok</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
+        ${waiting.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
           : '<div class="empty">Nikto nečaká.</div>'}
       </section>
 
@@ -561,10 +559,10 @@
         return;
       }
       case 'plan': return planTicket(t);
-      case 'move': return moveTicket(t);
+      case 'edit': return editTicket(t);
       case 'cancel': {
-        const ok = await confirmDialog(`Zrušiť pacienta ${code}?`, `Číslo ${code} sa odstráni zo zoznamu čakajúcich, ako keby nebolo zadané (nezapočíta sa ani do štatistík). Použite pri chybnom zadaní.`, 'Zrušiť pacienta', true);
-        if (ok) act(() => api(`/api/staff/tickets/${id}/cancel`, { body: {} }), `Pacient ${code} bol zrušený`);
+        const ok = await confirmDialog(`Zmazať pacienta ${code}?`, `Číslo ${code} sa odstráni zo zoznamu čakajúcich, ako keby nebolo zadané (nezapočíta sa ani do štatistík). Použite pri chybnom zadaní.`, 'Zmazať pacienta', true);
+        if (ok) act(() => api(`/api/staff/tickets/${id}/cancel`, { body: {} }), `Pacient ${code} bol zmazaný`);
         return;
       }
       case 'announce-edit': return announce();
@@ -680,22 +678,26 @@
   }
   const pickedRoom = (root) => { const v = root.querySelector('#m-room').value; return v === '' ? null : Number(v); };
 
-  /** 2026-11-16: zmena ambulancie čakajúceho pacienta – napr. keď ho prevezme druhá ambulancia. */
-  async function moveTicket(t) {
+  /** 2026-11-16 (Pali): úprava čakajúceho pacienta – číslo, čas objednania a ambulancia (napr. pacienta prevezme druhá ambulancia). */
+  async function editTicket(t) {
     if (!t) return;
-    // predvolene ponúkneme inú ambulanciu, než v ktorej pacient teraz je
-    const other = roomsActive().find((r) => r.id !== t.homeRoomId);
+    const cur = t.plannedAt ? fmtTime(t.plannedAt) : '';
     const res = await modal({
-      title: `Zmeniť ambulanciu – ${t.code}`,
+      title: `Upraviť pacienta ${t.code}`,
       okText: 'Uložiť',
-      body: `<p class="hint">Teraz: <b>${esc(t.homeRoomName || 'ktorákoľvek ambulancia (spoločný pacient)')}</b>. Pacient sa presunie do zoznamu vybranej ambulancie, poradie podľa času objednania ostáva.</p>
-        <div class="field"><label for="m-room">Nová ambulancia</label>${roomSelect(other ? other.id : t.homeRoomId)}</div>`,
+      body: `<div class="row">
+          <div class="field"><label for="m-card">Číslo alebo písmeno pacienta</label><input id="m-card" autocomplete="off" autocapitalize="characters" maxlength="6" value="${esc(t.code)}"></div>
+          <div class="field"><label for="m-time">Čas objednania</label><input id="m-time" type="time" step="60" value="${esc(cur)}"></div>
+        </div>
+        <div class="field" style="margin-top:14px"><label for="m-room">Ambulancia</label>${roomSelect(t.homeRoomId)}</div>
+        <p class="hint">Keď pacienta prevezme druhá ambulancia, vyberte ju tu – pacient sa presunie do jej zoznamu.</p>`,
       onOk: async (root) => {
         if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
-        return api(`/api/staff/tickets/${t.id}/room`, { body: { roomId: pickedRoom(root) } });
+        if (!root.querySelector('#m-card').value.trim()) throw new Error('Zadajte číslo alebo písmeno pacienta.');
+        return api(`/api/staff/tickets/${t.id}/edit`, { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: pickedRoom(root) } });
       },
     });
-    if (res && res.ticket) toast(`${res.ticket.code} presunutý: ${res.ticket.homeRoomName || 'všetky ambulancie'}`, 'ok');
+    if (res && res.ticket) toast(`Uložené: ${res.ticket.code}${res.ticket.plannedAt ? ' · ' + fmtTime(res.ticket.plannedAt) : ''} · ${res.ticket.homeRoomName || 'ktorákoľvek ambulancia'}`, 'ok');
   }
 
   async function planTicket(t) {
@@ -747,7 +749,7 @@
 
   // ---------- história ----------
   const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Vybavený', absent: 'Neprítomný',
-    requeue: 'Vrátený medzi čakajúcich', moved: 'Zmena ambulancie', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
+    requeue: 'Vrátený medzi čakajúcich', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
 
   async function renderHistory() {
     $view.innerHTML = '<div class="center-msg">Načítava sa história…</div>';
@@ -766,7 +768,7 @@
       for (const e of h.events) (evBy[e.ticketId] = evBy[e.ticketId] || []).push(e);
       const rows = h.tickets.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
         <td>${esc(fmtTime(t.createdAt))}</td><td>${esc(t.roomName || '')}</td><td>${printBadge(t.print)}</td>
-        <td class="hint">${(evBy[t.id] || []).map((e) => `${esc(fmtTime(e.at))} ${esc(EV_TEXT[e.type] || e.type)}${e.roomName && /call/.test(e.type) ? ' – ' + esc(e.roomName) : ''}${e.note && (e.type === 'call' || e.type === 'day_closed' || e.type === 'moved') ? ` <span class="ev-note">(${esc(e.note)})</span>` : ''}`).join('<br>')}</td></tr>`).join('');
+        <td class="hint">${(evBy[t.id] || []).map((e) => `${esc(fmtTime(e.at))} ${esc(EV_TEXT[e.type] || e.type)}${e.roomName && /call/.test(e.type) ? ' – ' + esc(e.roomName) : ''}${e.note && (e.type === 'call' || e.type === 'day_closed' || e.type === 'moved' || e.type === 'edited') ? ` <span class="ev-note">(${esc(e.note)})</span>` : ''}`).join('<br>')}</td></tr>`).join('');
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${h.tickets.length} čísel</span></div>

@@ -59,6 +59,30 @@ test('ambulancia pacienta: výber, zmena, zrušenie', async (t) => {
     assert.match(r.data.error.message, /neprítomného/);
   });
 
+  await t.test('úprava čísla, času a ambulancie naraz', async () => {
+    let r = await admin.post('/api/staff/cards', { cardNo: '40', plannedTime: '00:40', roomId: a1.id });
+    const id = r.data.ticket.id;
+    r = await admin.post(`/api/staff/tickets/${id}/edit`, { cardNo: '41', plannedTime: '00:45', roomId: a2.id });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    assert.equal(r.data.ticket.code, '41');
+    assert.equal(r.data.ticket.homeRoomId, a2.id);
+    assert.ok(r.data.ticket.plannedAt);
+    r = await admin.post(`/api/staff/tickets/${id}/edit`, { cardNo: '6' });
+    assert.equal(r.status, 409, 'označenie 6 už čaká');
+    r = await admin.post(`/api/staff/tickets/${id}/edit`, { cardNo: '!!' });
+    assert.equal(r.status, 400);
+  });
+
+  await t.test('úvodné stránky odkazujú na skripty s verziou (obchádza cache Cloudflare)', async () => {
+    for (const u of ['/sestra/', '/sestra/index.html', '/obrazovka/', '/tablet/']) {
+      const res = await fetch(s.base + u);
+      const html = await res.text();
+      assert.equal(res.headers.get('cache-control'), 'no-cache', u);
+      assert.match(html, /src="app\.js\?v=\w+"/, u);
+      assert.match(html, /href="styles\.css\?v=\w+"/, u);
+    }
+  });
+
   await t.test('lekár nemôže presúvať ani rušiť', async () => {
     await admin.post('/api/admin/users', { username: 'lekarx', password: 'Heslo-lekara-01', roomId: a1.id, doctorName: 'MUDr. X' });
     const doc = client(s.base);

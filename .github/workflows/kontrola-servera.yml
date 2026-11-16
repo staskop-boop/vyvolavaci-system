@@ -19,6 +19,12 @@ jobs:
           done
           echo "Sestra – verzia na serveri: $(curl -fsS -m 20 https://vyvolavaci.adna.sk/sestra/sw.js | grep -o "adna-sestra-v[0-9]*")"
           echo "Sestra – tlačidlo zobraziť heslo: $(echo "$SESTRA" | grep -c "pw-toggle") · hromadné kontá: $(echo "$SESTRA" | grep -c "btn-bulk-users")"
+          echo "Sestra – výber/zmena ambulancie (PR #29): $(echo "$SESTRA" | grep -c "moveTicket")"
+          for f in app.js sw.js index.html; do
+            echo "--- hlavičky /sestra/$f"; curl -sS -m 20 -D - -o /dev/null https://vyvolavaci.adna.sk/sestra/$f | grep -iE "^(cache-control|cf-cache-status|age|etag|last-modified|content-length|server):" || true
+          done
+          echo "app.js bez cache: $(curl -fsS -m 20 "https://vyvolavaci.adna.sk/sestra/app.js?t=$(date +%s)" | grep -c moveTicket)"
+          echo "app.js v repozitári: $(grep -c moveTicket apps/sestra/web/app.js 2>/dev/null || echo '?')"
           if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$SESTRA" | grep -q "m-ann-clear"; then
             echo "Server slúži aktuálnu verziu obrazovky."
           else

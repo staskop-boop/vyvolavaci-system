@@ -471,6 +471,35 @@ class Store extends EventEmitter {
   }
 
   /**
+   * 2026-11-16 (Pali): úprava zadaného pacienta – označenie, čas objednania a ambulancia naraz.
+   * Len čakajúci pacient z dnešného dňa; zmenené označenie musí byť jedinečné ako pri zaradení.
+   */
+  editTicket(ticketId, b, userId) {
+    const row0 = this.getTicketRow(ticketId);
+    this.requireToday(row0);
+    const code = b && 'cardNo' in b ? this.normCard(b.cardNo) : row0.code;
+    const planned = b && 'plannedTime' in b ? this.parsePlanned(b.plannedTime, row0.day) : row0.planned_at;
+    const home = b && 'roomId' in b ? (b.roomId != null && b.roomId !== '' ? this.requireRoom(b.roomId).id : null) : row0.home_room_id;
+    tx(this.db, () => {
+      const row = this.getTicketRow(ticketId);
+      if (row.status !== 'waiting') throw conflict(`Číslo ${row.code} je v stave „${STATUS_TEXT[row.status]}“ – upraviť možno len čakajúceho pacienta.`);
+      if (code !== row.code) {
+        const dup = this.db.prepare(`SELECT t.status, h.name AS home FROM tickets t LEFT JOIN rooms h ON h.id = t.home_room_id
+          WHERE t.day = ? AND t.code = ? AND t.id <> ? AND t.status IN ('waiting','called')`).get(row.day, code, row.id);
+        if (dup) throw conflict(`Označenie ${code} je už v zozname${dup.home ? ` (${dup.home})` : ''} – ${STATUS_TEXT[dup.status]}. Zvoľte iné.`);
+      }
+      this.db.prepare('UPDATE tickets SET code = ?, planned_at = ?, home_room_id = ?, version = version + 1 WHERE id = ?').run(code, planned, home, row.id);
+      const now = clock.nowIso();
+      const ev = this.db.prepare('INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note) VALUES (?, ?, ?, ?, ?, ?)');
+      if (code !== row.code) ev.run(row.id, 'edited', now, null, userId ?? null, `${row.code} → ${code}`);
+      if (planned !== row.planned_at) ev.run(row.id, 'planned', now, null, userId ?? null, planned ? String(b.plannedTime).trim() : 'bez času');
+      if (home !== row.home_room_id) ev.run(row.id, 'moved', now, home, userId ?? null, home ? this.getRoom(home).name : 'všetky ambulancie');
+    });
+    this.changed('tickets');
+    return { ticket: this.getTicket(Number(ticketId)) };
+  }
+
+  /**
    * 2026-11-16 (Pali): zrušenie chybne zadaného pacienta. Len čakajúci (ešte nevyvolaný) z dnešného dňa;
    * záznam sa odstráni úplne, aby nekazil štatistiky. Označenie sa tým uvoľní.
    */
