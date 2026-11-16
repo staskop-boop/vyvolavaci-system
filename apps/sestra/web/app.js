@@ -943,7 +943,7 @@
           <td>${docSelect('u-doc', u.doctorName, s.doctorList)}</td>
           <td><select class="u-room"><option value="">všetky</option>${rooms.filter((r) => r.active).map((r) => `<option value="${r.id}" ${r.id === u.roomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></td>
           <td><input type="checkbox" class="u-active" ${u.active ? 'checked' : ''} style="width:20px;height:20px"></td>
-          <td><input type="password" class="u-pw" placeholder="ponechať" autocomplete="new-password" style="width:150px"></td>
+          <td><input type="password" class="u-pw" placeholder="${u.noPassword ? 'nastaviť heslo' : 'ponechať'}" autocomplete="new-password" style="width:150px">${u.noPassword ? '<div class="hint" style="margin:4px 0 0"><b>⚠ Bez hesla</b> – prihlásenie nejde, kým ho nenastavíte.</div>' : ''}</td>
           <td class="actions"><button class="btn btn-sm btn-primary" data-user-save="${u.id}">Uložiť</button></td></tr>`).join('')}
         </tbody></table>
         <form class="row" id="f-user">

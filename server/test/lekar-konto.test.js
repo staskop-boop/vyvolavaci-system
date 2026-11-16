@@ -82,3 +82,26 @@ test('sestra (bez správcu) nevidí štatistiky ani nespravuje kontá', async ()
   assert.equal((await lekar.get('/api/staff/today-stats')).status, 401, 'lekár bol medzitým odhlásený');
   assert.equal((await sestra.post('/api/admin/users', { username: 'nove', password: 'Heslo-nove-0001' })).status, 403);
 });
+
+test('migrácia založí kontá lekárov bez hesla, prihlásiť sa nimi nedá, kým správca heslo nenastaví', () => {
+  const os = require('node:os'), fs = require('node:fs'), path = require('node:path');
+  const { open: openDb } = require('../src/db');
+  const { Store } = require('../src/store');
+  const { Auth } = require('../src/auth');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'adna-mig-'));
+  const file = path.join(dir, 'adna.db');
+  let db = openDb(file); new Store(db).seed(); db.close();   // prvé spustenie = naplnenie
+  db = openDb(file); new Store(db).seed();                    // druhé spustenie = migrácie
+  const auth = new Auth(db);
+  const docs = auth.listUsers().filter((u) => u.doctorName);
+  assert.deepEqual(docs.map((u) => u.username).sort(), ['czetoova', 'koval', 'kubikova', 'kudela', 'roskovicova', 'stasko']);
+  assert.ok(docs.every((u) => u.noPassword && u.role === 'staff' && u.active));
+  for (const pw of ['', '!', 'hocico-1234567']) assert.ok(auth.login('kudela', pw, '1.1.1.1').error);
+  const k = docs.find((u) => u.username === 'kudela');
+  assert.ok(!auth.updateUser(k.id, { password: 'Nove-heslo-2026' }, 0).error);
+  assert.ok(auth.login('kudela', 'Nove-heslo-2026', '1.1.1.2').token);
+  assert.equal(auth.listUsers().find((u) => u.id === k.id).noPassword, false);
+  db.close(); db = openDb(file); new Store(db).seed();        // tretie spustenie nič nezdvojí
+  assert.equal(new Auth(db).listUsers().filter((u) => u.doctorName).length, 6);
+  db.close();
+});

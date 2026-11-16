@@ -134,6 +134,23 @@ class Store extends EventEmitter {
         mark('mig-2026-11-16-personal-na-admin');
       });
     }
+    // 2026-11-16: kontá lekárov podľa priezviska, zatiaľ BEZ hesla (prihlásiť sa nedá, kým ho správca nenastaví v Nastaveniach → Kontá)
+    if (!done('mig-2026-11-16-konta-lekarov')) {
+      tx(this.db, () => {
+        const login = (full) => {
+          const parts = String(full).split(',')[0].replace(/\b(MUDr|MVDr|Mgr|Bc|Ing|doc|prof|PhD|MHA|MPH)\.?/gi, ' ').trim().split(/\s+/);
+          return String(parts[parts.length - 1] || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 30);
+        };
+        for (const name of this.getSettings().doctorList || []) {
+          const un = login(name);
+          if (un.length < 3) continue;
+          if (this.db.prepare('SELECT 1 FROM users WHERE doctor_name = ? OR username = ?').get(name, un)) continue;
+          this.db.prepare("INSERT INTO users (username, password_hash, role, created_at, doctor_name) VALUES (?, '!', 'staff', ?, ?)").run(un, clock.nowIso(), name);
+          log.info('Vytvorené konto lekára bez hesla', { username: un });
+        }
+        mark('mig-2026-11-16-konta-lekarov');
+      });
+    }
     // 2026-11-10: štatistiky lekárov – dnešné vyvolania doplníme o lekára, ktorý je dnes zadaný v ambulancii
     if (!done('mig-2026-11-10-lekar-vo-vyvolani')) {
       tx(this.db, () => {
