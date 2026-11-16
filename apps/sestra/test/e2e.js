@@ -224,18 +224,24 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await toastWith(A, /K7 zaradený.*Ambulancia č\. 2/);
     assert.equal(await row(A, 'tbl-waiting', 'K7').count(), 0, 'v zozname ambulancie 1 nie je');
     await A.selectOption('#room', { label: 'Ambulancia č. 2' });
-    await row(A, 'tbl-waiting', 'K7').getByRole('button', { name: 'Ambulancia…' }).click();
+    await row(A, 'tbl-waiting', 'K7').locator('.amb-pill', { hasText: 'Ambulancia č. 2' }).waitFor();
+    await row(A, 'tbl-waiting', 'K7').getByRole('button', { name: 'Upraviť' }).click();
+    await A.fill('#m-card', 'K8'); await A.fill('#m-time', '10:15');
     await A.selectOption('#m-room', { label: 'Ambulancia č. 1' });
     await A.click('#m-ok');
-    await toastWith(A, /K7 presunutý: Ambulancia č\. 1/);
-    await row(A, 'tbl-waiting', 'K7').waitFor({ state: 'detached' });
+    await toastWith(A, /Uložené: K8 · 10:15 · Ambulancia č\. 1/);
+    await row(A, 'tbl-waiting', 'K8').waitFor({ state: 'detached' });
     await A.selectOption('#room', { label: 'Ambulancia č. 1' });
-    await row(A, 'tbl-waiting', 'K7').getByRole('button', { name: 'Zrušiť' }).click();
-    await A.getByText('Zrušiť pacienta K7?').waitFor();
+    await row(A, 'tbl-waiting', 'K8').locator('.amb-pill', { hasText: 'Ambulancia č. 1' }).waitFor();
+    await shot(A, '7-zoznam-ambulancia');
+    await row(A, 'tbl-waiting', 'K8').getByRole('button', { name: 'Zmazať' }).click();
+    await A.getByText('Zmazať pacienta K8?').waitFor();
     await A.click('#m-ok');
-    await toastWith(A, /Pacient K7 bol zrušený/);
-    await row(A, 'tbl-waiting', 'K7').waitFor({ state: 'detached' });
-    ok('pri pridaní sa vyberá ambulancia; ambulanciu pacienta možno zmeniť; chybne zadaného pacienta možno zrušiť');
+    await toastWith(A, /Pacient K8 bol zmazaný/);
+    await row(A, 'tbl-waiting', 'K8').waitFor({ state: 'detached' });
+    const html = await (await fetch(URL_BASE + '/sestra/')).text();
+    assert.match(html, /src="app\.js\?v=\w+"/, 'úvodná stránka odkazuje na verziu app.js');
+    ok('pri pridaní sa vyberá ambulancia; stĺpec Ambulancia; úprava čísla, času a ambulancie; zmazanie chybne zadaného; app.js s verziou');
 
     // 11. história
     await A.click('.tab[data-view=history]');

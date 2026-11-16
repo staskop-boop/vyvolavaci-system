@@ -155,6 +155,7 @@ function createServer(opts = {}) {
   app.post('/api/staff/rooms/:id/doctor', requireNurse, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
   app.post('/api/staff/rooms/:id/delay', requireStaff, (req, res) => res.json(store.setRoomDelay(id(req), req.body?.minutes ?? null, req.body?.text)));
   app.post('/api/staff/tickets/:id/room', requireNurse, (req, res) => res.json(store.setHomeRoom(id(req), req.body?.roomId ?? null, req.user.id)));
+  app.post('/api/staff/tickets/:id/edit', requireNurse, (req, res) => res.json(store.editTicket(id(req), req.body || {}, req.user.id)));
   app.post('/api/staff/tickets/:id/cancel', requireNurse, (req, res) => res.json(store.cancelTicket(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/planned', requireNurse, (req, res) => res.json(store.setPlanned(id(req), req.body?.plannedTime, req.user.id)));
   app.get('/api/staff/days', requireStaff, (req, res) => res.json({ days: store.days() }));
@@ -215,6 +216,22 @@ function createServer(opts = {}) {
   // ---------- statické aplikácie ----------
   const staticOpts = { index: 'index.html', maxAge: 0, setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') };
   const mount = (url, dir) => { if (fs.existsSync(dir)) app.use(url, express.static(dir, staticOpts)); };
+  // 2026-11-16: Cloudflare prepisuje Cache-Control súborov .js/.css na max-age=14400 (4 h), takže prehliadač
+  // po aktualizácii servera ešte hodiny používal starý app.js. Úvodná stránka (HTML sa necachuje) preto
+  // odkazuje na skripty a štýly s ?v=<spustenie servera> – po každej aktualizácii je to nová adresa.
+  const indexCache = new Map();
+  const versionedIndex = (url, dir) => app.get([url + '/', url + '/index.html'], (req, res, next) => {
+    const file = path.join(dir, 'index.html');
+    if (!indexCache.has(file)) {
+      if (!fs.existsSync(file)) return next();
+      indexCache.set(file, fs.readFileSync(file, 'utf8').replace(/((?:src|href)=")([^":?#]+\.(?:js|css))"/g, `$1$2?v=${BOOT_ID}"`));
+    }
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('html').send(indexCache.get(file));
+  });
+  versionedIndex('/sestra', path.join(config.appsDir, 'sestra', 'web'));
+  versionedIndex('/tablet', path.join(config.appsDir, 'tablet', 'web'));
+  versionedIndex('/obrazovka', path.join(config.appsDir, 'tv', 'web'));
   mount('/shared', config.sharedDir);
   mount('/sestra', path.join(config.appsDir, 'sestra', 'web'));
   mount('/tablet', path.join(config.appsDir, 'tablet', 'web'));
