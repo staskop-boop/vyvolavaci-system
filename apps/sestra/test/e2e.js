@@ -213,6 +213,30 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await alert.waitFor({ state: 'detached' });
     ok('nedostupná tlačiareň → upozornenie pre personál; po opätovnej tlači upozornenie zmizne');
 
+    // 10b. (2026-11-16) výber ambulancie pri pridaní, zmena ambulancie, zrušenie chybne zadaného pacienta
+    await A.selectOption('#room', { label: 'Ambulancia č. 1' });
+    await A.click('#btn-card');
+    await A.fill('#m-card', 'K7'); await A.fill('#m-time', '10:00');
+    assert.equal(await A.locator('#m-room option:checked').textContent(), 'Ambulancia č. 1', 'predvolená je ambulancia sestry');
+    await A.selectOption('#m-room', { label: 'Ambulancia č. 2' });
+    await shot(A, '6-pridat-ambulancia');
+    await A.click('#m-ok');
+    await toastWith(A, /K7 zaradený.*Ambulancia č\. 2/);
+    assert.equal(await row(A, 'tbl-waiting', 'K7').count(), 0, 'v zozname ambulancie 1 nie je');
+    await A.selectOption('#room', { label: 'Ambulancia č. 2' });
+    await row(A, 'tbl-waiting', 'K7').getByRole('button', { name: 'Ambulancia…' }).click();
+    await A.selectOption('#m-room', { label: 'Ambulancia č. 1' });
+    await A.click('#m-ok');
+    await toastWith(A, /K7 presunutý: Ambulancia č\. 1/);
+    await row(A, 'tbl-waiting', 'K7').waitFor({ state: 'detached' });
+    await A.selectOption('#room', { label: 'Ambulancia č. 1' });
+    await row(A, 'tbl-waiting', 'K7').getByRole('button', { name: 'Zrušiť' }).click();
+    await A.getByText('Zrušiť pacienta K7?').waitFor();
+    await A.click('#m-ok');
+    await toastWith(A, /Pacient K7 bol zrušený/);
+    await row(A, 'tbl-waiting', 'K7').waitFor({ state: 'detached' });
+    ok('pri pridaní sa vyberá ambulancia; ambulanciu pacienta možno zmeniť; chybne zadaného pacienta možno zrušiť');
+
     // 11. história
     await A.click('.tab[data-view=history]');
     await A.locator('#hist-detail table').waitFor();

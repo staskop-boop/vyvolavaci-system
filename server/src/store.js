@@ -452,6 +452,45 @@ class Store extends EventEmitter {
     return { ticket: this.getTicket(id) };
   }
 
+  /**
+   * 2026-11-16 (Pali): zmena ambulancie pacienta – napr. keď ho prevezme druhá ambulancia.
+   * roomId = null → spoločný pacient (vidia ho všetky ambulancie).
+   */
+  setHomeRoom(ticketId, roomId, userId) {
+    const home = roomId != null && roomId !== '' ? this.requireRoom(roomId) : null;
+    tx(this.db, () => {
+      const row = this.getTicketRow(ticketId);
+      this.requireToday(row);
+      if (!['waiting', 'called', 'absent'].includes(row.status)) throw conflict(`Číslo ${row.code} je už vybavené – ambulanciu nemožno zmeniť.`);
+      this.db.prepare('UPDATE tickets SET home_room_id = ?, version = version + 1 WHERE id = ?').run(home ? home.id : null, row.id);
+      this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note) VALUES (?, 'moved', ?, ?, ?, ?)")
+        .run(row.id, clock.nowIso(), home ? home.id : null, userId ?? null, home ? home.name : 'všetky ambulancie');
+    });
+    this.changed('tickets');
+    return { ticket: this.getTicket(Number(ticketId)) };
+  }
+
+  /**
+   * 2026-11-16 (Pali): zrušenie chybne zadaného pacienta. Len čakajúci (ešte nevyvolaný) z dnešného dňa;
+   * záznam sa odstráni úplne, aby nekazil štatistiky. Označenie sa tým uvoľní.
+   */
+  cancelTicket(ticketId, userId) {
+    const code = tx(this.db, () => {
+      const row = this.getTicketRow(ticketId);
+      this.requireToday(row);
+      if (row.status !== 'waiting') throw conflict(`Číslo ${row.code} je v stave „${STATUS_TEXT[row.status]}“ – zrušiť možno len čakajúceho pacienta.`);
+      if (this.db.prepare("SELECT 1 FROM ticket_events WHERE ticket_id = ? AND type IN ('call','recall') LIMIT 1").get(row.id)) {
+        throw conflict(`Číslo ${row.code} už bolo vyvolané – namiesto zrušenia ho označte ako neprítomného.`);
+      }
+      this.db.prepare('DELETE FROM ticket_events WHERE ticket_id = ?').run(row.id);
+      this.db.prepare('DELETE FROM tickets WHERE id = ?').run(row.id);
+      return row.code;
+    });
+    log.info('Zrušený chybne zadaný pacient', { code, userId });
+    this.changed('tickets');
+    return { cancelled: true, code };
+  }
+
   /** Spárovanie / zmena plánovaného času (aj pre čísla z tabletu). */
   setPlanned(ticketId, plannedTime, userId) {
     const row = this.getTicketRow(ticketId);

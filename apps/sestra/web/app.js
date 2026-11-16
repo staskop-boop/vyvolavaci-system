@@ -390,6 +390,7 @@
     const printProblems = st.tickets.filter((t) => (t.status === 'waiting' || t.status === 'called') && t.print && (t.print.status === 'failed' || t.print.status === 'unverified'));
     const now = Date.now();
     const def = Number(lsGet(LS_ROOM));
+    const nurse = !S.user.doctorName;   // lekár pacientov nepridáva, nepresúva ani neruší
 
     const alerts = [];
     if (off) alerts.push(`<div class="alert alert-danger" role="alert"><div class="grow"><b>Bez spojenia so serverom.</b> Zobrazený zoznam nemusí byť aktuálny, akcie sú dočasne vypnuté. Spojenie sa obnoví automaticky.</div></div>`);
@@ -420,6 +421,8 @@
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis}>Vyvolať${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
         ${t.source === 'card' ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="reprint" data-id="${t.id}" ${dis} title="Znovu vytlačiť lístok">Tlač</button>`}
+        ${nurse ? `<button class="btn btn-sm needs-online" data-act="move" data-id="${t.id}" ${dis} title="Zmeniť ambulanciu – napr. pacienta prevezme druhá ambulancia">Ambulancia…</button>
+        <button class="btn btn-sm btn-danger needs-online" data-act="cancel" data-id="${t.id}" ${dis} title="Zrušiť chybne zadaného pacienta" aria-label="Zrušiť pacienta ${esc(t.code)}">✕</button>` : ''}
       </div></td></tr>`).join('');
 
     const calledRows = called.map((t) => `<tr data-ticket="${t.id}">
@@ -558,6 +561,12 @@
         return;
       }
       case 'plan': return planTicket(t);
+      case 'move': return moveTicket(t);
+      case 'cancel': {
+        const ok = await confirmDialog(`Zrušiť pacienta ${code}?`, `Číslo ${code} sa odstráni zo zoznamu čakajúcich, ako keby nebolo zadané (nezapočíta sa ani do štatistík). Použite pri chybnom zadaní.`, 'Zrušiť pacienta', true);
+        if (ok) act(() => api(`/api/staff/tickets/${id}/cancel`, { body: {} }), `Pacient ${code} bol zrušený`);
+        return;
+      }
       case 'announce-edit': return announce();
       case 'announce-clear': return act(() => api('/api/staff/announcement', { body: { text: null } }), 'Mimoriadny oznam bol zrušený.');
       case 'delay-clear': return act(() => api(`/api/staff/rooms/${S.roomId}/delay`, { body: { minutes: null } }), 'Oznam o meškaní bol zrušený.');
@@ -651,15 +660,42 @@
       body: `<div class="row">
           <div class="field"><label for="m-card">Číslo alebo písmeno pacienta</label><input id="m-card" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="napr. 12, A, K7" autofocus></div>
           <div class="field"><label for="m-time">Čas objednania (z kalendára)</label><input id="m-time" type="time" step="60" value="" required></div>
-        </div><p class="hint">Pracovisko: <b>${esc(roomName(S.roomId))}</b>. Podľa času objednania sa počíta poradie a časový sklz (teraz je ${esc(nowHm)}). Pacientovi povedzte (alebo napíšte) pridelené označenie. Na obrazovke v čakárni sa ukáže iba toto označenie a odchýlka od termínu.</p>`,
+        </div>
+        <div class="field" style="margin-top:14px"><label for="m-room">Ambulancia</label>${roomSelect(S.roomId)}</div>
+        <p class="hint">Podľa času objednania sa počíta poradie a časový sklz (teraz je ${esc(nowHm)}). Pacientovi povedzte (alebo napíšte) pridelené označenie. Na obrazovke v čakárni sa ukáže iba toto označenie a odchýlka od termínu.</p>`,
       onOk: async (root) => {
         if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
         if (!root.querySelector('#m-card').value.trim()) throw new Error('Zadajte číslo alebo písmeno pacienta.');
         if (!root.querySelector('#m-time').value) throw new Error('Zadajte čas objednania z kalendára – podľa neho sa počíta časový sklz.');
-        return api('/api/staff/cards', { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: S.roomId } });
+        return api('/api/staff/cards', { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: pickedRoom(root) } });
       },
     });
-    if (res && res.ticket) toast(`Pacient ${res.ticket.code} zaradený${res.ticket.plannedAt ? ' na ' + fmtTime(res.ticket.plannedAt) : ''}`, 'ok');
+    if (res && res.ticket) toast(`Pacient ${res.ticket.code} zaradený${res.ticket.plannedAt ? ' na ' + fmtTime(res.ticket.plannedAt) : ''} – ${res.ticket.homeRoomName || 'všetky ambulancie'}`, 'ok');
+  }
+
+  /** 2026-11-16: výber ambulancie pacienta (prázdna hodnota = spoločný pacient pre všetky ambulancie). */
+  function roomSelect(selId) {
+    return `<select id="m-room">${roomsActive().map((r) => `<option value="${r.id}" ${r.id === selId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
+      <option value="" ${selId == null ? 'selected' : ''}>Ktorákoľvek ambulancia (spoločný pacient)</option></select>`;
+  }
+  const pickedRoom = (root) => { const v = root.querySelector('#m-room').value; return v === '' ? null : Number(v); };
+
+  /** 2026-11-16: zmena ambulancie čakajúceho pacienta – napr. keď ho prevezme druhá ambulancia. */
+  async function moveTicket(t) {
+    if (!t) return;
+    // predvolene ponúkneme inú ambulanciu, než v ktorej pacient teraz je
+    const other = roomsActive().find((r) => r.id !== t.homeRoomId);
+    const res = await modal({
+      title: `Zmeniť ambulanciu – ${t.code}`,
+      okText: 'Uložiť',
+      body: `<p class="hint">Teraz: <b>${esc(t.homeRoomName || 'ktorákoľvek ambulancia (spoločný pacient)')}</b>. Pacient sa presunie do zoznamu vybranej ambulancie, poradie podľa času objednania ostáva.</p>
+        <div class="field"><label for="m-room">Nová ambulancia</label>${roomSelect(other ? other.id : t.homeRoomId)}</div>`,
+      onOk: async (root) => {
+        if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
+        return api(`/api/staff/tickets/${t.id}/room`, { body: { roomId: pickedRoom(root) } });
+      },
+    });
+    if (res && res.ticket) toast(`${res.ticket.code} presunutý: ${res.ticket.homeRoomName || 'všetky ambulancie'}`, 'ok');
   }
 
   async function planTicket(t) {
@@ -711,7 +747,7 @@
 
   // ---------- história ----------
   const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Vybavený', absent: 'Neprítomný',
-    requeue: 'Vrátený medzi čakajúcich', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
+    requeue: 'Vrátený medzi čakajúcich', moved: 'Zmena ambulancie', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
 
   async function renderHistory() {
     $view.innerHTML = '<div class="center-msg">Načítava sa história…</div>';
@@ -730,7 +766,7 @@
       for (const e of h.events) (evBy[e.ticketId] = evBy[e.ticketId] || []).push(e);
       const rows = h.tickets.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
         <td>${esc(fmtTime(t.createdAt))}</td><td>${esc(t.roomName || '')}</td><td>${printBadge(t.print)}</td>
-        <td class="hint">${(evBy[t.id] || []).map((e) => `${esc(fmtTime(e.at))} ${esc(EV_TEXT[e.type] || e.type)}${e.roomName && /call/.test(e.type) ? ' – ' + esc(e.roomName) : ''}${e.note && (e.type === 'call' || e.type === 'day_closed') ? ` <span class="ev-note">(${esc(e.note)})</span>` : ''}`).join('<br>')}</td></tr>`).join('');
+        <td class="hint">${(evBy[t.id] || []).map((e) => `${esc(fmtTime(e.at))} ${esc(EV_TEXT[e.type] || e.type)}${e.roomName && /call/.test(e.type) ? ' – ' + esc(e.roomName) : ''}${e.note && (e.type === 'call' || e.type === 'day_closed' || e.type === 'moved') ? ` <span class="ev-note">(${esc(e.note)})</span>` : ''}`).join('<br>')}</td></tr>`).join('');
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${h.tickets.length} čísel</span></div>
