@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       akcia:
-        description: 'diagnostika = len vypíše stav; aktualizovat = aj nasadí main a obnoví plánovač'
+        description: 'diagnostika = len vypíše stav; aktualizovat = aj nasadí main a obnoví plánovač; vynulovat-testovacie-data = záloha a zmazanie pacientov, histórie a štatistík'
         type: choice
-        options: [aktualizovat, diagnostika]
+        options: [aktualizovat, diagnostika, vynulovat-testovacie-data]
         default: aktualizovat
 concurrency: { group: udrzba, cancel-in-progress: false }
 permissions: { contents: read }
@@ -29,3 +29,10 @@ jobs:
           sleep 20
           S=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/api/display/state)
           echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "Server slúži aktuálnu verziu." || { echo "::error::Server stále slúži starú verziu."; exit 1; }
+      - name: Kontrola po vynulovaní
+        if: inputs.akcia == 'vynulovat-testovacie-data'
+        run: |
+          sleep 5
+          S=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/api/display/state)
+          echo "$S" | jq -c '{rooms: [.rooms[] | {name, current, calledToday}], queue: (.queue | length)}'
+          echo "$S" | jq -e '(.queue | length) == 0 and all(.rooms[]; .current == null)' >/dev/null && echo "Systém je čistý." || { echo "::error::⚠ Na obrazovke ešte sú pacienti."; exit 1; }
