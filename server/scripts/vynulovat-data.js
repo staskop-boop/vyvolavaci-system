@@ -56,7 +56,7 @@ function vynulovat(dataDir) {
 
 module.exports = { vynulovat };
 
-if (require.main === module) {
+if (require.main === module || process.argv[1] === '-') {
   if (!process.argv.includes('--potvrdit')) {
     console.error('⚠ Vynulovanie je nevratné (okrem zálohy). Spustite s prepínačom --potvrdit.');
     process.exit(2);
