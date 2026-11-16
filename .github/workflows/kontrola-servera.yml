@@ -17,6 +17,8 @@ jobs:
           for f in stasko czetoova kubikova kudela koval roskovicova; do
             echo "fotka $f: $(curl -s -o /dev/null -w '%{http_code}' -m 20 https://vyvolavaci.adna.sk/obrazovka/assets/doctors/$f.jpg)"
           done
+          echo "Sestra – verzia na serveri: $(curl -fsS -m 20 https://vyvolavaci.adna.sk/sestra/sw.js | grep -o "adna-sestra-v[0-9]*")"
+          echo "Sestra – tlačidlo zobraziť heslo: $(echo "$SESTRA" | grep -c "pw-toggle") · hromadné kontá: $(echo "$SESTRA" | grep -c "btn-bulk-users")"
           if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$SESTRA" | grep -q "m-ann-clear"; then
             echo "Server slúži aktuálnu verziu obrazovky."
           else
