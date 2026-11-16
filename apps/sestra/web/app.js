@@ -130,6 +130,66 @@
   /** Meno konta: malé písmená bez diakritiky a medzier (opravuje sa počas písania). */
   const cleanUsername = (v) => String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9._-]/g, '').slice(0, 30);
 
+  // ---------- hromadné založenie kont (správca) ----------
+  /** Náhodné heslo bez zameniteľných znakov (0/O, 1/l/I), generuje sa v prehliadači – nikam sa neposiela okrem servera. */
+  function randomPassword(len = 12) {
+    const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const a = new Uint32Array(len); crypto.getRandomValues(a);
+    return Array.from(a, (x) => abc[x % abc.length]).join('');
+  }
+  /** Priezvisko lekára → meno konta, napr. „MUDr. Veronika Roškovičová, PhD.“ → „roskovicova“. */
+  const surnameLogin = (full) => {
+    const parts = String(full).split(',')[0].replace(/\b(MUDr|MVDr|Mgr|Bc|Ing|doc|prof|PhD|MHA|MPH)\.?/gi, ' ').trim().split(/\s+/);
+    return cleanUsername(parts[parts.length - 1] || '');
+  };
+  async function bulkUsers(users, rooms, doctors) {
+    const taken = new Set(users.map((u) => u.username));
+    const plan = [];
+    const add = (p) => { if (p.username.length >= 3 && !taken.has(p.username)) { taken.add(p.username); plan.push(p); } };
+    // sestry len pre ambulancie (nie napr. USG pracovisko)
+    rooms.filter((r) => /ambulancia/i.test(r.name)).forEach((r, i) => { const n = (String(r.name).match(/(\d+)/) || [])[1] || String(i + 1);
+      add({ username: 'ambulancia' + n, kind: 'Sestra', roomId: r.id, where: r.name, doctorName: null }); });
+    const hasDoc = new Set(users.map((u) => u.doctorName).filter(Boolean));
+    doctors.filter((d) => !hasDoc.has(d)).forEach((d) => add({ username: surnameLogin(d), kind: 'Lekár', roomId: null, where: 'všetky', doctorName: d }));
+    if (!plan.length) { toast('Všetky kontá už existujú.', 'ok'); return; }
+    const ok = await modal({
+      title: `Založiť ${plan.length} kont?`, okText: 'Založiť kontá',
+      body: `<table><thead><tr><th>Konto</th><th>Typ</th><th>Lekár / pracovisko</th></tr></thead><tbody>
+        ${plan.map((p) => `<tr><td><b>${esc(p.username)}</b></td><td>${p.kind}</td><td>${esc(p.doctorName || p.where)}</td></tr>`).join('')}</tbody></table>
+        <p class="hint">Heslá sa vygenerujú náhodne a zobrazia sa <b>len raz</b> hneď po založení – vytlačte si ich alebo odpíšte. Neskôr sa dajú len zmeniť (Nové heslo).</p>`,
+    });
+    if (!ok) return;
+    const done = [];
+    for (const p of plan) {
+      const password = randomPassword();
+      try {
+        await api('/api/admin/users', { body: { username: p.username, password, roomId: p.roomId, role: 'staff', doctorName: p.doctorName } });
+        done.push({ ...p, password });
+      } catch (e) { done.push({ ...p, error: e.message }); }
+    }
+    const tableHtml = `<table><thead><tr><th>Konto</th><th>Heslo</th><th>Typ</th><th>Lekár / pracovisko</th></tr></thead><tbody>
+        ${done.map((p) => `<tr><td><b>${esc(p.username)}</b></td><td>${p.error ? `<span class="bad">⚠ ${esc(p.error)}</span>` : `<code style="font-size:18px">${esc(p.password)}</code>`}</td>
+          <td>${p.kind}</td><td>${esc(p.doctorName || p.where)}</td></tr>`).join('')}</tbody></table>`;
+    const printIt = () => {
+      // vytlačí sa len tabuľka s heslami (v novom okne), nie celá aplikácia
+      const w = window.open('', '_blank', 'width=800,height=900');
+      if (!w) { toast('Prehliadač zablokoval okno na tlač – heslá si odpíšte.', 'error'); return; }
+      w.document.write(`<!doctype html><meta charset="utf-8"><title>AdNa – kontá</title><style>body{font:16px system-ui;padding:24px}
+        table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}code{font-size:18px}</style>
+        <h2>Vyvolávací systém AdNa – prihlasovacie údaje</h2><p>${esc(location.origin)}/sestra</p>${tableHtml}`);
+      w.document.close(); w.focus(); w.print();
+    };
+    const shown = modal({
+      title: 'Kontá sú založené – heslá', okText: 'Mám ich zapísané', cancelText: 'Zavrieť',
+      body: `<div>${tableHtml}</div>
+        <div class="row" style="margin-top:12px"><button type="button" class="btn" id="bulk-print-btn">🖨 Vytlačiť heslá</button></div>
+        <p class="hint">Adresa: ${esc(location.origin)}/sestra · Heslá sa už znova nezobrazia.</p>`,
+    });
+    document.getElementById('bulk-print-btn').onclick = printIt;
+    await shown;
+    renderAdmin();
+  }
+
   // ---------- štart ----------
   async function boot() {
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -876,6 +936,8 @@
           ${kindSelect('', 'staff', 'nu-kind')}
           ${docSelect('', null, s.doctorList, 'nu-doc')}
           <button class="btn btn-primary" type="submit">Pridať konto</button></form>
+        <div class="row"><button class="btn" type="button" id="btn-bulk-users">Založiť kontá pre ambulancie a všetkých lekárov…</button>
+          <span class="hint">Vytvorí chýbajúce kontá (ambulancia1, ambulancia2 … a lekárov podľa priezviska) s náhodnými heslami, ktoré uvidíte len vy.</span></div>
       </section>
 
       <form class="card stack" id="f-general"><h2>Všeobecné</h2>
@@ -1034,6 +1096,7 @@
         toast('Konto bolo vytvorené.', 'ok'); renderAdmin();
       } catch (e2) { handleError(e2); }
     };
+    document.getElementById('btn-bulk-users').onclick = () => bulkUsers(users, rooms.filter((r) => r.active), s.doctorList || []);
     $view.querySelectorAll('[data-user-save]').forEach((b) => { b.onclick = async () => {
       const tr = b.closest('tr');
       const body = { roomId: tr.querySelector('.u-room').value ? Number(tr.querySelector('.u-room').value) : null,

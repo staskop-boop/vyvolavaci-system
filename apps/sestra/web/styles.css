@@ -233,7 +233,7 @@ td.nw, td.code { white-space: nowrap; }
 .toast.ok { background: var(--ok); }
 
 .modal-back { position: fixed; inset: 0; background: rgba(26, 26, 26, .5); display: flex; align-items: center; justify-content: center; z-index: 40; padding: 16px; }
-.modal { background: #fff; border-radius: var(--r-card); padding: 26px; width: 100%; max-width: 520px; box-shadow: 0 30px 80px rgba(0,0,0,.3), inset 0 0 0 1px rgba(188,26,33,0.14); }
+.modal { background: #fff; border-radius: var(--r-card); padding: 26px; width: 100%; max-width: 520px; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: 0 30px 80px rgba(0,0,0,.3), inset 0 0 0 1px rgba(188,26,33,0.14); }
 .modal h2 { font-size: 22px; }
 .modal .m-body .row { align-items: flex-end; }
 .modal .m-body .field input, .modal .m-body .field select, .modal .m-body .field textarea { width: 100%; }
