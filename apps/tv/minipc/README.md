@@ -65,3 +65,17 @@ ambulancia jedna“. Ak slovenský hlas chýba, v lište TV svieti štítok **�
 Hlas zapnete/vypnete a nastavíte rýchlosť v aplikácii Sestra → Nastavenia → Obrazovka → Hlasové hlásenie
 (bez zvuku sa nehlási ani hlas). Rozšírenie `rozsirenie-tv-ramec` sa v Edge načíta rovnako cez `edge://extensions`
 → Režim pre vývojárov → Načítať rozbalené.
+
+## Mini PC s Linuxom
+
+Na Linuxe (Ubuntu, Mint, Debian…) sa namiesto súborov `.cmd` používa jeden skript `obrazovka-linux.sh`.
+Potrebný je Microsoft Edge, Google Chrome alebo Chromium. Prvé nastavenie v termináli:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/apps/tv/minipc/obrazovka-linux.sh | bash -s -- --instalovat
+```
+
+Skript stiahne doplnok pre Antik do `~/AdNa-obrazovka` a otvorí stránku doplnkov: zapnúť „Režim pre vývojárov“,
+„Načítať rozbalené“ → `~/AdNa-obrazovka/rozsirenie-tv-ramec`, potom F5 na karte obrazovky a raz sa prihlásiť do Antiku.
+Ďalej: `~/AdNa-obrazovka/obrazovka-linux.sh` (celá obrazovka, Alt+F4 ukončí) a `--autostart` (spustenie po prihlásení).
+Bez doplnku v tomto profile Antik hlási „Zadali ste nesprávne údaje“, aj keď sú údaje správne.
