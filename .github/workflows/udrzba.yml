@@ -35,4 +35,4 @@ jobs:
           sleep 5
           S=$(curl -fsS -m 20 https://vyvolavaci.adna.sk/api/display/state)
           echo "$S" | jq -c '{rooms: [.rooms[] | {name, current, calledToday}], queue: (.queue | length)}'
-          echo "$S" | jq -e '(.queue | length) == 0 and all(.rooms[]; .current == null)' >/dev/null && echo "Systém je čistý." || { echo "::error::⚠ Na obrazovke ešte sú pacienti."; exit 1; }
+          echo "$S" | jq -e '(.queue | length) == 0 and all(.rooms[]; .current == null and (.calledToday | not))' >/dev/null && echo "Systém je čistý." || { echo "::error::⚠ Na obrazovke ešte sú pacienti."; exit 1; }

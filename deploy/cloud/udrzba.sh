@@ -74,25 +74,29 @@ fi
 if [ "$AKCIA" = vynulovat-testovacie-data ]; then
   echo "== Vynulovanie testovacích údajov (záloha → zmazanie pacientov, histórie a štatistík) =="
   SKRIPT_B64=$(base64 -w0 server/scripts/vynulovat-data.js)
-  { echo "SKRIPT_B64='$SKRIPT_B64'"; cat <<'VYNULOVAT'; } | ssh_ 2>&1 | grep -Ev "$FILTER"
+  LOG=$(mktemp)
+  { echo "SKRIPT_B64='$SKRIPT_B64'"; cat <<'VYNULOVAT'; } | ssh_ 2>&1 | grep -Ev "$FILTER" | tee "$LOG" || true
 set -e
 cd /opt/adna/deploy
 echo "$SKRIPT_B64" | base64 -d > /tmp/vynulovat-data.js
 echo "-- denná záloha (server ešte beží):"
-docker compose exec -T adna node --disable-warning=ExperimentalWarning scripts/zaloha.js
+docker compose exec -T adna node --disable-warning=ExperimentalWarning scripts/zaloha.js </dev/null
 echo "-- zastavujem server"
-trap 'docker compose start adna >/dev/null 2>&1 || true' EXIT
-docker compose stop adna
+trap 'docker compose start adna </dev/null >/dev/null 2>&1 || true' EXIT
+docker compose stop adna </dev/null
 set +e
 docker compose run --rm -T --no-deps adna node --disable-warning=ExperimentalWarning - --potvrdit < /tmp/vynulovat-data.js
 RC=$?
 set -e
 rm -f /tmp/vynulovat-data.js
 echo "-- spúšťam server"
-docker compose start adna
+docker compose start adna </dev/null
 for i in $(seq 1 30); do curl -fsS -m 5 http://127.0.0.1:8080/api/health >/dev/null 2>&1 && break; sleep 2; done
 curl -fsS -m 5 http://127.0.0.1:8080/api/health && echo
 echo "-- zálohy na serveri:"; ls -la data/zalohy | tail -5
 [ $RC = 0 ] || { echo "VYNULOVANIE ZLYHALO (kód $RC)"; exit $RC; }
+echo "VYNULOVANIE DOKONČENÉ"
 VYNULOVAT
+  # príkazy v kontajneri nesmú zjesť zvyšok skriptu zo stdin – bez záverečnej značky to nie je úspech
+  grep -q "VYNULOVANIE DOKONČENÉ" "$LOG" || chyba "Vynulovanie neprebehlo celé."
 fi
