@@ -47,7 +47,7 @@ test('bez prihlásenia sa k rozhraniu sestry nedostane nikto', async () => {
   assert.equal((await anon.get('/api/staff/state')).status, 401);
   assert.equal((await anon.post('/api/staff/call-next', { roomId: 1 })).status, 401);
   assert.equal((await anon.get('/api/admin/settings')).status, 401);
-  const bad = await anon.post('/api/auth/login', { username: 'personal', password: 'zle-heslo-xxx' });
+  const bad = await anon.post('/api/auth/login', { username: 'admin', password: 'zle-heslo-xxx' });
   assert.equal(bad.status, 401);
 });
 
@@ -85,7 +85,7 @@ test('omylom vyvolané číslo: vrátenie ho stiahne z obrazovky', async () => {
 
 test('dve sestry súčasne vyvolajú toho istého pacienta → len jedna uspeje', async () => {
   const staff2 = h.client(s.base);
-  await staff2.post('/api/auth/login', { username: 'personal', password: 'Testovacie-heslo-1' });
+  await staff2.post('/api/auth/login', { username: 'admin', password: 'Testovacie-heslo-1' });
   const st = (await staff.get('/api/staff/state')).data;
   const t = st.tickets.find((x) => x.status === 'waiting');
   const rs = await Promise.all([

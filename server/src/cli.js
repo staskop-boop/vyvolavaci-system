@@ -23,8 +23,8 @@ function ask(q, hidden) {
     const pw2 = await ask('Zopakujte heslo: ', true);
     if (pw !== pw2) { console.error('Heslá sa nezhodujú.'); process.exit(1); }
   }
-  auth.createOrResetUser('personal', pw, 'admin');
+  auth.createOrResetUser('admin', pw, 'admin');
   try { require('node:fs').rmSync(require('node:path').join(config.dataDir, 'SETUP-KOD.txt')); } catch {}
-  console.log('Heslo pre konto „personal“ bolo nastavené. Všetky doterajšie prihlásenia boli zrušené.');
+  console.log('Heslo pre konto „admin“ bolo nastavené. Všetky doterajšie prihlásenia boli zrušené.');
   database.close();
 })();

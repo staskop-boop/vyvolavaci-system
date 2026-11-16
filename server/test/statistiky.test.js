@@ -63,7 +63,7 @@ test('uzavretie nevybavených čísel staršieho dňa', async () => {
   assert.equal((await admin.post('/api/staff/close-past-day', { day: day1 })).status, 400, 'dnešok sa takto neuzatvára');
   await reg();
   clock.setOffset(24 * 3600_000); s.store.tick();
-  await admin.post('/api/auth/login', { username: 'personal', password: 'Testovacie-heslo-1' });
+  await admin.post('/api/auth/login', { username: 'admin', password: 'Testovacie-heslo-1' });
   const before = (await admin.get('/api/staff/days')).data.days.find((d) => d.day === day1);
   assert.ok(before.waiting + before.called >= 2);
   const r = await admin.post('/api/staff/close-past-day', { day: day1 });

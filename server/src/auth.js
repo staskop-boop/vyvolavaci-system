@@ -60,7 +60,7 @@ class Auth {
     if (!this.setupCode || String(setupCode || '').trim().toUpperCase() !== this.setupCode) return { error: 'Nesprávny inštalačný kód.' };
     const err = validatePassword(password);
     if (err) return { error: err };
-    this.createOrResetUser('personal', password, 'admin');
+    this.createOrResetUser('admin', password, 'admin');
     try { fs.rmSync(path.join(config.dataDir, 'SETUP-KOD.txt')); } catch {}
     this.setupCode = null;
     log.info('Prvotné nastavenie hesla dokončené');
@@ -94,7 +94,10 @@ class Auth {
   login(username, password, ip, label) {
     const wait = this.isLocked(ip);
     if (wait) return { error: `Príliš veľa neúspešných pokusov. Skúste znova o ${wait} s.`, locked: true };
-    const u = this.db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(String(username || '').trim());
+    const name = String(username || '').trim().toLowerCase();
+    const find = (n) => this.db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(n);
+    // konto správcu sa do 2026-11-16 volalo „personal“ – staré meno ešte funguje, ak také konto neexistuje
+    const u = find(name) || (name === 'personal' ? find('admin') : null);
     if (!u || !verifyPassword(password, u.password_hash)) { this.noteFailure(ip); return { error: 'Nesprávne meno alebo heslo.' }; }
     this.failures.delete(ip);
     const token = crypto.randomBytes(32).toString('base64url');

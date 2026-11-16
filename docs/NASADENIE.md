@@ -28,13 +28,13 @@ Jedno spustenie v GitHub Actions (`.github/workflows/nasadenie.yml` → `deploy/
 2. **Tunel** `vyvolavaci` so smerovaním `vyvolavaci.adna.sk → http://adna:8080`.
 3. **DNS** CNAME `vyvolavaci` → tunel (existujúci iný záznam neprepíše).
 4. **Server Hetzner** (Ubuntu 24.04, `cx23`, pri nedostupnosti ďalšie typy) so zálohami; cloud-init spustí
-   `deploy/vps/instaluj.sh`, ktorý nastaví prvé heslo konta `personal` z tajomstva `ADNA_HESLO`.
+   `deploy/vps/instaluj.sh`, ktorý nastaví prvé heslo konta `admin` z tajomstva `ADNA_HESLO`.
 
 Potrebné tajomstvá (Settings → Secrets and variables → Actions):
 * `CLOUDFLARE_API_TOKEN` – vlastný token: Account › Cloudflare Tunnel › Edit, Account › Access: Apps and Policies › Edit,
   Zone › DNS › Edit a Zone › Zone › Read pre adna.sk;
 * `HCLOUD_TOKEN` – Hetzner Cloud projekt → Security → API Tokens → Read & Write;
-* `ADNA_HESLO` – prvé heslo konta `personal` (min. 10 znakov), po prihlásení ho zmeňte v aplikácii.
+* `ADNA_HESLO` – prvé heslo konta `admin` (min. 10 znakov), po prihlásení ho zmeňte v aplikácii.
 
 **Aktualizácie:** server každých 5 minút skontroluje vetvu `main` a novú verziu nasadí sám (pred tým urobí zálohu),
 log `/var/log/adna-aktualizacia.log`. Zlúčenie PR = nasadenie.

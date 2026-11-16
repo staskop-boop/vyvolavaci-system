@@ -46,7 +46,7 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
   for (let i = 0; i < 100; i++) { try { if ((await fetch(BASE + '/api/health')).ok) break; } catch {} await sleep(100); }
   const code = fs.readFileSync(path.join(dataDir, 'SETUP-KOD.txt'), 'utf8').match(/KOD:\s*(\S+)/)[1];
   await api('POST', '/api/setup', { setupCode: code, password: PASSWORD });
-  await api('POST', '/api/auth/login', { username: 'personal', password: PASSWORD });
+  await api('POST', '/api/auth/login', { username: 'admin', password: PASSWORD });
   await api('PUT', '/api/admin/settings', { news: { feeds: [{ name: 'TASR', url: fb + '/tasr' }, { name: 'SME', url: fb + '/sme' }, { name: 'BBC', url: fb + '/bbc' }] } });
   await api('POST', '/api/admin/news/refresh', {});
   const rooms = (await api('GET', '/api/staff/state')).rooms;

@@ -305,3 +305,5 @@ body.is-doctor [data-act="announce-edit"], body.is-doctor [data-act="announce-cl
 body.is-doctor #btn-doctor { cursor: default; }
 .u-doc { min-width: 200px; }
 .stats-table tr.me-row td { background: var(--blush); font-weight: 800; }
+.pw-toggle { margin-left: 4px; white-space: nowrap; }
+.field .pw-toggle { align-self: flex-start; margin: 4px 0 0; }

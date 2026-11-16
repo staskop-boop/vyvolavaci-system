@@ -124,7 +124,7 @@ function createServer(opts = {}) {
   };
   app.post('/api/auth/login', (req, res) => {
     if (auth.setupRequired()) return res.status(409).json({ error: { code: 'SETUP_REQUIRED', message: 'Najprv dokončite prvotné nastavenie hesla.' } });
-    const r = auth.login(req.body?.username || 'personal', req.body?.password, req.ip, req.body?.deviceLabel);
+    const r = auth.login(req.body?.username || 'admin', req.body?.password, req.ip, req.body?.deviceLabel);
     if (r.error) return res.status(r.locked ? 429 : 401).json({ error: { code: r.locked ? 'RATE_LIMITED' : 'UNAUTHORIZED', message: r.error } });
     setCookie(req, res, r.token, config.sessionHours * 3600 * 14); // cookie žije dlhšie, platnosť stráži server
     res.json({ user: r.user });

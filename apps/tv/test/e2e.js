@@ -51,7 +51,7 @@ async function login() {
     const code = fs.readFileSync(path.join(dataDir, 'SETUP-KOD.txt'), 'utf8').match(/KOD:\s*(\S+)/)[1];
     await api('POST', '/api/setup', { setupCode: code, password: PASSWORD });
   }
-  await api('POST', '/api/auth/login', { username: 'personal', password: PASSWORD });
+  await api('POST', '/api/auth/login', { username: 'admin', password: PASSWORD });
 }
 const register = () => api('POST', '/api/kiosk/tickets', { requestId: 'tv-e2e-' + Math.random().toString(36).slice(2) + Date.now(), deviceId: 'e2e' });
 
@@ -153,7 +153,7 @@ async function shot(page, name) {
     });
     await step('po obnovení servera sa štítok skryje a stav sa načíta', async () => {
       await startServer();
-      cookie = ''; await api('POST', '/api/auth/login', { username: 'personal', password: PASSWORD });
+      cookie = ''; await api('POST', '/api/auth/login', { username: 'admin', password: PASSWORD });
       const d = (await register()).ticket;
       await page.waitForSelector('#offline.hidden', { state: 'attached', timeout: 20000 });
       const n = (await T()).chimes;

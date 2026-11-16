@@ -154,7 +154,7 @@ done
 echo "stav tunela: $ST"
 {
   echo "### Vyvolávací systém AdNa"
-  echo "* Adresa: https://$HOST/sestra/ (konto **personal**, heslo z tajomstva ADNA_HESLO)"
+  echo "* Adresa: https://$HOST/sestra/ (konto **admin**, heslo z tajomstva ADNA_HESLO)"
   echo "* Obrazovka: https://$HOST/obrazovka/"
   echo "* Stav tunela: **$ST**"
 } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
