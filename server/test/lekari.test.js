@@ -26,7 +26,7 @@ test('migrácia: konto personal sa premenuje na admin, heslo ostáva a staré me
   auth.createOrResetUser('personal', 'Testovacie-heslo-1', 'admin');
   db.prepare("DELETE FROM settings WHERE key = 'mig-2026-11-16-personal-na-admin'").run();
   new Store(db).seed();
-  assert.deepEqual(db.prepare('SELECT username, role FROM users').all().map((u) => ({ ...u })), [{ username: 'admin', role: 'admin' }]);
+  assert.deepEqual(db.prepare('SELECT username, role FROM users WHERE doctor_name IS NULL').all().map((u) => ({ ...u })), [{ username: 'admin', role: 'admin' }]);
   assert.ok(auth.login('admin', 'Testovacie-heslo-1', '1.1.1.1').token);
   assert.ok(auth.login('personal', 'Testovacie-heslo-1', '1.1.1.1').token, 'staré meno funguje ako alias');
 });

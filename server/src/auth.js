@@ -125,10 +125,10 @@ class Auth {
 
   // ---------- kontá personálu (v2.1: každá ambulancia má vlastné konto) ----------
   listUsers() {
-    return this.db.prepare(`SELECT u.id, u.username, u.role, u.active, u.room_id, u.doctor_name, u.created_at, r.name AS room_name FROM users u
+    return this.db.prepare(`SELECT u.id, u.username, u.role, u.active, u.room_id, u.doctor_name, u.created_at, u.password_hash = '!' AS no_pw, r.name AS room_name FROM users u
       LEFT JOIN rooms r ON r.id = u.room_id ORDER BY u.id`).all()
       .map((u) => ({ id: u.id, username: u.username, role: u.role, active: !!u.active, roomId: u.room_id ?? null, roomName: u.room_name ?? null,
-        doctorName: u.doctor_name || null, createdAt: u.created_at }));
+        doctorName: u.doctor_name || null, noPassword: !!u.no_pw, createdAt: u.created_at }));
   }
   /** Meno lekára pre lekárske konto (null = konto sestry/správcu). */
   doctorOk(v) {
