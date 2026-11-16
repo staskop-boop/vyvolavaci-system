@@ -109,6 +109,27 @@
     S.roomId = active.some((r) => r.id === def) ? def : active[0].id;
   }
 
+  // ---------- heslá: tlačidlo „zobraziť heslo“ pri každom poli hesla ----------
+  function enhancePasswords(root) {
+    root.querySelectorAll('input[type=password]:not([data-pwt])').forEach((inp) => {
+      inp.dataset.pwt = '1';
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn btn-sm btn-ghost pw-toggle'; b.textContent = '👁 Zobraziť';
+      b.setAttribute('aria-label', 'Zobraziť heslo'); b.setAttribute('aria-pressed', 'false');
+      b.onclick = () => {
+        const show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        b.textContent = show ? '🙈 Skryť' : '👁 Zobraziť';
+        b.setAttribute('aria-pressed', String(show));
+        inp.focus();
+      };
+      inp.insertAdjacentElement('afterend', b);
+    });
+  }
+  new MutationObserver(() => enhancePasswords(document.body)).observe(document.body, { childList: true, subtree: true });
+  /** Meno konta: malé písmená bez diakritiky a medzier (opravuje sa počas písania). */
+  const cleanUsername = (v) => String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9._-]/g, '').slice(0, 30);
+
   // ---------- štart ----------
   async function boot() {
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
@@ -155,7 +176,7 @@
       if (p1 !== p2) { err.textContent = 'Heslá sa nezhodujú.'; return; }
       try {
         await api('/api/setup', { body: { setupCode: f.querySelector('#code').value, password: p1 } });
-        await api('/api/auth/login', { body: { username: 'personal', password: p1, deviceLabel: 'Sestra' } });
+        await api('/api/auth/login', { body: { username: 'admin', password: p1, deviceLabel: 'Sestra' } });
         toast('Heslo bolo nastavené.', 'ok');
         boot();
       } catch (e2) { err.textContent = e2.message; }
@@ -170,7 +191,7 @@
       <img class="auth-logo" src="adna-logo.png" alt="AdNa s.r.o.">
       <h1>Sestra</h1>
       <div class="sub">Prihlásenie personálu</div>
-      <div class="field"><label for="un">Konto</label><input type="text" id="un" autocomplete="username" autocapitalize="none" value="${esc(lsGet(LS_USER) || 'personal')}" required></div>
+      <div class="field"><label for="un">Konto</label><input type="text" id="un" autocomplete="username" autocapitalize="none" value="${esc(lsGet(LS_USER) || 'admin')}" required></div>
       <div class="field"><label for="pw">Heslo</label><input type="password" id="pw" autocomplete="current-password" required></div>
       <div class="error-text" id="err"></div>
       <button class="btn btn-primary btn-xl" type="submit" id="login-btn">Prihlásiť sa</button>
@@ -849,7 +870,7 @@
           <td class="actions"><button class="btn btn-sm btn-primary" data-user-save="${u.id}">Uložiť</button></td></tr>`).join('')}
         </tbody></table>
         <form class="row" id="f-user">
-          <input type="text" id="nu-name" placeholder="meno konta, napr. ambulancia1" maxlength="30" autocapitalize="none" style="min-width:220px">
+          <input type="text" id="nu-name" placeholder="meno konta, napr. ambulancia1" title="Malé písmená bez diakritiky a medzier" maxlength="30" autocapitalize="none" style="min-width:220px">
           <select id="nu-room">${rooms.filter((r) => r.active).map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join('')}<option value="">všetky pracoviská</option></select>
           <input type="password" id="nu-pw" placeholder="heslo (aspoň 10 znakov)" autocomplete="new-password">
           ${kindSelect('', 'staff', 'nu-kind')}
@@ -1001,8 +1022,12 @@
     document.getElementById('p-check').onclick = () => printerTest(false);
     document.getElementById('p-test').onclick = () => printerTest(true);
 
+    const nuName = document.getElementById('nu-name');
+    nuName.oninput = () => { const c = cleanUsername(nuName.value); if (c !== nuName.value) nuName.value = c; };
     document.getElementById('f-user').onsubmit = async (e) => {
       e.preventDefault();
+      if (val('nu-name').length < 3) { toast('Meno konta musí mať aspoň 3 znaky (napr. ambulancia1).', 'error'); nuName.focus(); return; }
+      if (document.getElementById('nu-pw').value.length < 10) { toast('Heslo musí mať aspoň 10 znakov.', 'error'); document.getElementById('nu-pw').focus(); return; }
       try {
         await api('/api/admin/users', { body: { username: val('nu-name'), password: val('nu-pw'), roomId: val('nu-room') ? Number(val('nu-room')) : null, role: val('nu-kind') === 'admin' ? 'admin' : 'staff',
           doctorName: val('nu-kind') === 'doctor' ? val('nu-doc') : null } });

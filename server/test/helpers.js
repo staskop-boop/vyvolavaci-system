@@ -39,7 +39,7 @@ async function setupAndLogin(s, password = 'Testovacie-heslo-1') {
   const c = client(s.base);
   const r1 = await c.post('/api/setup', { setupCode: s.auth.setupCode, password });
   if (r1.status !== 200) throw new Error('setup failed ' + JSON.stringify(r1.data));
-  const r2 = await c.post('/api/auth/login', { username: 'personal', password });
+  const r2 = await c.post('/api/auth/login', { username: 'admin', password });
   if (r2.status !== 200) throw new Error('login failed');
   return c;
 }

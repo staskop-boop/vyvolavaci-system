@@ -35,7 +35,7 @@ V systéme **nie je žiadne predvolené heslo**. Pri prvom spustení:
 1. Na počítači sestry otvorte `http://IP-SERVERA:8080/sestra/`.
 2. Zobrazí sa „Prvotné nastavenie“. Zadajte **inštalačný kód** z konzoly servera alebo zo súboru
    `server\data\SETUP-KOD.txt` a dvakrát nové heslo (aspoň 10 znakov; odporúčame vetu, napr. `Modra-cakaren-2026!`).
-3. Kód sa po použití zneplatní a súbor sa zmaže. Konto sa volá `personal` (spoločné konto v1).
+3. Kód sa po použití zneplatní a súbor sa zmaže. Konto sa volá `admin` (spoločné konto v1).
 
 Zabudnuté heslo: na serveri v `C:\AdNa\server` spustite `npm run nastav-heslo` (heslo sa zadáva skryto;
 všetky prihlásenia sa zrušia). Zmena hesla bežne: *Nastavenia → Zmena hesla*.

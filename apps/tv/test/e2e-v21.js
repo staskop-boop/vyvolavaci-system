@@ -34,7 +34,7 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
   const admin = cl();
   const code = fs.readFileSync(path.join(dataDir, 'SETUP-KOD.txt'), 'utf8').match(/KOD:\s*(\S+)/)[1];
   await admin('POST', '/api/setup', { setupCode: code, password: 'Admin-heslo-0001' });
-  await admin('POST', '/api/auth/login', { username: 'personal', password: 'Admin-heslo-0001' });
+  await admin('POST', '/api/auth/login', { username: 'admin', password: 'Admin-heslo-0001' });
   const rooms = (await admin('GET', '/api/admin/rooms')).rooms;
   await admin('PUT', '/api/admin/settings', { news: { enabled: false } });
   fs.mkdirSync(SHOTS, { recursive: true });
@@ -44,7 +44,7 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
   await step('administrácia: vytvorenie kont pre dve ambulancie', async () => {
     const pa = await b.newPage({ viewport: { width: 1600, height: 1100 } }); pa.on('pageerror', (e) => errors.push(String(e)));
     await pa.goto(BASE + '/sestra/');
-    await pa.fill('#un', 'personal'); await pa.fill('#pw', 'Admin-heslo-0001'); await pa.keyboard.press('Enter');
+    await pa.fill('#un', 'admin'); await pa.fill('#pw', 'Admin-heslo-0001'); await pa.keyboard.press('Enter');
     await pa.waitForSelector('#btn-card');
     await pa.waitForSelector('#m-doc'); await pa.click('#m-cancel');      // vedúca sestra: lekára zadajú ambulancie
     await pa.click('button[data-view="admin"]');

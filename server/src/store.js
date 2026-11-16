@@ -127,6 +127,13 @@ class Store extends EventEmitter {
         mark('mig-2026-11-10-roskovicova');
       });
     }
+    // 2026-11-16: konto správcu sa volá „admin“ (predtým „personal“) – heslo aj relácie ostávajú
+    if (!done('mig-2026-11-16-personal-na-admin')) {
+      tx(this.db, () => {
+        if (!this.db.prepare("SELECT 1 FROM users WHERE username = 'admin'").get()) this.db.prepare("UPDATE users SET username = 'admin' WHERE username = 'personal'").run();
+        mark('mig-2026-11-16-personal-na-admin');
+      });
+    }
     // 2026-11-10: štatistiky lekárov – dnešné vyvolania doplníme o lekára, ktorý je dnes zadaný v ambulancii
     if (!done('mig-2026-11-10-lekar-vo-vyvolani')) {
       tx(this.db, () => {

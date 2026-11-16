@@ -50,7 +50,7 @@ async function api(method, path, body) {
 async function login() {
   const st = await api('GET', '/api/setup/status');
   if (st.setupRequired) await api('POST', '/api/setup', { setupCode: process.env.ADNA_SETUP_CODE, password: PASSWORD });
-  await api('POST', '/api/auth/login', { username: 'personal', password: PASSWORD });
+  await api('POST', '/api/auth/login', { username: 'admin', password: PASSWORD });
 }
 const tickets = async () => (await api('GET', '/api/staff/state')).tickets;
 

@@ -90,7 +90,7 @@ Kódy: `BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED,
 |---|---|---|
 | `POST /api/setup` | `{setupCode, password}` | prvotné nastavenie hesla (iba keď nie je žiadne konto) |
 | `GET /api/setup/status` | – | `{ setupRequired: bool }` |
-| `POST /api/auth/login` | `{username, password}` | prihlásenie (`username` v1 = `personal`) |
+| `POST /api/auth/login` | `{username, password}` | prihlásenie (`username` v1 = `admin`) |
 | `POST /api/auth/logout` | – | odhlásenie |
 | `GET /api/auth/me` | – | `{ user: {id, username, role} }` |
 | `GET /api/staff/state` | – | `staff.state` (pozri nižšie) |

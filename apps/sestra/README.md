@@ -58,7 +58,7 @@ Keď ešte nie je nastavené heslo, aplikácia zobrazí obrazovku **Prvotné nas
 3. Po nastavení sa súbor s kódom automaticky vymaže a ste prihlásení.
 
 Heslo sa ukladá iba ako odtlačok (scrypt so soľou), nikdy nie v čitateľnej podobe. Zabudnuté heslo
-nastavíte na serveri príkazom `npm run nastav-heslo`. V prvej verzii je jedno spoločné konto `personal`.
+nastavíte na serveri príkazom `npm run nastav-heslo`. V prvej verzii je jedno spoločné konto `admin`.
 
 ## Denná práca
 
