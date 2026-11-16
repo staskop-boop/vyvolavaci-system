@@ -333,6 +333,23 @@
   }
   tick(); setInterval(tick, 15000);
 
+  // po aktualizácii servera sa aplikácia načíta znova sama – len keď používateľ práve nič nevypĺňa
+  let bootId = null;
+  async function checkBoot() {
+    try {
+      const h = await (await fetch('/api/health', { cache: 'no-store' })).json();
+      if (!h.boot) return;
+      if (bootId && h.boot !== bootId) {
+        const a = document.activeElement;
+        const typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.value;
+        if (document.getElementById('modal-root').children.length || typing || S.busy) return;   // skúsi o minútu
+        location.reload(); return;
+      }
+      bootId = h.boot;
+    } catch {}
+  }
+  checkBoot(); setInterval(checkBoot, 60000);
+
   // ---------- zoznam ----------
   // v2.1: každá ambulancia vidí predvolene svojich pacientov (+ spoločných, napr. z tabletu)
   const showAll = () => lsGet(LS_ALL) === '1';
