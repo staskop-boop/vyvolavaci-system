@@ -31,6 +31,14 @@ function validatePassword(pw) {
   return null;
 }
 
+/** Meno konta tak, ako ho ľudia píšu: bez diakritiky a veľkých písmen („Czetöová“ → „czetoova“). */
+const plainName = (v) => String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+/** Prihlasovacie meno lekára z celého mena (priezvisko bez titulov a diakritiky) – rovnako ako pri zakladaní kont. */
+const surnameLogin = (full) => {
+  const parts = String(full).split(',')[0].replace(/\b(MUDr|MVDr|Mgr|Bc|Ing|doc|prof|PhD|MHA|MPH)\.?/gi, ' ').trim().split(/\s+/);
+  return plainName(parts[parts.length - 1] || '').replace(/[^a-z0-9._-]/g, '');
+};
+
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 class Auth {
@@ -79,27 +87,37 @@ class Auth {
       .run(username, h, role, clock.nowIso()).lastInsertRowid);
   }
 
-  /** Brzda proti hádaniu hesla: po 5 chybách z jednej IP 60 s pauza. */
-  isLocked(ip) {
-    const f = this.failures.get(ip);
-    return f && f.until && f.until > Date.now() ? Math.ceil((f.until - Date.now()) / 1000) : 0;
+  /**
+   * Brzda proti hádaniu hesla: po 5 chybách na jedno konto z jednej IP 60 s pauza – len pre to konto.
+   * 2026-11-17: predtým sa blokovala celá IP, a keďže celá ambulancia ide von cez jednu adresu (Cloudflare),
+   * preklepy jedného človeka zablokovali prihlásenie všetkým. Celkovo z jednej IP najviac 20 chýb za minútu.
+   */
+  isLocked(ip, name) {
+    const now = Date.now();
+    const left = (f) => (f && f.until > now ? Math.ceil((f.until - now) / 1000) : 0);
+    return Math.max(left(this.failures.get('u:' + ip + ':' + name)), left(this.failures.get('ip:' + ip)));
   }
-  noteFailure(ip) {
-    const f = this.failures.get(ip) || { count: 0, until: 0 };
-    f.count += 1;
-    if (f.count >= 5) { f.until = Date.now() + 60_000; f.count = 0; log.warn('Opakované neúspešné prihlásenie', { ip }); }
-    this.failures.set(ip, f);
+  noteFailure(ip, name) {
+    for (const [k, max] of [['u:' + ip + ':' + name, 5], ['ip:' + ip, 20]]) {
+      const f = this.failures.get(k) || { count: 0, until: 0 };
+      f.count += 1;
+      if (f.count >= max) { f.until = Date.now() + 60_000; f.count = 0; log.warn('Opakované neúspešné prihlásenie', { ip, konto: k.startsWith('u:') ? name : '*' }); }
+      this.failures.set(k, f);
+    }
   }
 
   login(username, password, ip, label) {
-    const wait = this.isLocked(ip);
-    if (wait) return { error: `Príliš veľa neúspešných pokusov. Skúste znova o ${wait} s.`, locked: true };
-    const name = String(username || '').trim().toLowerCase();
+    const name = plainName(username);
+    const wait = this.isLocked(ip, name);
+    if (wait) return { error: `Príliš veľa neúspešných pokusov pre konto „${name}“. Skúste znova o ${wait} s.`, locked: true };
     const find = (n) => this.db.prepare('SELECT * FROM users WHERE username = ? AND active = 1').get(n);
-    // konto správcu sa do 2026-11-16 volalo „personal“ – staré meno ešte funguje, ak také konto neexistuje
-    const u = find(name) || (name === 'personal' ? find('admin') : null);
-    if (!u || !verifyPassword(password, u.password_hash)) { this.noteFailure(ip); return { error: 'Nesprávne meno alebo heslo.' }; }
-    this.failures.delete(ip);
+    // konto správcu sa do 2026-11-16 volalo „personal“ – staré meno ešte funguje, ak také konto neexistuje;
+    // lekár sa môže prihlásiť aj celým menom („MUDr. Adela Czetöová“ → konto czetoova)
+    const u = find(name) || (name === 'personal' ? find('admin') : null) || (/\s/.test(name) ? find(surnameLogin(name)) : null);
+    // konto lekára založené bez hesla – prihlásiť sa nedá, kým ho správca nenastaví (nepočíta sa ako pokus o uhádnutie)
+    if (u && u.password_hash === '!') return { error: `Konto „${u.username}“ ešte nemá nastavené heslo. Nastaví ho správca v Nastaveniach → Kontá.` };
+    if (!u || !verifyPassword(password, u.password_hash)) { this.noteFailure(ip, name); return { error: 'Nesprávne meno alebo heslo.' }; }
+    this.failures.delete('u:' + ip + ':' + name);
     const token = crypto.randomBytes(32).toString('base64url');
     const now = clock.now();
     const exp = new Date(now.getTime() + config.sessionHours * 3600_000);

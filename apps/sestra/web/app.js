@@ -271,14 +271,17 @@
       const btn = f.querySelector('#login-btn');
       btn.disabled = true;
       try {
-        const un = f.querySelector('#un').value.trim().toLowerCase();
+        // meno konta bez diakritiky a veľkých písmen („Czetöová“ → czetoova), rovnako to robí server
+        const un = f.querySelector('#un').value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
         const r = await api('/api/auth/login', { body: { username: un, password: f.querySelector('#pw').value, deviceLabel: 'Sestra' } });
         lsSet(LS_USER, un);
         S.user = r.user;
         startApp();
       } catch (e2) {
         if (e2.code === 'SETUP_REQUIRED') return showSetup();
-        f.querySelector('#err').textContent = e2.message;
+        f.querySelector('#err').textContent = e2.status === 401
+          ? `${e2.message} Skontrolujte aj pole Konto – prihlasujete sa ako „${f.querySelector('#un').value.trim()}“.`
+          : e2.message;
         btn.disabled = false;
         f.querySelector('#pw').select();
       }
