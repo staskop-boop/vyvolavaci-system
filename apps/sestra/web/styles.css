@@ -316,3 +316,12 @@ body.is-doctor #btn-doctor { cursor: default; }
 .stats-table tr.me-row td { background: var(--blush); font-weight: 800; }
 .pw-toggle { margin-left: 4px; white-space: nowrap; }
 .field .pw-toggle { align-self: flex-start; margin: 4px 0 0; }
+
+/* 2026-11-17: identifikátor pacienta od sestry – len v aplikácii Sestra, nikdy na TV */
+.ident-pill { display: inline-block; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;
+  padding: 2px 10px; border-radius: 999px; background: #fff; color: var(--black); border: 1.5px dashed var(--red);
+  font-family: var(--font-body); font-size: 14px; font-weight: 600; letter-spacing: 0; }
+.type-pill { display: inline-block; vertical-align: middle; padding: 2px 10px; border-radius: 999px; background: var(--black); color: #fff;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+.hero-meta .ident-pill { font-size: 16px; max-width: 30ch; }
+.hero-meta .type-pill { font-size: 16px; background: #fff; color: var(--black); }

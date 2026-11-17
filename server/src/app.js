@@ -141,7 +141,10 @@ function createServer(opts = {}) {
   });
 
   // ---------- personál ----------
-  app.get('/api/staff/state', requireStaff, (req, res) => res.json(store.staffState()));
+  // identifikátor a typ pacienta vidí všetok prihlásený personál – sestry, lekári aj správca (Pali 2026-11-17);
+  // obrazovka v čakárni a tablet (verejné API, kanál display) nikdy
+  const seesNote = (u) => !!u;
+  app.get('/api/staff/state', requireStaff, (req, res) => res.json(store.staffState({ withNote: seesNote(req.user) })));
   app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId), res.json(store.call(id(req), req.body?.roomId, req.user.id, req.body?.note))));
   app.post('/api/staff/call-next', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId), res.json(store.callNext(req.body?.roomId, req.user.id))));
   app.post('/api/staff/tickets/:id/recall', requireStaff, (req, res) => res.json(store.recall(id(req), req.body?.roomId, req.user.id)));
@@ -150,7 +153,8 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/requeue', requireStaff, (req, res) => res.json(store.requeue(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/reprint', requireNurse, wrap(async (req, res) => res.json(await store.reprint(id(req), req.user.id))));
   app.post('/api/staff/cards', requireNurse, (req, res) => res.status(201).json(store.registerCard(req.body?.cardNo, req.body?.plannedTime, req.user.id,
-    req.body && 'roomId' in req.body ? req.body.roomId : req.user.roomId)));
+    req.body && 'roomId' in req.body ? req.body.roomId : req.user.roomId, req.body?.staffNote, req.body?.patientType)));
+  app.post('/api/staff/tickets/:id/note', requireNurse, (req, res) => res.json(store.setStaffNote(id(req), req.body || {}, req.user.id)));
   app.post('/api/staff/announcement', requireNurse, (req, res) => res.json(store.setAnnouncement(req.body?.text, req.user)));
   app.post('/api/staff/rooms/:id/doctor', requireNurse, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
   app.post('/api/staff/rooms/:id/delay', requireStaff, (req, res) => res.json(store.setRoomDelay(id(req), req.body?.minutes ?? null, req.body?.text)));
@@ -159,7 +163,7 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/cancel', requireNurse, (req, res) => res.json(store.cancelTicket(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/planned', requireNurse, (req, res) => res.json(store.setPlanned(id(req), req.body?.plannedTime, req.user.id)));
   app.get('/api/staff/days', requireStaff, (req, res) => res.json({ days: store.days() }));
-  app.get('/api/staff/history', requireStaff, (req, res) => res.json(store.history(req.query.day)));
+  app.get('/api/staff/history', requireStaff, (req, res) => res.json(store.history(req.query.day, seesNote(req.user))));
   app.post('/api/staff/close-past-day', requireNurse, (req, res) => res.json(store.closePastDay(req.body?.day, req.user.id)));
 
   // ---------- administrácia ----------
@@ -265,6 +269,8 @@ function createServer(opts = {}) {
       const token = parseCookies(req.headers.cookie)[COOKIE];
       if (channel === 'staff' && !auth.check(token)) { ws.close(4401, 'unauthorized'); return; }
       ws.channel = channel; ws.token = token; ws.alive = true;
+      // obrazovka a tablet (kanál display) identifikátor nikdy nedostanú; kanál staff len prihlásený personál
+      ws.withNote = channel === 'staff' && seesNote(auth.check(token));
       clients.add(ws);
       ws.on('pong', () => { ws.alive = true; });
       ws.on('message', (m) => {
@@ -279,7 +285,7 @@ function createServer(opts = {}) {
 
   function send(ws, obj) { if (ws.readyState === 1) ws.send(typeof obj === 'string' ? obj : JSON.stringify(obj)); }
   function sendState(ws) {
-    if (ws.channel === 'staff') send(ws, { type: 'staff.state', rev: store.rev, state: store.staffState() });
+    if (ws.channel === 'staff') send(ws, { type: 'staff.state', rev: store.rev, state: store.staffState({ withNote: ws.withNote }) });
     else send(ws, { type: 'display.state', rev: store.rev, state: store.displayState() });
   }
 
@@ -290,12 +296,14 @@ function createServer(opts = {}) {
     pending = setTimeout(() => {
       pending = null;
       const disp = JSON.stringify({ type: 'display.state', rev: store.rev, state: store.displayState() });
-      let staff = null;
+      const staff = {};   // podľa seesNote(konto) – stav s identifikátormi alebo bez nich
       for (const ws of clients) {
         if (ws.channel === 'staff') {
-          if (!auth.check(ws.token)) { ws.close(4401, 'unauthorized'); continue; }
-          staff = staff || JSON.stringify({ type: 'staff.state', rev: store.rev, state: store.staffState() });
-          send(ws, staff);
+          const u = auth.check(ws.token);
+          if (!u) { ws.close(4401, 'unauthorized'); continue; }
+          const k = ws.withNote = seesNote(u);
+          staff[k] = staff[k] || JSON.stringify({ type: 'staff.state', rev: store.rev, state: store.staffState({ withNote: k }) });
+          send(ws, staff[k]);
         } else send(ws, disp);
       }
     }, 25);
