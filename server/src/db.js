@@ -89,6 +89,9 @@ function migrate(db) {
   if (!cols.includes('planned_at')) db.exec('ALTER TABLE tickets ADD COLUMN planned_at TEXT');
   if (!cols.includes('source')) db.exec("ALTER TABLE tickets ADD COLUMN source TEXT NOT NULL DEFAULT 'kiosk'");
   // v2.1: pracovisko, ktorému pacient patrí (ambulancia sestry, ktorá ho zaradila); null = spoločné (napr. z tabletu)
+  // 2026-11-17 (Pali): identifikátor pacienta, ktorý si k číslu dopíše sestra (meno, poznámka…).
+  // Vidia ho len sesterské kontá – nikdy TV, tablet ani lekárske konto. Po skončení dňa sa vymaže.
+  if (!cols.includes('staff_note')) db.exec('ALTER TABLE tickets ADD COLUMN staff_note TEXT');
   if (!cols.includes('home_room_id')) db.exec('ALTER TABLE tickets ADD COLUMN home_room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');
   // v2.2: smer k ambulancii zo stredu čakárne (šípka na TV): right | left | straight | ''
   const rcols = db.prepare('PRAGMA table_info(rooms)').all().map((c) => c.name);
