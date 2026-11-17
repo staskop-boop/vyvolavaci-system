@@ -47,6 +47,21 @@ a DNS; tajomstvá `HCLOUD_TOKEN` a `ADNA_HESLO` netreba. Na serveri v ambulancii
 `vyvolavaci` → Configure. Cookie prihlásenia je pri prístupe cez HTTPS automaticky `Secure`, takže sestry sa
 prihlásia cez `https://vyvolavaci.adna.sk` aj cez `http://IP:8080` v LAN (bez `ADNA_SECURE_COOKIE`).
 
+**Linux server (Debian / Ubuntu) – presun z Hetzneru** (Pali 2026-11-17). Lokálny server má vlastný tunel
+`vyvolavaci-lokal`; tunel Hetzneru ostáva ako záloha, kým sa neprepne DNS.
+
+1. Workflow **Nasadenie** s voľbou `server = lokalny` (bez `prepnut_dns`) vytvorí tunel `vyvolavaci-lokal`
+   (`vyvolavaci.adna.sk → http://localhost:8080`). Adresa zatiaľ ďalej ukazuje na Hetzner.
+2. Na serveri ako root: `curl -fsSL https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/deploy/lokalny/instaluj.sh -o /tmp/adna-instaluj.sh && sudo bash /tmp/adna-instaluj.sh`
+   – Docker, kód do `/opt/adna`, server na porte 8080, služba `cloudflared` (token zo Zero Trust → Networks →
+   Tunnels → `vyvolavaci-lokal` sa vkladá skryto), denná záloha a aktualizácia z `main` každých 5 minút.
+3. Keď v ambulancii nikto nevyvoláva: `sudo /opt/adna/deploy/lokalny/prenos-udajov.sh` – prihlásením správcu
+   stiahne databázu zo starého servera (kontá, nastavenia, pacienti, história) a nahradí ňou databázu nového.
+4. Hneď potom workflow **Nasadenie** s `server = lokalny` a `prepnut_dns` – prepne CNAME na nový tunel (len ak je
+   pripojený). Návrat späť: `server = hetzner` a `prepnut_dns`.
+
+V LAN je server dostupný aj priamo na `http://IP-servera:8080` (pri výpadku internetu).
+
 **Windows server / PC** – jeden skript (PowerShell **ako správca**):
 
 ```powershell
