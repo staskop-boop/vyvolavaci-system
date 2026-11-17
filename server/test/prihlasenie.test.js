@@ -48,3 +48,10 @@ test('celkový limit z jednej IP ostáva (hádanie cez veľa mien)', async () =>
   assert.ok(codes.includes(429), 'po 20 chybách z jednej IP nasleduje pauza');
   assert.equal((await login('admin', 'Testovacie-heslo-1')).status, 429);
 });
+
+test('krátke nové heslo pri úprave konta neuloží nič (ani ostatné zmeny)', async () => {
+  const u = (await admin.get('/api/admin/users')).data.users.find((x) => x.username === 'czetoova');
+  const r = await admin.put('/api/admin/users/' + u.id, { password: 'kratke', active: false });
+  assert.equal(r.status, 400);
+  assert.equal((await admin.get('/api/admin/users')).data.users.find((x) => x.id === u.id).active, true);
+});

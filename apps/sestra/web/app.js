@@ -159,11 +159,14 @@
       add({ username: 'ambulancia' + n, kind: 'Sestra', roomId: r.id, where: r.name, doctorName: null }); });
     const hasDoc = new Set(users.map((u) => u.doctorName).filter(Boolean));
     doctors.filter((d) => !hasDoc.has(d)).forEach((d) => add({ username: surnameLogin(d), kind: 'Lekár', roomId: null, where: 'všetky', doctorName: d }));
-    if (!plan.length) { toast('Všetky kontá už existujú.', 'ok'); return; }
+    // 2026-11-17: kontá lekárov bez hesla (založila ich aktualizácia 16. 11.) dostanú heslo tiež – predtým sa preskočili
+    users.filter((u) => u.noPassword && u.active).forEach((u) => plan.push({ username: u.username, kind: u.doctorName ? 'Lekár' : 'Sestra', roomId: u.roomId,
+      where: u.roomName || 'všetky', doctorName: u.doctorName, existingId: u.id }));
+    if (!plan.length) { toast('Všetky kontá už existujú a majú heslo.', 'ok'); return; }
     const ok = await modal({
       title: `Založiť ${plan.length} kont?`, okText: 'Založiť kontá',
       body: `<table><thead><tr><th>Konto</th><th>Typ</th><th>Lekár / pracovisko</th></tr></thead><tbody>
-        ${plan.map((p) => `<tr><td><b>${esc(p.username)}</b></td><td>${p.kind}</td><td>${esc(p.doctorName || p.where)}</td></tr>`).join('')}</tbody></table>
+        ${plan.map((p) => `<tr><td><b>${esc(p.username)}</b>${p.existingId ? ' <span class="hint">(už existuje, dostane heslo)</span>' : ''}</td><td>${p.kind}</td><td>${esc(p.doctorName || p.where)}</td></tr>`).join('')}</tbody></table>
         <p class="hint">Heslá sa vygenerujú náhodne a zobrazia sa <b>len raz</b> hneď po založení – vytlačte si ich alebo odpíšte. Neskôr sa dajú len zmeniť (Nové heslo).</p>`,
     });
     if (!ok) return;
@@ -171,7 +174,8 @@
     for (const p of plan) {
       const password = randomPassword();
       try {
-        await api('/api/admin/users', { body: { username: p.username, password, roomId: p.roomId, role: 'staff', doctorName: p.doctorName } });
+        if (p.existingId) await api('/api/admin/users/' + p.existingId, { method: 'PUT', body: { password } });
+        else await api('/api/admin/users', { body: { username: p.username, password, roomId: p.roomId, role: 'staff', doctorName: p.doctorName } });
         done.push({ ...p, password });
       } catch (e) { done.push({ ...p, error: e.message }); }
     }

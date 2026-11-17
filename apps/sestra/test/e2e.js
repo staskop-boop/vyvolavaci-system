@@ -343,6 +343,17 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-finished', tn).waitFor();
     ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi');
 
+    // 11c. hromadné kontá nastavia heslo aj kontám lekárov, ktoré vznikli bez hesla
+    await A.click('.tab[data-view=admin]');
+    await A.click('#btn-bulk-users');
+    await A.locator('.modal', { hasText: 'už existuje, dostane heslo' }).waitFor();
+    await A.click('#m-ok');
+    await A.locator('.modal', { hasText: 'Kontá sú založené' }).waitFor();
+    await A.click('#m-cancel');
+    const noPw = await A.evaluate(async () => (await (await fetch('/api/admin/users')).json()).users.filter((u) => u.noPassword).map((u) => u.username));
+    assert.deepEqual(noPw, [], 'žiadne konto bez hesla');
+    ok('hromadné kontá dajú heslo aj existujúcim kontám lekárov bez hesla');
+
     // 12. ukončenie dňa s potvrdením
     await A.click('.tab[data-view=admin]');
     await A.click('#btn-close-day');
