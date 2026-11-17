@@ -17,6 +17,10 @@ on:
       ip_ambulancie:
         description: 'Verejná IP ambulancie – tablet/kiosk bez prihlásenia (voliteľné)'
         default: ''
+      prepnut_dns:
+        description: 'Prepnúť adresu vyvolavaci.adna.sk na tunel zvoleného servera (pri lokálnom len ak je jeho tunel pripojený)'
+        type: boolean
+        default: false
       typ_servera:
         description: 'Typ servera Hetzner (pri nedostupnosti sa skúsia ďalšie)'
         default: 'cx23'
@@ -41,6 +45,7 @@ jobs:
           SERVER: ${{ inputs.server }}
           EMAILY: ${{ inputs.emaily }}
           IP_AMBULANCIE: ${{ inputs.ip_ambulancie }}
+          PREPNUT_DNS: ${{ inputs.prepnut_dns }}
           TYP_SERVERA: ${{ inputs.typ_servera }}
           LOKALITA: ${{ inputs.lokalita }}
         run: bash deploy/cloud/nasad.sh

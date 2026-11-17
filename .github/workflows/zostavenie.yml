@@ -30,6 +30,39 @@ jobs:
           docker exec adna test -f /data/SETUP-KOD.txt
           docker logs adna | tail -5
 
+  lokalny-server:
+    # lokálny server v ambulancii (deploy/lokalny): spustenie cez compose a prenos údajov zo „starého“ servera
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Starý server s kontom správcu a jedným číslom
+        run: |
+          set -e
+          for f in deploy/lokalny/*.sh deploy/cloud/*.sh; do bash -n "$f"; done
+          docker build -q -t adna-server .
+          docker run -d --name stary -p 8081:8080 adna-server
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8081/api/health && break; sleep 1; done
+          docker exec -e ADNA_NEW_PASSWORD=Testovacie-heslo-CI-1 stary node --disable-warning=ExperimentalWarning src/cli.js
+          curl -fsS -c /tmp/c -H 'Content-Type: application/json' -d '{"username":"admin","password":"Testovacie-heslo-CI-1"}' http://127.0.0.1:8081/api/auth/login >/dev/null
+          curl -fsS -b /tmp/c -H 'Content-Type: application/json' -d '{"cardNo":"K7"}' http://127.0.0.1:8081/api/staff/cards | head -c 300; echo
+      - name: Nový server a prenos údajov
+        run: |
+          set -e
+          sudo ln -s "$PWD" /opt/adna
+          cd deploy/lokalny
+          mkdir -p data && sudo chown 1000:1000 data
+          sudo docker compose up -d --build
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8080/api/health && break; sleep 1; done
+          IP=$(hostname -I | awk '{print $1}')
+          sudo ADNA_MENO=admin ADNA_HESLO=Testovacie-heslo-CI-1 ./prenos-udajov.sh "http://$IP:8081"
+          # na novom serveri funguje prihlásenie zo starého a je tam prenesené číslo
+          curl -fsS -c /tmp/n -H 'Content-Type: application/json' -d '{"username":"admin","password":"Testovacie-heslo-CI-1"}' http://127.0.0.1:8080/api/auth/login >/dev/null
+          curl -fsS -b /tmp/n http://127.0.0.1:8080/api/staff/state | grep -q '"K7"'
+          sudo ls data/zalohy | grep -q adna-pred-prenosom
+          # druhý pokus proti sebe samému sa musí odmietnuť
+          if sudo ADNA_MENO=admin ADNA_HESLO=Testovacie-heslo-CI-1 ./prenos-udajov.sh "http://$IP:8080"; then echo "::error::prenos sám na seba mal zlyhať"; exit 1; fi
+          curl -fsS -o /dev/null http://127.0.0.1:8080/api/health
+
   linux-obrazovka:
     # spúšťač obrazovky pre mini PC s Linuxom (apps/tv/minipc/obrazovka-linux.sh)
     runs-on: ubuntu-latest

@@ -171,6 +171,13 @@ function createServer(opts = {}) {
     res.json(store.doctorOwnStats(req.user.doctorName, String(req.query.from || ''), String(req.query.to || '')));
   });
   app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''))));
+  // Záloha databázy na stiahnutie (len správca) – používa sa pri presune na iný server (deploy/lokalny/prenos-udajov.sh).
+  app.get('/api/admin/backup', requireAdmin, (req, res, next) => {
+    const tmp = path.join(config.dataDir, `prenos-${Date.now().toString(36)}.db`);
+    try { database.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`); } catch (e) { return next(e); }
+    log.info('Záloha databázy stiahnutá správcom', { userId: req.user.id });
+    res.download(tmp, 'adna.db', () => fs.rm(tmp, { force: true }, () => {}));
+  });
   app.get('/api/admin/settings', requireAdmin, (req, res) => res.json(store.getSettings()));
   app.put('/api/admin/settings', requireAdmin, (req, res) => res.json(store.updateSettings(req.body)));
   app.get('/api/admin/news', requireAdmin, (req, res) => res.json({ feeds: news.status(), updatedAt: news.updatedAt, items: news.items.length }));

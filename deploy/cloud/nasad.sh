@@ -23,7 +23,10 @@ TYPY="${TYP_SERVERA:-cx23} cx22 cpx22 cpx21 cpx11"
 # SERVER=hetzner (VPS v Dockeri, služba http://adna:8080) alebo SERVER=lokalny (server v ambulancii,
 # cloudflared na tom istom PC → http://localhost:8080; token tunela si Pali skopíruje v Zero Trust → Tunnels)
 SERVER="${SERVER:-hetzner}"
-case "$SERVER" in hetzner) SLUZBA="http://adna:8080";; lokalny) SLUZBA="http://localhost:8080";; *) echo "::error::⚠ SERVER musí byť hetzner alebo lokalny" >&2; exit 1;; esac
+# Lokálny server má vlastný tunel „vyvolavaci-lokal“ (Pali 2026-11-17), aby tunel Hetzneru ostal ako záloha.
+# PREPNUT_DNS=true prepíše existujúci CNAME na tunel zvoleného servera (inak sa cudzí záznam nikdy neprepisuje).
+PREPNUT_DNS="${PREPNUT_DNS:-false}"
+case "$SERVER" in hetzner) SLUZBA="http://adna:8080";; lokalny) SLUZBA="http://localhost:8080"; TUNEL="vyvolavaci-lokal";; *) echo "::error::⚠ SERVER musí byť hetzner alebo lokalny" >&2; exit 1;; esac
 
 chyba() { echo "::error::⚠ $*" >&2; exit 1; }
 # všetky tajomstvá sa overia ešte pred prvou zmenou (nič sa nevytvorí, kým niektoré chýba)
@@ -91,6 +94,10 @@ TUNNEL_TOKEN=$(cf GET "/accounts/$ACC/cfd_tunnel/$TID/token" | jq -r .)
 echo "::add-mask::$TUNNEL_TOKEN"
 echo "smerovanie $HOST → $SLUZBA nastavené"
 
+if [ "$SERVER" = lokalny ] && [ "$PREPNUT_DNS" = true ]; then
+  ST=$(cf GET "/accounts/$ACC/cfd_tunnel/$TID" | jq -r .status)
+  [ "$ST" = healthy ] || chyba "Tunel $TUNEL nie je pripojený (stav $ST) – DNS neprepínam. Najprv spustite cloudflared na lokálnom serveri."
+fi
 echo "== 3/4 DNS =="
 CIEL="$TID.cfargotunnel.com"
 REC=$(cf GET "/zones/$ZONE_ID/dns_records?name=$HOST")
@@ -98,6 +105,12 @@ if [ "$(jq length <<<"$REC")" -eq 0 ]; then
   cf POST "/zones/$ZONE_ID/dns_records" "$(jq -cn --arg h "$HOST" --arg c "$CIEL" '{type:"CNAME", name:$h, content:$c, proxied:true, comment:"Vyvolávací systém AdNa – Cloudflare Tunnel"}')" >/dev/null
   echo "CNAME $HOST vytvorený"
 elif [ "$(jq -r '.[0].type + " " + .[0].content' <<<"$REC")" = "CNAME $CIEL" ]; then echo "CNAME $HOST už existuje"
+elif [ "$(jq -r '.[0].type' <<<"$REC")" = CNAME ] && jq -e '.[0].content | endswith(".cfargotunnel.com")' <<<"$REC" >/dev/null; then
+  if [ "$PREPNUT_DNS" = true ]; then
+    cf PATCH "/zones/$ZONE_ID/dns_records/$(jq -r '.[0].id' <<<"$REC")" "$(jq -cn --arg c "$CIEL" '{type:"CNAME", content:$c, proxied:true}')" >/dev/null
+    echo "CNAME $HOST prepnutý na tunel $TUNEL"
+  elif [ "$SERVER" = lokalny ]; then DNS_INDE=1; echo "CNAME $HOST zatiaľ ukazuje na iný tunel – neprepínam (spustite znova s prepnut_dns, keď lokálny server beží)"
+  else chyba "CNAME $HOST ukazuje na iný tunel – na prepnutie spustite workflow s voľbou prepnut_dns."; fi
 else chyba "Pre $HOST už existuje iný DNS záznam ($(jq -r '.[0].type + " " + .[0].content' <<<"$REC")) – neprepisujem, rozhodnite ručne."; fi
 
 if [ "$SERVER" = lokalny ]; then
@@ -106,9 +119,12 @@ if [ "$SERVER" = lokalny ]; then
     echo "### Vyvolávací systém AdNa – lokálny server"
     echo "* Tunel **$TUNEL** je pripravený (stav: **$ST**), smeruje na $SLUZBA."
     echo "* Na serveri v ambulancii spustite príkaz z Zero Trust → Networks → Tunnels → $TUNEL → Configure (cloudflared service install …)."
+    [ -n "${DNS_INDE:-}" ] && echo "* ⚠ DNS **$HOST** ešte ukazuje na pôvodný server. Prepne sa až spustením s voľbou **prepnut_dns**."
+    echo "* Postup na serveri: docs/NASADENIE.md → Lokálny server (Linux)."
     echo "* Potom: https://$HOST/sestra/"
   } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
-  echo "Cloudflare je pripravené (tunel: $ST). Na lokálnom serveri nainštalujte cloudflared s tokenom z Zero Trust → Tunnels → $TUNEL."
+  echo "Cloudflare je pripravené (tunel $TUNEL: $ST). Na lokálnom serveri nainštalujte cloudflared s tokenom z Zero Trust → Tunnels → $TUNEL."
+  if [ "$PREPNUT_DNS" = true ] && [ "$ST" != healthy ]; then echo "::warning::⚠ DNS je prepnuté, ale tunel $TUNEL nie je pripojený (stav $ST) – adresa nebude fungovať, kým sa cloudflared na lokálnom serveri nepripojí."; fi
   exit 0
 fi
 

@@ -1,0 +1,15 @@
+# Server AdNa na lokálnom serveri v ambulancii (Linux). Cloudflare Tunnel beží mimo Dockera ako služba
+# cloudflared na tom istom počítači a smeruje https://vyvolavaci.adna.sk na http://localhost:8080.
+# Spustenie (v priečinku deploy/lokalny/):  docker compose up -d --build
+services:
+  adna:
+    build: ../..
+    image: adna-server
+    restart: unless-stopped
+    environment:
+      # cloudflared aj počítače v LAN prichádzajú cez sieť Dockera; cookie je pri HTTPS Secure automaticky
+      ADNA_TRUST_PROXY: "loopback, uniquelocal"
+    volumes:
+      - ./data:/data                       # databáza, logy, inštalačný kód, zálohy (nikdy necommitovať)
+    ports:
+      - "8080:8080"                        # aj pre LAN: http://IP-servera:8080 funguje pri výpadku internetu
