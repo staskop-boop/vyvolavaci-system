@@ -246,11 +246,16 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     // 10c. (2026-11-17) identifikátor pacienta – vidí ho len sestra, obrazovka v čakárni nie
     await A.click('#btn-card');
     await A.fill('#m-card', 'K9'); await A.fill('#m-time', '10:30'); await A.fill('#m-ident', 'Pacient Skúšobný');
+    const types = await A.locator('#m-type option').allTextContents();
+    assert.equal(types[1], 'Vstupné vyšetrenie varixy'); assert.equal(types.at(-1), 'AVF');
+    await A.selectOption('#m-type', 'Kontrola po CLaCS');
+    await shot(A, '8-pridat-typ');
     await A.click('#m-ok');
     await toastWith(A, /K9 zaradený/);
     await row(A, 'tbl-waiting', 'K9').locator('.ident-pill', { hasText: 'Pacient Skúšobný' }).waitFor();
+    await row(A, 'tbl-waiting', 'K9').locator('.type-pill', { hasText: 'Kontrola po CLaCS' }).waitFor();
     await shot(A, '8-identifikator');
-    assert.ok(!JSON.stringify(await display()).includes('Skúšobný'), 'identifikátor nie je na obrazovke v čakárni');
+    assert.ok(!/Skúšobný|CLaCS/.test(JSON.stringify(await display())), 'identifikátor ani typ nie sú na obrazovke v čakárni');
     await row(A, 'tbl-waiting', 'K9').getByRole('button', { name: 'Upraviť' }).click();
     assert.equal(await A.inputValue('#m-ident'), 'Pacient Skúšobný');
     await A.fill('#m-ident', 'Druhý Skúšobný'); await A.click('#m-ok');
@@ -260,11 +265,13 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-called', 'K9').locator('.ident-pill', { hasText: 'Druhý Skúšobný' }).waitFor();
     assert.ok(!JSON.stringify(await display()).includes('Skúšobný'), 'ani po vyvolaní nie je identifikátor na obrazovke');
     await row(A, 'tbl-called', 'K9').getByRole('button', { name: 'Identifikátor' }).click();
+    assert.equal(await A.inputValue('#m-type'), 'Kontrola po CLaCS');
     await A.fill('#m-ident', ''); await A.click('#m-ok');
-    await toastWith(A, /K9: identifikátor odstránený/);
-    assert.equal(await row(A, 'tbl-called', 'K9').locator('.ident-pill').count(), 0);
+    await toastWith(A, /K9: uložené/);
+    await row(A, 'tbl-called', 'K9').locator('.ident-pill').waitFor({ state: 'detached' });
+    await row(A, 'tbl-called', 'K9').locator('.type-pill', { hasText: 'Kontrola po CLaCS' }).waitFor();
     await row(A, 'tbl-called', 'K9').getByRole('button', { name: 'Vybavený' }).click();
-    ok('identifikátor pacienta: zadanie, úprava, zobrazenie len v Sestre, odstránenie; obrazovka ho nemá');
+    ok('typ a identifikátor pacienta: ponuka typov, zadanie, úprava, odstránenie; obrazovka ich nemá');
 
     // 11. história
     await A.click('.tab[data-view=history]');

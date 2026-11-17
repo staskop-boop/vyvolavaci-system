@@ -1,6 +1,6 @@
 'use strict';
-// 2026-11-17 (Pali): sestra dopíše k číslu identifikátor pacienta. Vidí ho len sesterské konto a správca –
-// nikdy obrazovka v čakárni, tablet, verejné API ani lekárske konto.
+// 2026-11-17 (Pali): sestra dopíše k číslu identifikátor a typ pacienta. Vidí ich všetok personál
+// (sestry, lekári, správca) – nikdy obrazovka v čakárni, tablet ani verejné API.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
@@ -34,28 +34,36 @@ function open(channel, cookie) {
   };
   return { ws, raw, waitFor };
 }
-const noName = (obj, where) => assert.ok(!JSON.stringify(obj).includes('Testovací'), `identifikátor nesmie byť v: ${where}`);
+const noName = (obj, where) => {
+  const j = typeof obj === 'string' ? obj : JSON.stringify(obj);
+  assert.ok(!j.includes('Testovací'), `identifikátor nesmie byť v: ${where}`);
+  assert.ok(!/varixy|CLaCS|AVF|angio|hemoroidy/.test(j), `typ pacienta nesmie byť v: ${where}`);
+};
 
 test('sestra zadá identifikátor pri pridaní pacienta a vidí ho v zozname', async () => {
-  const r = await sestra.post('/api/staff/cards', { cardNo: 'ID1', plannedTime: '23:00', roomId: room.id, staffNote: `  ${MENO}  ` });
+  const r = await sestra.post('/api/staff/cards', { cardNo: 'ID1', plannedTime: '23:00', roomId: room.id, staffNote: `  ${MENO}  `, patientType: 'Kontrola varixy' });
   assert.equal(r.status, 201, JSON.stringify(r.data));
   assert.equal(r.data.ticket.staffNote, MENO);
-  const t = (await sestra.get('/api/staff/state')).data.tickets.find((x) => x.code === 'ID1');
-  assert.equal(t.staffNote, MENO);
+  assert.equal(r.data.ticket.patientType, 'Kontrola varixy');
+  const st = (await sestra.get('/api/staff/state')).data;
+  assert.equal(st.patientTypes[0], 'Vstupné vyšetrenie varixy', 'najčastejší typ je prvý');
+  assert.equal(st.patientTypes.at(-1), 'AVF', 'najmenej častý typ je posledný');
+  const t = st.tickets.find((x) => x.code === 'ID1');
+  assert.equal(t.staffNote, MENO); assert.equal(t.patientType, 'Kontrola varixy');
   const a = (await admin.get('/api/staff/state')).data.tickets.find((x) => x.code === 'ID1');
   assert.equal(a.staffNote, MENO, 'správca (admin) ho vidí');
 });
 
-test('obrazovka, tablet, verejné API ani lekár identifikátor nedostanú', async () => {
+test('lekár identifikátor a typ vidí; obrazovka, tablet ani verejné API nie', async () => {
   noName((await kiosk.get('/api/display/state')).data, '/api/display/state');
   noName((await kiosk.get('/api/public/config')).data, '/api/public/config');
   const k = await kiosk.post('/api/kiosk/tickets', { requestId: crypto.randomUUID() });
   noName(k.data, 'odpoveď tabletu');
   assert.equal((await kiosk.get('/api/staff/state')).status, 401);
   const ls = (await lekar.get('/api/staff/state')).data;
-  noName(ls, 'stav pre lekára');
-  assert.ok(ls.tickets.every((t) => !('staffNote' in t)));
-  noName((await lekar.get('/api/staff/history?day=' + ls.day)).data, 'história pre lekára');
+  const lt = ls.tickets.find((x) => x.code === 'ID1');
+  assert.equal(lt.staffNote, MENO, 'lekár identifikátor vidí'); assert.equal(lt.patientType, 'Kontrola varixy');
+  assert.equal((await lekar.get('/api/staff/history?day=' + ls.day)).data.tickets.find((x) => x.code === 'ID1').staffNote, MENO);
   const sh = (await sestra.get('/api/staff/history?day=' + ls.day)).data;
   assert.equal(sh.tickets.find((x) => x.code === 'ID1').staffNote, MENO, 'sestra ho vidí aj v histórii dneška');
   // lekár vyvolá pacienta – odpoveď ani správa „call“ ho neobsahuje
@@ -63,27 +71,28 @@ test('obrazovka, tablet, verejné API ani lekár identifikátor nedostanú', asy
   await d.waitFor((m) => m.type === 'display.state');
   const id1 = ls.tickets.find((x) => x.code === 'ID1').id;
   const c = await lekar.post(`/api/staff/tickets/${id1}/call`, { roomId: room.id });
-  assert.equal(c.status, 200); noName(c.data, 'odpoveď na vyvolanie');
+  assert.equal(c.status, 200); noName(c.data.call, 'správa o vyvolaní pre TV');
   await d.waitFor((m) => m.type === 'call');
   d.raw.forEach((m) => noName(m, 'WebSocket obrazovky'));
   d.ws.close();
   assert.equal((await lekar.post(`/api/staff/tickets/${id1}/note`, { staffNote: 'x' })).status, 403, 'lekár identifikátor nemení');
 });
 
-test('WebSocket: sestra dostane identifikátor, lekár a obrazovka nie', async () => {
+test('WebSocket: sestra aj lekár dostanú identifikátor, obrazovka nie', async () => {
   const d = open('display'); const se = open('staff', sestra.cookie); const le = open('staff', lekar.cookie);
   await Promise.all([d.waitFor((m) => m.type === 'display.state'), se.waitFor((m) => m.type === 'staff.state'), le.waitFor((m) => m.type === 'staff.state')]);
-  const r = await sestra.post('/api/staff/cards', { cardNo: 'ID2', plannedTime: '23:10', roomId: room.id, staffNote: 'Druhý Testovací' });
+  const r = await sestra.post('/api/staff/cards', { cardNo: 'ID2', plannedTime: '23:10', roomId: room.id, staffNote: 'Druhý Testovací', patientType: 'AVF' });
   await se.waitFor((m) => m.type === 'staff.state' && m.state.tickets.some((t) => t.code === 'ID2' && t.staffNote === 'Druhý Testovací'));
-  await le.waitFor((m) => m.type === 'staff.state' && m.state.tickets.some((t) => t.code === 'ID2'));
+  await le.waitFor((m) => m.type === 'staff.state' && m.state.tickets.some((t) => t.code === 'ID2' && t.staffNote === 'Druhý Testovací' && t.patientType === 'AVF'));
   await d.waitFor((m) => m.type === 'display.state' && m.state.queue.some((q) => q.code === 'ID2'));
   d.raw.forEach((m) => noName(m, 'WebSocket obrazovky'));
-  le.raw.forEach((m) => noName(m, 'WebSocket lekára'));
   // zmena a vymazanie identifikátora
   const u = await sestra.post(`/api/staff/tickets/${r.data.ticket.id}/note`, { staffNote: 'Iný Testovací' });
   assert.equal(u.status, 200); assert.equal(u.data.ticket.staffNote, 'Iný Testovací');
-  const e = await sestra.post(`/api/staff/tickets/${r.data.ticket.id}/edit`, { staffNote: '' });
-  assert.equal(e.status, 200); assert.equal(e.data.ticket.staffNote, null);
+  assert.equal(u.data.ticket.patientType, 'AVF', 'typ ostal');
+  const e = await sestra.post(`/api/staff/tickets/${r.data.ticket.id}/edit`, { staffNote: '', patientType: 'Kontrola angio' });
+  assert.equal(e.status, 200); assert.equal(e.data.ticket.staffNote, null); assert.equal(e.data.ticket.patientType, 'Kontrola angio');
+  assert.equal((await sestra.post(`/api/staff/tickets/${r.data.ticket.id}/note`, { patientType: 'Niečo iné' })).status, 400, 'len typ z ponuky');
   [d, se, le].forEach((x) => x.ws.close());
 });
 
