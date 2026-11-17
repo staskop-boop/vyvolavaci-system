@@ -17,6 +17,8 @@ const DEFAULT_SETTINGS = {
   ticketPrefix: 'A',
   ticketDisplaySeconds: 15,
   soundEnabled: true,
+  // 2026-11-17 (Pali): hlasitosť vyvolania na TV v % – signál sa dá zosilniť až na 200 %, hlas prehliadača najviac na 100 %
+  soundVolume: 150,
   recentCount: 5,
   // v2 – obrazovka s TV programom
   queueCount: 8,            // koľko čísel „na rade“ ukáže TV
@@ -202,6 +204,7 @@ class Store extends EventEmitter {
     }
     if ('ticketDisplaySeconds' in patch) next.ticketDisplaySeconds = clampInt(patch.ticketDisplaySeconds, 5, 120, 'Čas zobrazenia čísla');
     if ('soundEnabled' in patch) next.soundEnabled = !!patch.soundEnabled;
+    if ('soundVolume' in patch) next.soundVolume = clampInt(patch.soundVolume, 10, 200, 'Hlasitosť vyvolania (%)');
     if ('recentCount' in patch) next.recentCount = clampInt(patch.recentCount, 0, 10, 'Počet naposledy vyvolaných');
     if ('queueCount' in patch) next.queueCount = clampInt(patch.queueCount, 0, 15, 'Počet čísel na rade');
     if ('doctorList' in patch) {
@@ -311,9 +314,60 @@ class Store extends EventEmitter {
     this.db.prepare("INSERT INTO settings (key, value) VALUES ('doctors', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
       .run(JSON.stringify({ day: clock.today(), byRoom }));
     log.info('Lekár v ambulancii', { room: room.name, userId });
+    this.reopenRoom(room.id);
     this.changed('doctors');
     return { doctors: byRoom };
   }
+  // ---------- 2026-11-17 (Pali): „dnes v tejto ambulancii neordinuje nikto“ – ambulancia sa dnes nezobrazuje ----------
+  roomsClosedToday() {
+    const raw = this.db.prepare("SELECT value FROM settings WHERE key = 'roomsClosed'").get();
+    let d = null; try { d = raw ? JSON.parse(raw.value) : null; } catch {}
+    return d && d.day === clock.today() && Array.isArray(d.ids) ? d.ids : [];
+  }
+  saveRoomsClosed(ids) {
+    this.db.prepare("INSERT INTO settings (key, value) VALUES ('roomsClosed', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(JSON.stringify({ day: clock.today(), ids }));
+  }
+  setRoomClosed(roomId, closed, userId) {
+    const room = this.requireRoom(roomId);
+    const ids = this.roomsClosedToday().filter((x) => x !== room.id);
+    if (closed) {
+      const open = this.listRooms({ activeOnly: true }).filter((r) => r.id !== room.id && !ids.includes(r.id));
+      if (!open.length) throw conflict('Aspoň jedna ambulancia musí ordinovať. Keď dnes už nevyšetrujete, použite tlačidlo „Ukončiť deň“.');
+      ids.push(room.id);
+      // dnešný lekár tejto ambulancie sa zruší, aby sa jeho meno nikde neukazovalo
+      const byRoom = { ...this.doctorsToday() };
+      if (room.id in byRoom) {
+        delete byRoom[room.id];
+        this.db.prepare("INSERT INTO settings (key, value) VALUES ('doctors', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+          .run(JSON.stringify({ day: clock.today(), byRoom }));
+      }
+    }
+    this.saveRoomsClosed(ids);
+    log.info(closed ? 'Ambulancia dnes neordinuje' : 'Ambulancia dnes opäť ordinuje', { room: room.name, userId });
+    this.changed('rooms');
+    return { roomsClosed: ids };
+  }
+  /** Keď sa do „zatvorenej“ ambulancie zadá lekár alebo z nej niekto vyvolá, dnes zas ordinuje. */
+  reopenRoom(roomId) {
+    const ids = this.roomsClosedToday();
+    if (ids.includes(roomId)) { this.saveRoomsClosed(ids.filter((x) => x !== roomId)); this.changed('rooms'); }
+  }
+
+  // ---------- 2026-11-17 (Pali): „Ukončiť deň“ – dnes už nových pacientov neprijímame ----------
+  dayEnd() {
+    const raw = this.db.prepare("SELECT value FROM settings WHERE key = 'dayEnd'").get();
+    let d = null; try { d = raw ? JSON.parse(raw.value) : null; } catch {}
+    return d && d.day === clock.today() ? { at: d.at } : null;
+  }
+  setDayEnd(ended, user) {
+    const v = ended ? { day: clock.today(), at: clock.nowIso() } : null;
+    this.db.prepare("INSERT INTO settings (key, value) VALUES ('dayEnd', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(JSON.stringify(v));
+    log.info(ended ? 'Príjem pacientov na dnes ukončený' : 'Príjem pacientov opäť otvorený', { user: user && user.username });
+    this.changed('dayEnd');
+    return { dayEnd: this.dayEnd() };
+  }
+
   // ---------- v2.3: mimoriadny oznam pre celú čakáreň ----------
   announcement() {
     const raw = this.db.prepare("SELECT value FROM settings WHERE key = 'announcement'").get();
@@ -434,9 +488,11 @@ class Store extends EventEmitter {
     if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) throw bad('Chýba alebo je neplatný identifikátor požiadavky.');
     const dev = typeof deviceId === 'string' ? deviceId.slice(0, 60) : null;
     const settings = this.getSettings();
+    const ended = this.dayEnd();
     const res = tx(this.db, () => {
       const ex = this.db.prepare('SELECT id FROM tickets WHERE request_id = ?').get(requestId);
       if (ex) return { id: ex.id, duplicate: true };
+      if (ended) throw new AppError(409, 'DAY_ENDED', 'Príjem pacientov je na dnes ukončený. Obráťte sa, prosím, na sestru.');
       const day = clock.today();
       const { last_seq: seq } = this.db.prepare(`INSERT INTO day_counters (day, last_seq) VALUES (?, 1)
         ON CONFLICT(day) DO UPDATE SET last_seq = last_seq + 1 RETURNING last_seq`).get(day);
@@ -660,6 +716,7 @@ class Store extends EventEmitter {
       return { id: row.id, eventId: Number(ev.lastInsertRowid) };
     });
     this.clearRoomDelay(room.id);
+    this.reopenRoom(room.id);
     const call = this.emitCall(r.eventId, r.id, false);
     return { ticket: this.getTicket(r.id), call };
   }
@@ -679,6 +736,7 @@ class Store extends EventEmitter {
       return { id: row.id, eventId: Number(ev.lastInsertRowid) };
     });
     this.clearRoomDelay(room.id);
+    this.reopenRoom(room.id);
     const call = this.emitCall(r.eventId, r.id, false);
     return { ticket: this.getTicket(r.id), call };
   }
@@ -842,6 +900,7 @@ class Store extends EventEmitter {
       WHERE t.day = ? AND e.type = 'call' AND t.planned_at IS NOT NULL ORDER BY e.id DESC LIMIT 1`).get(day);
     const clinicDelayMinutes = last ? callDelay(last) : 0;
     // v2.1: sklz každého pracoviska zvlášť – podľa jeho posledného vyvolania a hlásenia sestry
+    const closed = this.roomsClosedToday();
     const rooms = this.listRooms({ activeOnly: true }).map((r) => {
       const lr = this.db.prepare(`SELECT e.at, t.planned_at, t.created_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
         WHERE t.day = ? AND e.type = 'call' AND e.room_id = ? AND t.planned_at IS NOT NULL ORDER BY e.id DESC LIMIT 1`).get(day, r.id);
@@ -849,7 +908,8 @@ class Store extends EventEmitter {
       return { id: r.id, name: r.name, doctorName: this.doctorsToday()[r.id] || null, direction: r.direction,
         lastCallDelayMinutes: lr ? callDelay(lr) : null,
         reported: rd ? { minutes: rd.minutes, text: rd.text || '', at: rd.at } : null,
-        current: roomCurrent[r.id] ? roomCurrent[r.id].code : null, calledToday: r.id in roomCurrent };
+        current: roomCurrent[r.id] ? roomCurrent[r.id].code : null, calledToday: r.id in roomCurrent,
+        closedToday: closed.includes(r.id) };
     });
     return {
       clinicName: s.clinicName, soundEnabled: s.soundEnabled, recentCount: s.recentCount, day,
@@ -859,7 +919,9 @@ class Store extends EventEmitter {
         doctorName: t.home_room_id != null ? this.doctorsToday()[t.home_room_id] || null : null })),
       rooms, longDelayMinutes: s.longDelayMinutes,
       announcement: this.announcement(),
+      dayEnd: this.dayEnd(),
       waitingCount: waiting.length,
+      soundVolume: s.soundVolume,
       clinicDelayMinutes, onTimeMinutes: s.onTimeMinutes,
       ticketDisplaySeconds: s.ticketDisplaySeconds,
       tvSource: s.tvSource, newsEnabled: s.news.enabled,
@@ -885,6 +947,8 @@ class Store extends EventEmitter {
       settings: s,
       doctors: this.doctorsToday(),
       announcement: this.announcement(),
+      roomsClosed: this.roomsClosedToday(),
+      dayEnd: this.dayEnd(),
       printer: { enabled: s.printer.enabled, lastStatus: lp.status, lastMessage: lp.message, lastCheckedAt: lp.checkedAt },
       previousDayOpen: prev ? { day: prev.day, count: prev.n } : null,
     };
@@ -893,7 +957,7 @@ class Store extends EventEmitter {
   publicConfig() {
     const s = this.getSettings();
     return { clinicName: s.clinicName, ticketDisplaySeconds: s.ticketDisplaySeconds, soundEnabled: s.soundEnabled,
-      recentCount: s.recentCount, printEnabled: s.printer.enabled, ticketInstruction: s.ticketInstruction,
+      recentCount: s.recentCount, printEnabled: s.printer.enabled, ticketInstruction: s.ticketInstruction, dayEnded: !!this.dayEnd(),
       day: clock.today(), serverTime: clock.nowIso() };
   }
 

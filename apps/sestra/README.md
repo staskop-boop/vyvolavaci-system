@@ -74,6 +74,12 @@ nastavíte na serveri príkazom `npm run nastav-heslo`. V prvej verzii je jedno 
   tlač zlyhala). Nové číslo sa nikdy nevytvorí.
 * Upozornenia nad zoznamom: zlyhaná alebo neoverená tlač lístka, vypnutá tlač, nevybavené čísla z
   predchádzajúceho dňa (sú v **Histórii**, do nového dňa sa neprenášajú).
+* **🏁 Ukončiť deň** (sestra, správca) – dnes už nových pacientov neprijímame: tablet prestane vydávať
+  čísla a obrazovka v čakárni ukáže oznam (kým niekto čaká: „Príjem pacientov je na dnes ukončený…“, potom
+  „Dnes už neordinujeme…“). Čakajúcich možno ďalej vyvolávať. **Obnoviť príjem** to zruší; nový deň začína sám.
+* **Dnes v tejto ambulancii neordinuje nikto** – v okne výberu lekára. Ambulancia sa dnes nezobrazuje na
+  TV ani vo výbere ambulancie (pridanie, vyvolanie). Znova sa zobrazí po zadaní lekára, vyvolaní pacienta
+  do nej alebo tlačidlom **Ambulancia ordinuje**.
 * Vpravo hore je stav spojenia: **Pripojené** / **Pripája sa…** / **Bez spojenia**. Bez spojenia sú
   tlačidlá vypnuté a aplikácia sa sama znovu pripojí a načíta aktuálny stav.
 
@@ -86,9 +92,10 @@ vyvolanie; druhá sestra uvidí hlásenie *„Číslo A012 už medzičasom vyvol
 ## Nastavenia (administrácia)
 
 Záložka **Nastavenia**: názvy a poradie ambulancií (pridanie, premenovanie, deaktivácia), názov
-zariadenia, predpona čísla, čas zobrazenia čísla na tablete, zvuk na obrazovke, počet naposledy
+zariadenia, predpona čísla, čas zobrazenia čísla na tablete, zvuk na obrazovke a **hlasitosť vyvolania**
+(10 – 200 %, predvolene 150 %; tlačidlo *Vyskúšať na TV*), počet naposledy
 vyvolaných čísel, text pokynu, sieťová tlačiareň (IP, port, diakritika, orezanie, zisťovanie stavu,
-*Overiť tlačiareň*, *Skúšobná tlač*), zmena hesla, **Ukončiť deň** (potvrdenie slovom UKONČIŤ) a
+*Overiť tlačiareň*, *Skúšobná tlač*), zmena hesla, **Uzavrieť dnešné nevybavené čísla** (potvrdenie slovom UKONČIŤ) a
 **Vymazať údaje** (potvrdenie slovom VYMAZAŤ a heslom).
 
 ## Riešenie problémov

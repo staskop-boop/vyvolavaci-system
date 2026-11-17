@@ -98,12 +98,20 @@
   }
 
   const roomsActive = () => (S.staff ? S.staff.rooms.filter((r) => r.active) : []);
+  // 2026-11-17 (Pali): ambulancia, v ktorej dnes neordinuje nikto, sa nezobrazuje na TV ani vo výbere ambulancie
+  const isClosed = (id) => !!(S.staff && (S.staff.roomsClosed || []).includes(id));
+  const roomsOpen = (keepId) => roomsActive().filter((r) => !isClosed(r.id) || r.id === keepId);
   const roomName = (id) => { const r = S.staff && S.staff.rooms.find((x) => x.id === id); return r ? r.name : ''; };
 
   function pickRoom() {
     const active = roomsActive();
     if (!active.length) { S.roomId = null; return; }
     if (S.roomId && active.some((r) => r.id === S.roomId)) return;
+    const open = active.filter((r) => !isClosed(r.id));
+    if (S.user && S.user.roomId && open.some((r) => r.id === S.user.roomId)) { S.roomId = S.user.roomId; return; }
+    const def0 = Number(lsGet(LS_ROOM));
+    if (open.some((r) => r.id === def0)) { S.roomId = def0; return; }
+    if (open.length) { S.roomId = open[0].id; return; }
     if (S.user && S.user.roomId && active.some((r) => r.id === S.user.roomId)) { S.roomId = S.user.roomId; return; }
     const def = Number(lsGet(LS_ROOM));
     S.roomId = active.some((r) => r.id === def) ? def : active[0].id;
@@ -410,6 +418,7 @@
     const nWaitAll = st.tickets.filter((t) => t.status === 'waiting').length;
     const delay = (st.settings.roomDelays || {})[S.roomId];
     const doctor = (st.doctors || {})[S.roomId] || null;
+    const closedHere = isClosed(S.roomId);
     const printProblems = st.tickets.filter((t) => (t.status === 'waiting' || t.status === 'called') && t.print && (t.print.status === 'failed' || t.print.status === 'unverified'));
     const now = Date.now();
     const def = Number(lsGet(LS_ROOM));
@@ -424,6 +433,12 @@
         <b>Lístok ${esc(t.code)}: ${esc(PRINT_TEXT[t.print.status])}.</b> ${esc(t.print.message || '')}</div>
         <button class="btn btn-sm needs-online" data-act="reprint" data-id="${t.id}" ${dis}>Znovu vytlačiť lístok</button></div>`);
     }
+    if (st.dayEnd) alerts.push(`<div class="alert alert-info day-end" role="status"><div class="grow"><b>🏁 Deň je ukončený (od ${esc(fmtTime(st.dayEnd.at))}).</b>
+      Tablet už nevydáva poradové čísla a obrazovka v čakárni oznamuje, že dnes už nových pacientov neprijímame. Čakajúcich ešte môžete vyvolať.</div>
+      ${nurse ? `<button class="btn btn-sm needs-online" data-act="day-reopen" ${dis}>Obnoviť príjem</button>` : ''}</div>`);
+    if (closedHere) alerts.push(`<div class="alert alert-info" role="status"><div class="grow"><b>${esc(roomName(S.roomId))}: dnes tu neordinuje nikto.</b>
+      Ambulancia sa nezobrazuje na obrazovke v čakárni ani vo výbere ambulancie. Keď v nej niekto začne ordinovať, zadajte lekára alebo vyvolajte pacienta.</div>
+      ${nurse ? `<button class="btn btn-sm needs-online" data-act="room-reopen" ${dis}>Ambulancia ordinuje</button>` : ''}</div>`);
     if (st.announcement) alerts.push(`<div class="alert alert-danger" role="status"><div class="grow"><b>📢 Mimoriadny oznam v čakárni:</b> ${esc(st.announcement.text)}
       <span class="hint">(od ${esc(fmtTime(st.announcement.at))})</span></div>
       <button class="btn btn-sm needs-online" data-act="announce-edit" ${dis}>Upraviť</button>
@@ -494,13 +509,14 @@
         <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
         <div class="rb-btns">
-          <button class="btn needs-online ${doctor || S.user.doctorName ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : S.user.doctorName ? '👩‍⚕️ ' + esc(S.user.doctorName) : '⚠ Zadať lekára'}</button>
+          <button class="btn needs-online ${doctor || S.user.doctorName || closedHere ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : S.user.doctorName ? '👩‍⚕️ ' + esc(S.user.doctorName) : closedHere ? 'Dnes neordinuje nikto' : '⚠ Zadať lekára'}</button>
           <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
           <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
+          ${nurse ? `<button class="btn needs-online ${st.dayEnd ? 'on' : ''}" id="btn-day-end" ${dis} title="Dnes už nových pacientov neprijímame – tablet prestane vydávať čísla, TV ukáže oznam">🏁 ${st.dayEnd ? 'Deň je ukončený' : 'Ukončiť deň'}</button>` : ''}
         </div>
         <div class="rb-pick">
           <label class="lbl" for="room">Zmeniť pracovisko</label>
-          <select id="room">${active.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}${r.id === def ? ' (predvolená)' : ''}</option>`).join('')}</select>
+          <select id="room">${active.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}${r.id === def ? ' (predvolená)' : ''}${isClosed(r.id) ? ' – dnes neordinuje' : ''}</option>`).join('')}</select>
           <label class="check hint"><input type="checkbox" id="room-def" ${S.roomId === def ? 'checked' : ''}> Predvolená pre tento počítač</label>
           <label class="check hint"><input type="checkbox" id="show-all" ${all ? 'checked' : ''}> Pacienti všetkých pracovísk</label>
         </div>
@@ -552,7 +568,9 @@
     const isDoc = !!S.user.doctorName;
     document.getElementById('btn-doctor').onclick = isDoc ? () => toast('Vaše meno sa na TV nastaví samo pri prvom vyvolaní.', 'ok') : () => askDoctor(false);
     // povinný údaj na začiatku dňa: bez lekára sa okno nedá zavrieť (lekárske konto sa nastaví samo)
-    if (!isDoc && !doctor && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
+    const de = document.getElementById('btn-day-end');
+    if (de) de.onclick = () => (st.dayEnd ? reopenDay() : endDay());
+    if (!isDoc && !doctor && !closedHere && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
     document.getElementById('show-all').onchange = (e) => { lsSet(LS_ALL, e.target.checked ? '1' : null); renderQueue(); };
     document.getElementById('btn-next').onclick = () => act(
       () => api('/api/staff/call-next', { body: { roomId: S.roomId } }),
@@ -595,12 +613,15 @@
       case 'announce-clear': return act(() => api('/api/staff/announcement', { body: { text: null } }), 'Mimoriadny oznam bol zrušený.');
       case 'delay-clear': return act(() => api(`/api/staff/rooms/${S.roomId}/delay`, { body: { minutes: null } }), 'Oznam o meškaní bol zrušený.');
       case 'open-history': S.historyDay = b.dataset.day; return go('history');
+      case 'day-reopen': return reopenDay();
+      case 'room-reopen': return act(() => api(`/api/staff/rooms/${S.roomId}/closed`, { body: { closed: false } }), `${roomName(S.roomId)} dnes opäť ordinuje.`);
     }
   });
 
   /** v2.2: lekár, ktorý dnes ordinuje v ambulancii – na TV sa ukáže namiesto názvu ambulancie. */
   async function askDoctor(required) {
     S.askingDoctor = true;
+    delete document.getElementById('modal-root').dataset.closed;
     const list = (S.staff.settings.doctorList || []);
     const cur = (S.staff.doctors || {})[S.roomId] || '';
     try {
@@ -612,17 +633,40 @@
           <div class="field"><label for="m-doc">Meno a priezvisko lekára (alebo iniciály)</label>
             <input id="m-doc" list="m-doc-list" maxlength="60" value="${esc(cur)}" autocomplete="off" placeholder="napr. MUDr. Ján Novák" autofocus>
             <datalist id="m-doc-list">${list.map((n) => `<option value="${esc(n)}">`).join('')}</datalist></div>
-          ${list.length ? `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:10px">${list.map((n) => `<button type="button" class="btn btn-sm" data-doc="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}`,
+          ${list.length ? `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:10px">${list.map((n) => `<button type="button" class="btn btn-sm" data-doc="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
+          <div class="closed-pick"><button type="button" class="btn btn-sm btn-dark" id="m-closed">Dnes v tejto ambulancii neordinuje nikto</button>
+            <span class="hint">Ambulancia sa dnes nebude zobrazovať na obrazovke v čakárni ani vo výbere ambulancie.</span></div>`,
         onOk: async (root) => {
+          if (root.dataset.closed) { delete root.dataset.closed; return api(`/api/staff/rooms/${S.roomId}/closed`, { body: { closed: true } }); }
           const name = root.querySelector('#m-doc').value.trim();
           if (name.length < 2) throw new Error('Zadajte meno lekára – je to povinný údaj pre dnešný deň.');
           return api(`/api/staff/rooms/${S.roomId}/doctor`, { body: { name } });
         },
       });
-      if (res) toast('Lekár bol uložený.', 'ok');
+      if (res && res.roomsClosed) toast(`${roomName(S.roomId)}: dnes neordinuje nikto – na TV sa nezobrazuje.`, 'ok');
+      else if (res) toast('Lekár bol uložený.', 'ok');
       else if (required) toast('Bez zadaného lekára sa na TV ukáže len názov ambulancie.', 'error');
     } finally { S.askingDoctor = false; S.doctorAsked = true; }
   }
+  // „Dnes v tejto ambulancii neordinuje nikto“ priamo z okna výberu lekára
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#m-closed')) return;
+    document.getElementById('modal-root').dataset.closed = '1';
+    document.getElementById('m-ok').click();
+  });
+
+  /** 2026-11-17 (Pali): „Ukončiť deň“ – dnes už nových pacientov neprijímame (tablet nevydáva čísla, TV ukáže oznam). */
+  async function endDay() {
+    const w = S.staff.counts.waiting;
+    const ok = await confirmDialog('Ukončiť deň?', `Tablet prestane vydávať poradové čísla a obrazovka v čakárni oznámi, že dnes už nových pacientov neprijímame.
+      ${w ? `Čakajúcich pacientov (${w}) môžete ešte normálne vyvolať.` : 'Nikto nečaká – TV ukáže „Dnes už neordinujeme“.'} Príjem sa dá kedykoľvek obnoviť, zajtra sa začne sám.`, 'Ukončiť deň');
+    if (ok) act(() => api('/api/staff/day-end', { body: { ended: true } }), 'Deň je ukončený – nové čísla sa už nevydávajú.');
+  }
+  async function reopenDay() {
+    const ok = await confirmDialog('Obnoviť príjem pacientov?', 'Tablet znova začne vydávať poradové čísla a oznam o ukončení dňa z obrazovky zmizne.', 'Obnoviť príjem');
+    if (ok) act(() => api('/api/staff/day-end', { body: { ended: false } }), 'Príjem pacientov je opäť otvorený.');
+  }
+
   // výber lekára kliknutím na meno v okne
   document.addEventListener('click', (e) => { const b = e.target.closest('button[data-doc]'); if (b) { const i = document.getElementById('m-doc'); if (i) { i.value = b.dataset.doc; i.focus(); } } });
 
@@ -701,7 +745,7 @@
 
   /** 2026-11-16: výber ambulancie pacienta (prázdna hodnota = spoločný pacient pre všetky ambulancie). */
   function roomSelect(selId) {
-    return `<select id="m-room">${roomsActive().map((r) => `<option value="${r.id}" ${r.id === selId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
+    return `<select id="m-room">${roomsOpen(selId).map((r) => `<option value="${r.id}" ${r.id === selId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}
       <option value="" ${selId == null ? 'selected' : ''}>Ktorákoľvek ambulancia (spoločný pacient)</option></select>`;
   }
   const pickedRoom = (root) => { const v = root.querySelector('#m-room').value; return v === '' ? null : Number(v); };
@@ -765,7 +809,7 @@
     if (!outOfOrder) {
       return act(() => api(`/api/staff/tickets/${t.id}/call`, { body: { roomId: S.roomId } }), (r) => `Vyvolané ${r.ticket.code} – ${r.ticket.roomName}`);
     }
-    const rooms = roomsActive();
+    const rooms = roomsOpen(S.roomId);
     const res = await modal({
       title: `Vyvolať ${t.code}`,
       okText: 'Vyvolať',
@@ -1048,6 +1092,11 @@
         </div>
         <div class="field"><label for="s-instr">Pokyn pre pacienta (tablet a lístok)</label><input type="text" id="s-instr" value="${esc(s.ticketInstruction)}" maxlength="120"></div>
         <label class="check"><input type="checkbox" id="s-sound" ${s.soundEnabled ? 'checked' : ''}> Zvukový signál na obrazovke v čakárni</label>
+        <div class="field vol-field"><label for="s-vol">Hlasitosť vyvolania na TV: <b id="s-vol-val">${s.soundVolume ?? 150} %</b></label>
+          <div class="vol-row"><span aria-hidden="true">🔈</span><input type="range" id="s-vol" min="10" max="200" step="10" value="${s.soundVolume ?? 150}"><span aria-hidden="true">🔊</span>
+            <button class="btn btn-sm" type="button" id="s-vol-test">Vyskúšať na TV</button></div>
+          <span class="hint">100 % = pôvodná hlasitosť. Zvukový signál sa dá zosilniť až na 200 %, hlas hlásenia najviac na 100 % (viac nedovolí prehliadač) –
+            ak je hlas stále tichý, zvýšte hlasitosť na televízore. „Vyskúšať na TV“ zahrá signál a hlásenie s hodnotou z posuvníka.</span></div>
         <div><button class="btn btn-primary" type="submit">Uložiť nastavenia</button></div>
       </form>
 
@@ -1128,7 +1177,8 @@
       <section class="card stack"><h2>Ukončenie dňa a údaje</h2>
         <p>Ukončenie dňa označí všetky dnešné čakajúce a vyvolané čísla ako <b>Neprítomný</b> a vyčistí obrazovku v čakárni.
           Číslovanie pokračuje – už vydané čísla sa dnes nezopakujú. Nový deň (od polnoci) začína automaticky od A001.</p>
-        <div class="row"><button class="btn btn-danger" id="btn-close-day">Ukončiť deň…</button></div>
+        <p class="hint">Bežné „Ukončiť deň“ (tablet prestane vydávať čísla, TV ukáže oznam) je tlačidlo 🏁 v Zozname.</p>
+        <div class="row"><button class="btn btn-danger" id="btn-close-day">Uzavrieť dnešné nevybavené čísla…</button></div>
         <p>Vymazanie údajov je nevratné. Zvoľte rozsah: história (všetky dni okrem dneška) alebo všetky čísla vrátane dneška.</p>
         <div class="row"><button class="btn btn-danger" id="btn-purge">Vymazať údaje…</button></div>
       </section>
@@ -1143,8 +1193,16 @@
       e.preventDefault();
       saveSettings({
         clinicName: val('s-name'), ticketPrefix: val('s-prefix'), ticketDisplaySeconds: Number(val('s-secs')),
-        recentCount: Number(val('s-recent')), ticketInstruction: val('s-instr'), soundEnabled: chk('s-sound'),
+        recentCount: Number(val('s-recent')), ticketInstruction: val('s-instr'), soundEnabled: chk('s-sound'), soundVolume: Number(val('s-vol')),
       }, 'Nastavenia boli uložené.');
+    };
+    const vol = document.getElementById('s-vol');
+    vol.oninput = () => { document.getElementById('s-vol-val').textContent = vol.value + ' %'; };
+    document.getElementById('s-vol-test').onclick = async () => {
+      try {
+        const r = await api('/api/admin/sound-test', { body: { volume: Number(vol.value) } });
+        toast(r.screens ? `Skúšobné vyvolanie zahrané na TV (${vol.value} %). Hodnotu uložte tlačidlom „Uložiť nastavenia“.` : '⚠ Obrazovka v čakárni nie je pripojená – skúšku nebolo kam poslať.', r.screens ? 'ok' : 'error');
+      } catch (e) { handleError(e); }
     };
     const printerPatch = () => ({ printer: {
       enabled: chk('p-enabled'), host: val('p-host'), port: Number(val('p-port')), encoding: val('p-enc'),
@@ -1245,7 +1303,7 @@
     };
 
     document.getElementById('btn-close-day').onclick = () => modal({
-      title: 'Ukončiť deň?', okText: 'Ukončiť deň', okClass: 'btn-danger solid',
+      title: 'Uzavrieť dnešné nevybavené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
       body: `<p>Všetky dnešné čakajúce a vyvolané čísla (${S.staff ? S.staff.counts.waiting + S.staff.counts.called : '?'}) budú označené ako Neprítomný a obrazovka v čakárni sa vyčistí.</p>
         <div class="field"><label for="m-confirm">Pre potvrdenie napíšte UKONČIŤ</label><input type="text" id="m-confirm" autocomplete="off"></div>`,
       onOk: async (root) => {

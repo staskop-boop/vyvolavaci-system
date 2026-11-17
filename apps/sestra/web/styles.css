@@ -326,3 +326,10 @@ body.is-doctor #btn-doctor { cursor: default; }
   font-family: var(--font-body); font-size: 14px; font-weight: 600; letter-spacing: 0; white-space: nowrap; }
 .hero-meta .ident-pill { font-size: 16px; max-width: 30ch; }
 .hero-meta .type-pill { font-size: 16px; }
+
+/* 2026-11-17: ukončenie dňa, ambulancia bez lekára, hlasitosť vyvolania */
+.alert-info.day-end { border-left-color: var(--adna-primary); }
+.closed-pick { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--adna-border); display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.vol-field { max-width: 560px; }
+.vol-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.vol-row input[type=range] { flex: 1; min-width: 180px; accent-color: var(--adna-primary); height: 28px; }

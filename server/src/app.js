@@ -157,6 +157,8 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/note', requireNurse, (req, res) => res.json(store.setStaffNote(id(req), req.body || {}, req.user.id)));
   app.post('/api/staff/announcement', requireNurse, (req, res) => res.json(store.setAnnouncement(req.body?.text, req.user)));
   app.post('/api/staff/rooms/:id/doctor', requireNurse, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
+  app.post('/api/staff/rooms/:id/closed', requireNurse, (req, res) => res.json(store.setRoomClosed(id(req), !!req.body?.closed, req.user.id)));
+  app.post('/api/staff/day-end', requireNurse, (req, res) => res.json(store.setDayEnd(!!req.body?.ended, req.user)));
   app.post('/api/staff/rooms/:id/delay', requireStaff, (req, res) => res.json(store.setRoomDelay(id(req), req.body?.minutes ?? null, req.body?.text)));
   app.post('/api/staff/tickets/:id/room', requireNurse, (req, res) => res.json(store.setHomeRoom(id(req), req.body?.roomId ?? null, req.user.id)));
   app.post('/api/staff/tickets/:id/edit', requireNurse, (req, res) => res.json(store.editTicket(id(req), req.body || {}, req.user.id)));
@@ -184,6 +186,15 @@ function createServer(opts = {}) {
   });
   app.get('/api/admin/settings', requireAdmin, (req, res) => res.json(store.getSettings()));
   app.put('/api/admin/settings', requireAdmin, (req, res) => res.json(store.updateSettings(req.body)));
+  // skúšobné vyvolanie na TV s hlasitosťou z posuvníka (ešte neuloženou) – správca si ju vyladí podľa čakárne
+  app.post('/api/admin/sound-test', requireAdmin, (req, res) => {
+    const v = Number(req.body?.volume ?? store.getSettings().soundVolume);
+    if (!Number.isInteger(v) || v < 10 || v > 200) throw new AppError(400, 'BAD_REQUEST', 'Hlasitosť musí byť od 10 do 200 %.');
+    const msg = JSON.stringify({ type: 'sound.test', volume: v });
+    let n = 0;
+    for (const ws of clients) if (ws.channel === 'display' && ws.readyState === 1) { ws.send(msg); n++; }
+    res.json({ ok: true, screens: n });
+  });
   app.get('/api/admin/news', requireAdmin, (req, res) => res.json({ feeds: news.status(), updatedAt: news.updatedAt, items: news.items.length }));
   app.post('/api/admin/news/refresh', requireAdmin, wrap(async (req, res) => { await news.refresh(); res.json({ feeds: news.status(), updatedAt: news.updatedAt, items: news.items.length }); }));
   const userResult = (res, r, okStatus = 200) => {
