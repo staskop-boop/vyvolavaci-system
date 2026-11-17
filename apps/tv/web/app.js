@@ -87,13 +87,28 @@
     return ctx;
   }
   function soundActive() { return !!ctx && ctx.state === 'running'; }
+  // 2026-11-17 (Pali): hlasitosť vyvolania (10 – 200 %). Signál ide cez zosilnenie a obmedzovač,
+  // aby sa ani pri 200 % nezačal skresľovať; hlas prehliadača sa dá nastaviť najviac na 100 %.
+  let master = null, volOverride = null;
+  const volPct = () => (volOverride ?? (state && state.soundVolume) ?? 150);
+  function out() {
+    if (!master) {
+      const lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = -6; lim.knee.value = 3; lim.ratio.value = 12; lim.attack.value = 0.002; lim.release.value = 0.2;
+      master = ctx.createGain();
+      master.connect(lim).connect(ctx.destination);
+    }
+    master.gain.value = Math.max(0.1, Math.min(2, volPct() / 100));
+    T.volume = volPct();
+    return master;
+  }
   function tone(freq, start, dur, gain) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.type = 'sine'; o.frequency.value = freq;
     g.gain.setValueAtTime(0.0001, start);
     g.gain.exponentialRampToValueAtTime(gain, start + 0.02);
     g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    o.connect(g).connect(ctx.destination);
+    o.connect(g).connect(out());
     o.start(start); o.stop(start + dur + 0.05);
   }
   /** Úder marimby: základný tón + dva rýchlo doznievajúce alikvoty. */
@@ -104,7 +119,7 @@
       gn.gain.setValueAtTime(0.0001, start);
       gn.gain.linearRampToValueAtTime(g, start + 0.012);
       gn.gain.setTargetAtTime(0.0001, start + 0.012, dur / decay);
-      o.connect(gn).connect(ctx.destination);
+      o.connect(gn).connect(out());
       o.start(start); o.stop(start + dur + 0.1);
     }
   }
@@ -221,11 +236,21 @@
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         u.voice = skVoice; u.lang = skVoice.lang || 'sk-SK';
-        u.rate = (state.voice && state.voice.rate) || 0.9; u.pitch = 1; u.volume = 1;
+        u.rate = (state.voice && state.voice.rate) || 0.9; u.pitch = 1; u.volume = Math.min(1, volPct() / 100);
+        T.speechVolume = u.volume;
         speechSynthesis.speak(u);
         T.spoken = (T.spoken || 0) + 1;
       } catch {}
     }, delayMs);
+  }
+  /** Skúška hlasitosti zo Sestry (Nastavenia → Obrazovka): signál + hlásenie s hlasitosťou z posuvníka. */
+  function soundTest(vol) {
+    T.soundTests = (T.soundTests || 0) + 1;
+    if (showing) return;   // práve niekoho vyvoláva – skúška by ho prerušila
+    volOverride = Number(vol) || null;
+    chime();
+    speakCall({ code: '25', roomName: 'Ambulancia č. 1' });
+    setTimeout(() => { volOverride = null; }, 8000);
   }
   if (params.get('hlas') === 'test') setTimeout(() => { chime(); speakCall({ code: '25', roomName: 'Ambulancia č. 1' }); }, 2500);
 
@@ -346,7 +371,7 @@
   // ---------- Práve vyšetrujeme ----------
   /** Ambulancie, ktoré dnes pracujú (lekár, dnešné vyvolanie alebo čakajúci); inak prvé dve. Najviac 3. */
   function activeRooms(s) {
-    const rooms = s.rooms || [];
+    const rooms = (s.rooms || []).filter((r) => !r.closedToday);   // „dnes neordinuje nikto“ → ambulancia sa nezobrazuje
     const busy = rooms.filter((r) => r.doctorName || r.current || r.calledToday || (s.queue || []).some((q) => q.roomId === r.id));
     return (busy.length ? busy : rooms.slice(0, 2)).slice(0, 3);
   }
@@ -407,7 +432,7 @@
     let cut = false;
     for (const li of el.queueList.children) { const r = li.getBoundingClientRect(); cut = cut || r.right > box.right + 1 || r.bottom > bottom + 1; li.classList.toggle('cut', cut); }
     // súhrn: najväčší sklz ambulancie, v ktorej niekto čaká
-    const withQ = (s.rooms || []).filter((r) => s.queue.some((q) => q.roomId === r.id));
+    const withQ = (s.rooms || []).filter((r) => !r.closedToday && s.queue.some((q) => q.roomId === r.id));
     const ds = withQ.map((r) => roomDelay(r.id, s));
     const anyPlanned = s.queue.some((q) => q.plannedAt);
     const worst = ds.length ? Math.max(...ds) : (anyPlanned ? (s.clinicDelayMinutes || 0) : null);
@@ -525,6 +550,13 @@
 
   // ---------- mimoriadny oznam ----------
   let lastAnnId, annInit = false, annText = '';
+  /** „Ukončiť deň“ od sestry – oznam v čakárni, kým nie je zadaný mimoriadny oznam. */
+  function dayEndAnnouncement(s) {
+    if (!s.dayEnd) return null;
+    return s.waitingCount > 0
+      ? { id: 'koniec-dna-caka', text: 'Príjem pacientov je na dnes ukončený. Čakajúcich pacientov ešte vyšetríme – ďakujeme za trpezlivosť.' }
+      : { id: 'koniec-dna', text: 'Dnes už neordinujeme. Ďakujeme za návštevu a prajeme pekný deň.' };
+  }
   function renderAnnouncement(a) {
     const on = !!(a && a.text);
     annText = on ? a.text : '';
@@ -651,7 +683,7 @@
     renderHeader(s.screen);
     renderInfo(s.screen);
     setTvSource(zoneEmpty ? null : (s.tvSource || null));
-    renderAnnouncement(s.announcement);
+    renderAnnouncement(s.announcement || dayEndAnnouncement(s));
     el.ticker.classList.toggle('no-news', s.newsEnabled === false);
     if (soundEnabled !== !!s.soundEnabled) { soundEnabled = !!s.soundEnabled; updateSoundUi(); }
     updateVoiceUi();
@@ -708,6 +740,7 @@
       health.ok = true;
       if (m.type === 'display.state') render(m.state);
       else if (m.type === 'call') onCall(m.call);
+      else if (m.type === 'sound.test') soundTest(m.volume);
     },
   });
   // Prvé načítanie aj cez HTTP (rýchlejšie zobrazenie, kým sa pripojí WebSocket).

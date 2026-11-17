@@ -280,13 +280,44 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await A.locator('#hist-detail').getByText('Opakovaná tlač').first().waitFor();
     ok('história dňa so stavmi a priebehom');
 
+    // 11b. 2026-11-17: Ukončiť deň, ambulancia bez lekára, hlasitosť vyvolania
+    await A.click('.tab[data-view=queue]');
+    await A.click('#btn-day-end'); await A.click('#m-ok');
+    await toastWith(A, /Deň je ukončený/);
+    await A.locator('.alert.day-end').waitFor();
+    assert.ok((await display()).dayEnd, 'TV vie o ukončení dňa');
+    assert.equal((await kiosk()).error.code, 'DAY_ENDED', 'tablet nevydá číslo');
+    await shot(A, '10-den-ukonceny');
+    await A.locator('.alert.day-end').getByRole('button', { name: 'Obnoviť príjem' }).click(); await A.click('#m-ok');
+    await toastWith(A, /opäť otvorený/);
+    assert.equal((await display()).dayEnd, null);
+    await A.selectOption('#room', { label: 'Ambulancia č. 2' });
+    await A.click('#btn-doctor'); await A.locator('#m-closed').click();
+    await toastWith(A, /dnes neordinuje nikto/);
+    assert.equal((await display()).rooms.find((r) => r.name === 'Ambulancia č. 2').closedToday, true);
+    await A.getByRole('button', { name: 'Ambulancia ordinuje' }).waitFor();
+    await shot(A, '11-ambulancia-neordinuje');
+    await A.getByRole('button', { name: 'Ambulancia ordinuje' }).click();
+    await toastWith(A, /opäť ordinuje/);
+    assert.equal((await display()).rooms.find((r) => r.name === 'Ambulancia č. 2').closedToday, false);
+    await A.click('.tab[data-view=admin]');
+    await A.locator('#s-vol').fill('170');
+    assert.equal(await A.textContent('#s-vol-val'), '170 %');
+    await A.click('#s-vol-test');
+    await toastWith(A, /nie je pripojená|zahrané na TV/);
+    await A.locator('#f-general button[type=submit]').click();
+    await toastWith(A, /Nastavenia boli uložené/);
+    assert.equal((await display()).soundVolume, 170);
+    await shot(A, '12-hlasitost');
+    ok('Ukončiť deň (tablet nevydá číslo) a obnovenie; ambulancia „dnes neordinuje nikto“; posuvník hlasitosti');
+
     // 12. ukončenie dňa s potvrdením
     await A.click('.tab[data-view=admin]');
     await A.click('#btn-close-day');
     await A.fill('#m-confirm', 'nie'); await A.click('#m-ok');
     await A.locator('#m-err', { hasText: 'UKONČIŤ' }).waitFor();
     await A.fill('#m-confirm', 'UKONČIŤ'); await A.click('#m-ok');
-    await toastWith(A, /Deň bol ukončený/);
+    await toastWith(A, /Deň bol ukončený/);   // (Nastavenia → Uzavrieť dnešné nevybavené čísla)
     assert.equal((await display()).current, null);
     ok('ukončenie dňa vyžaduje napísanie UKONČIŤ; obrazovka sa vyčistí');
 

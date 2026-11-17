@@ -79,7 +79,7 @@
   function showError(e, transient) {
     $('error-text').textContent = transient
       ? 'Nepodarilo sa spojiť so serverom.'
-      : (e.code === 'RATE_LIMITED' ? 'Príliš veľa pokusov naraz.' : 'Registrácia sa nepodarila.');
+      : (e.code === 'RATE_LIMITED' ? 'Príliš veľa pokusov naraz.' : e.code === 'DAY_ENDED' ? 'Dnes už nových pacientov neprijímame.' : 'Registrácia sa nepodarila.');
     $('error-detail').textContent = transient
       ? 'Skúste to, prosím, znova o chvíľu. Ak problém pretrváva, obráťte sa na sestru.'
       : (e.message || 'Skúste to, prosím, znova. Ak problém pretrváva, obráťte sa na sestru.');

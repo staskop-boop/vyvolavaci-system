@@ -164,6 +164,36 @@ async function shot(page, name) {
   } else {
     results.push(['SKIP', 'výpadok servera (test beží proti cudziemu serveru)']);
   }
+  // 2026-11-17 (Pali): hlasitosť, ambulancia bez lekára, ukončenie dňa
+  await page.waitForSelector('#tvCall.hidden', { state: 'attached', timeout: 15000 });
+  await step('skúška hlasitosti zo Sestry: signál zahrá s hodnotou z posuvníka', async () => {
+    const n = (await T()).chimes;
+    await api('POST', '/api/admin/sound-test', { volume: 120 });
+    await page.waitForFunction((x) => window.__adnaTest.chimes > x && window.__adnaTest.volume === 120, n, { timeout: 5000 });
+    await api('PUT', '/api/admin/settings', { soundVolume: 180 });
+    await sleep(8500);   // skúšobná hodnota platí 8 s, potom znova uložená
+    const m = (await T()).chimes;
+    await api('POST', '/api/admin/sound-test', {});
+    await page.waitForFunction((x) => window.__adnaTest.chimes > x && window.__adnaTest.volume === 180, m, { timeout: 5000 });
+  });
+  await step('ambulancia „dnes neordinuje nikto“ sa na TV nezobrazuje', async () => {
+    if (r2.id === r1.id) return;
+    await page.waitForSelector(`#roomRows [data-room="${r2.id}"]`, { timeout: 5000 });
+    await api('POST', `/api/staff/rooms/${r2.id}/closed`, { closed: true });
+    await page.waitForSelector(`#roomRows [data-room="${r2.id}"]`, { state: 'detached', timeout: 5000 });
+    assert.ok(await page.locator(`#roomRows [data-room="${r1.id}"]`).isVisible());
+    await shot(page, '7-jedna-ambulancia');
+    await api('POST', `/api/staff/rooms/${r2.id}/closed`, { closed: false });
+    await page.waitForSelector(`#roomRows [data-room="${r2.id}"]`, { timeout: 5000 });
+  });
+  await step('Ukončiť deň: TV ukáže oznam, po obnovení príjmu zmizne', async () => {
+    await api('POST', '/api/staff/day-end', { ended: true });
+    await page.waitForSelector('#tvAnnounce:not(.hidden)', { timeout: 5000 });
+    assert.match(await text('#tvAnnText'), /Príjem pacientov je na dnes ukončený|Dnes už neordinujeme/);
+    await shot(page, '8-koniec-dna');
+    await api('POST', '/api/staff/day-end', { ended: false });
+    await page.waitForSelector('#tvAnnounce.hidden', { state: 'attached', timeout: 5000 });
+  });
   await b1.close();
 
   // ---------- 2. bežný prehliadač: automatické prehrávanie zablokované ----------
