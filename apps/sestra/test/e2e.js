@@ -311,6 +311,38 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await shot(A, '12-hlasitost');
     ok('Ukončiť deň (tablet nevydá číslo) a obnovenie; ambulancia „dnes neordinuje nikto“; posuvník hlasitosti');
 
+    // 11c. 2026-11-17: dva kroky – sestra, potom lekár (TV ukáže najprv sestru, potom lekára)
+    await A.click('.tab[data-view=queue]');
+    await A.selectOption('#room', { label: 'Ambulancia č. 1' });
+    await A.click('#btn-nurse');
+    await A.locator('#m-nurse').waitFor();
+    await A.fill('#m-doc', 'MUDr. Pavel Staško');
+    await A.locator('button[data-nurse="Daniela Fetyková"]').click();
+    assert.equal(await A.inputValue('#m-nurse'), 'Daniela Fetyková');
+    await A.click('#m-ok');
+    await toastWith(A, /Sestra a lekár boli uložení/);
+    await A.locator('#btn-nurse', { hasText: 'Daniela Fetyková' }).waitFor();
+    const tn = (await kiosk()).ticket.code;
+    await row(A, 'tbl-waiting', tn).getByRole('button', { name: /^Vyvolať/ }).click();
+    if (await A.locator('#m-ok').count()) await A.click('#m-ok');
+    await row(A, 'tbl-called', tn).locator('.stage-pill', { hasText: 'u sestry' }).waitFor();
+    d = await display();
+    assert.equal(d.current.code, tn); assert.equal(d.current.stage, 'nurse'); assert.equal(d.current.nurseName, 'Daniela Fetyková');
+    await shot(A, '13-u-sestry');
+    await row(A, 'tbl-called', tn).getByRole('button', { name: '→ K lekárovi' }).click();
+    await toastWith(A, /čaká na lekára/);
+    await row(A, 'tbl-doctor', tn).waitFor();
+    assert.deepEqual((await display()).rooms.find((r) => r.name === 'Ambulancia č. 1').doctorQueue, [tn]);
+    await shot(A, '14-caka-na-lekara');
+    await row(A, 'tbl-doctor', tn).getByRole('button', { name: /Vyvolať k lekárovi/ }).click();
+    if (await A.locator('#m-ok').count()) await A.click('#m-ok');
+    await row(A, 'tbl-called', tn).locator('.stage-pill', { hasText: 'u lekára' }).waitFor();
+    d = await display();
+    assert.equal(d.current.code, tn); assert.equal(d.current.stage, 'doctor'); assert.equal(d.current.doctorName, 'MUDr. Pavel Staško');
+    await row(A, 'tbl-called', tn).getByRole('button', { name: /Vybavený/ }).click();
+    await row(A, 'tbl-finished', tn).waitFor();
+    ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi');
+
     // 12. ukončenie dňa s potvrdením
     await A.click('.tab[data-view=admin]');
     await A.click('#btn-close-day');

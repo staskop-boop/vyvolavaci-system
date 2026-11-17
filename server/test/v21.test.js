@@ -75,7 +75,13 @@ test('v2.1: dve pripravovne s vlastnými kontami, spoločná TV, hlásenie mešk
     assert.equal(st.rooms.find((x) => x.id === p1.id).doctorName, 'MUDr. Ján Novák');
     assert.equal(st.queue.find((q) => q.code === '9').doctorName, 'MUDr. Ján Novák');
     r = await s1.post(`/api/staff/rooms/${p1.id}/doctor`, { name: 'MUDr. Eva Malá' });   // zmena počas dňa
-    const c = await s1.post('/api/staff/call-next', { roomId: p1.id });
+    // 2026-11-17: prvé vyvolanie je k sestre (na TV sestra), druhé k lekárovi
+    const c1 = await s1.post('/api/staff/call-next', { roomId: p1.id });
+    assert.equal(c1.data.call.stage, 'nurse');
+    assert.equal(c1.data.call.doctorName, null);
+    assert.equal((await s1.post(`/api/staff/tickets/${c1.data.ticket.id}/to-doctor`, {})).status, 200);
+    const c = await s1.post('/api/staff/call-next', { roomId: p1.id, stage: 'doctor' });
+    assert.equal(c.data.call.stage, 'doctor');
     assert.equal(c.data.call.doctorName, 'MUDr. Eva Malá');
     assert.equal(c.data.call.direction, 'right');
     st = (await pub.get('/api/display/state')).data;

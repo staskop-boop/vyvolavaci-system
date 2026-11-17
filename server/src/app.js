@@ -145,8 +145,13 @@ function createServer(opts = {}) {
   // obrazovka v čakárni a tablet (verejné API, kanál display) nikdy
   const seesNote = (u) => !!u;
   app.get('/api/staff/state', requireStaff, (req, res) => res.json(store.staffState({ withNote: seesNote(req.user) })));
-  app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId), res.json(store.call(id(req), req.body?.roomId, req.user.id, req.body?.note))));
-  app.post('/api/staff/call-next', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId), res.json(store.callNext(req.body?.roomId, req.user.id))));
+  // lekárske konto si pacienta volá vždy k sebe (krok „lekár“); sestra volá podľa kroku čísla, „ďalšieho“ z radu k sestre alebo k lekárovi
+  app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId),
+    res.json(store.call(id(req), req.body?.roomId, req.user.id, req.body?.note, { byDoctor: !!req.user.doctorName }))));
+  app.post('/api/staff/call-next', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId),
+    res.json(store.callNext(req.body?.roomId, req.user.id, req.user.doctorName ? 'doctor' : req.body?.stage === 'doctor' ? 'doctor' : 'nurse'))));
+  // 2026-11-17: sestra pošle pacienta k lekárovi – von do čakárne (rad lekára) alebo priamo, bez čakania
+  app.post('/api/staff/tickets/:id/to-doctor', requireNurse, (req, res) => res.json(store.sendToDoctor(id(req), req.user.id, !!req.body?.direct)));
   app.post('/api/staff/tickets/:id/recall', requireStaff, (req, res) => res.json(store.recall(id(req), req.body?.roomId, req.user.id)));
   app.post('/api/staff/tickets/:id/done', requireStaff, (req, res) => res.json(store.done(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/absent', requireStaff, (req, res) => res.json(store.absent(id(req), req.user.id)));
@@ -157,6 +162,7 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/note', requireNurse, (req, res) => res.json(store.setStaffNote(id(req), req.body || {}, req.user.id)));
   app.post('/api/staff/announcement', requireNurse, (req, res) => res.json(store.setAnnouncement(req.body?.text, req.user)));
   app.post('/api/staff/rooms/:id/doctor', requireNurse, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
+  app.post('/api/staff/rooms/:id/nurse', requireNurse, (req, res) => res.json(store.setNurse(id(req), req.body?.name, req.user.id)));
   app.post('/api/staff/rooms/:id/closed', requireNurse, (req, res) => res.json(store.setRoomClosed(id(req), !!req.body?.closed, req.user.id)));
   app.post('/api/staff/day-end', requireNurse, (req, res) => res.json(store.setDayEnd(!!req.body?.ended, req.user)));
   app.post('/api/staff/rooms/:id/delay', requireStaff, (req, res) => res.json(store.setRoomDelay(id(req), req.body?.minutes ?? null, req.body?.text)));
@@ -176,7 +182,8 @@ function createServer(opts = {}) {
     if (!req.user.doctorName) throw new AppError(403, 'FORBIDDEN', 'Prehľad je pre lekárske konto.');
     res.json(store.doctorOwnStats(req.user.doctorName, String(req.query.from || ''), String(req.query.to || '')));
   });
-  app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''))));
+  app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''),
+    ['doctor', 'nurse', 'room'].includes(req.query.groupBy) ? req.query.groupBy : 'doctor')));
   // Záloha databázy na stiahnutie (len správca) – používa sa pri presune na iný server (deploy/lokalny/prenos-udajov.sh).
   app.get('/api/admin/backup', requireAdmin, (req, res, next) => {
     const tmp = path.join(config.dataDir, `prenos-${Date.now().toString(36)}.db`);

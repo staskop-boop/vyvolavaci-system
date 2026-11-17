@@ -295,13 +295,33 @@
   }
   function initials(n) { const names = noPost(n).split(/\s+/).filter((w) => w && !/\.$/.test(w)); return names.slice(0, 2).map((w) => w[0]).join('').toUpperCase(); }
   const missingPhoto = new Set();
-  /** Obrázok s náhradou (iniciály), keď fotka chýba. */
-  function setPhoto(img, n, onMissing) {
+  /** Obrázok s náhradou (iniciály), keď fotka chýba. fallback = náhradný obrázok (napr. sestra bez fotky). */
+  function setPhoto(img, n, onMissing, fallback) {
     const src = n ? docPhoto(n) : '';
-    if (!src || missingPhoto.has(src)) { img.removeAttribute('src'); img.classList.add('hidden'); onMissing && onMissing(); return; }
+    const useFallback = () => { if (img.getAttribute('src') !== fallback) img.src = fallback; img.classList.remove('hidden'); img.onerror = null; };
+    if (!src || missingPhoto.has(src)) {
+      if (fallback) return useFallback();
+      img.removeAttribute('src'); img.classList.add('hidden'); onMissing && onMissing(); return;
+    }
     img.classList.remove('hidden');
-    img.onerror = () => { missingPhoto.add(src); img.classList.add('hidden'); onMissing && onMissing(); };
+    img.onerror = () => { missingPhoto.add(src); if (fallback) return useFallback(); img.classList.add('hidden'); onMissing && onMissing(); };
     if (img.getAttribute('src') !== src) img.src = src;
+  }
+  /** 2026-11-17: sestra bez fotky (zastupujúca, externistka) – ilustrácia s nápisom „Sestra“. */
+  const NURSE_FALLBACK = 'assets/doctors/sestra.svg';
+  /** „Sestra Fetyková“ / „Sestra PhDr. Cibuľová“; bez mena len „Sestra“. */
+  const shortNurse = (n) => (n ? 'Sestra ' + shortDoc(n) : 'Sestra');
+  /**
+   * Kto pacienta volá: pri 1. vyvolaní sestra (meno + fotka sestry), pri 2. vyvolaní lekár.
+   * Starší server bez kroku = lekár ako doteraz.
+   */
+  function callPerson(call, room) {
+    if (call.stage === 'nurse') {
+      const n = call.nurseName ?? null;
+      return { nurse: true, name: n, full: n ? 'Sestra ' + noPost(n) : 'Sestra', short: shortNurse(n), photoName: n, fallback: NURSE_FALLBACK };
+    }
+    const d = call.doctorName ?? room.doctorName ?? null;
+    return d ? { nurse: false, name: d, full: d, short: shortDoc(d), photoName: d, fallback: null } : null;
   }
   const DIR_TEXT = { right: 'vpravo', left: 'vľavo', straight: 'rovno' };
   const ARROW = { right: 'M5 12h12M12 5l7 7-7 7', left: 'M19 12H7M12 5l-7 7 7 7', straight: 'M12 19V7M5 12l7-7 7 7' };
@@ -387,6 +407,10 @@
     el.rcCount.textContent = rooms.length === 1 ? '1 ambulancia' : `${rooms.length} ambulancie`;
     el.roomRows.innerHTML = rooms.map((r) => {
       const c = roomColor(r.id), door = doorText(r), late = longDelay(r, s);
+      // 2026-11-17: pacient u sestry → avatar sestry (bez fotky ilustrácia), inak lekár ako doteraz
+      const atNurse = r.current && r.currentStage === 'nurse';
+      const avatar = atNurse ? `<img class="avatar" alt="${esc(shortNurse(r.nurseName))}" data-doc="${esc(r.nurseName || '')}" data-fallback="${NURSE_FALLBACK}">`
+        : r.doctorName ? `<img class="avatar" alt="${esc(r.doctorName)}" data-doc="${esc(r.doctorName)}">` : '<div></div>';
       return `<div class="room" data-room="${r.id}">
         <div class="tile c${c}${r.current ? '' : ' empty'}">${r.current ? esc(r.current) : '–'}</div>
         <div class="r-text">
@@ -395,15 +419,16 @@
           ${r.doctorName ? `<div class="r-doc">${esc(compact ? noPost(r.doctorName) : r.doctorName)}${door ? `<span class="door-inline"> · ${esc(door)}</span>` : ''}</div>` : (door ? `<div class="r-doc"><span class="door-inline">${esc(door)}</span></div>` : '')}
           ${door ? `<div class="r-door">${arrowSvg(r.direction)}<span>${esc(door)}</span></div>` : ''}
         </div>
-        ${r.doctorName ? `<img class="avatar" alt="${esc(r.doctorName)}" data-doc="${esc(r.doctorName)}">` : '<div></div>'}
+        ${avatar}
         ${late ? `<div class="r-late">${esc(late)}</div>` : ''}
+        ${!compact && r.doctorQueue && r.doctorQueue.length ? `<div class="r-dq"><span>Na lekára čakajú</span>${r.doctorQueue.slice(0, 6).map((c) => `<b>${esc(c)}</b>`).join('')}${r.doctorQueue.length > 6 ? `<span>+${r.doctorQueue.length - 6}</span>` : ''}</div>` : ''}
       </div>`;
     }).join('');
     // dlhší názov ambulancie sa radšej zmenší, než aby sa zalomil alebo orezal
     for (const n of el.roomRows.querySelectorAll('.r-name')) { let f = 26; while (n.scrollWidth > n.clientWidth + 1 && f > 17) { f--; n.style.fontSize = f + 'px'; } }
     for (const img of el.roomRows.querySelectorAll('img[data-doc]')) {
       const n = img.dataset.doc;
-      setPhoto(img, n, () => { const d = document.createElement('div'); d.className = 'avatar'; d.textContent = initials(n); img.replaceWith(d); });
+      setPhoto(img, n, () => { const d = document.createElement('div'); d.className = 'avatar'; d.textContent = initials(n); img.replaceWith(d); }, img.dataset.fallback || null);
     }
   }
 
@@ -607,21 +632,23 @@
   function showCall(call) {
     callingRoomId = call.roomId ?? -1;
     const room = (state && state.rooms || []).find((r) => r.id === call.roomId) || {};
-    const r = { name: call.roomName || room.name || 'ambulancia', roomName: call.roomName || room.name, direction: call.direction ?? room.direction, doctorName: call.doctorName ?? room.doctorName };
+    const r = { name: call.roomName || room.name || 'ambulancia', roomName: call.roomName || room.name, direction: call.direction ?? room.direction };
+    const who = callPerson(call, room);
     const door = doorText(r), c = roomColor(call.roomId);
     const isLetter = /^[\p{L}]+$/u.test(call.code);
     // ľavá karta
     el.code.textContent = call.code;
     el.code.classList.toggle('long', String(call.code).length > 3);
     el.room.textContent = r.name;
-    el.callSub.innerHTML = [r.doctorName ? esc(r.doctorName) : '', door ? `<strong>${esc(door)}</strong>` : ''].filter(Boolean).join(' · ');
-    const hasDoc = !!r.doctorName;
+    el.callSub.innerHTML = [who ? esc(who.full) : '', door ? `<strong>${esc(door)}</strong>` : ''].filter(Boolean).join(' · ');
+    const hasDoc = !!who;
     el.ccGrid.classList.toggle('no-doc', !hasDoc);
     el.callDoc.classList.toggle('hidden', !hasDoc);
+    el.callDoc.classList.toggle('nurse', !!(who && who.nurse));
     if (hasDoc) {
-      el.callDocInit.textContent = initials(r.doctorName);
-      setPhoto(el.callDocImg, r.doctorName);
-      el.callDocCap.textContent = [shortDoc(r.doctorName), door.replace('Dvere', 'dvere').replace(' · ', ' ')].filter(Boolean).join(' · ');
+      el.callDocInit.textContent = who.name ? initials(who.name) : '';
+      setPhoto(el.callDocImg, who.photoName, null, who.fallback);
+      el.callDocCap.textContent = [who.short, door.replace('Dvere', 'dvere').replace(' · ', ' ')].filter(Boolean).join(' · ');
       el.callPoint.className = 'cc-point ' + (ARROW[r.direction] ? r.direction : 'none');
     }
     el.callBar.classList.remove('run'); void el.callBar.offsetWidth;
@@ -633,8 +660,8 @@
     el.tvCallCode.textContent = call.code;
     el.tvCallCode.className = 'tb-code c' + c;
     el.tvCallTitle.textContent = `Pacient s ${isLetter ? 'písmenom' : 'číslom'} ${call.code}, prosíme, vstúpte`;
-    el.tvCallSub.textContent = [r.name, door.replace(' · ', ' '), r.doctorName ? `${shortDoc(r.doctorName)} vás čaká` : ''].filter(Boolean).join(' · ');
-    if (hasDoc) setPhoto(el.tvCallImg, r.doctorName); else el.tvCallImg.classList.add('hidden');
+    el.tvCallSub.textContent = [r.name, door.replace(' · ', ' '), who ? `${who.short} vás čaká` : ''].filter(Boolean).join(' · ');
+    if (hasDoc) setPhoto(el.tvCallImg, who.photoName, null, who.fallback); else el.tvCallImg.classList.add('hidden');
     el.tvAnnounce.classList.add('hidden');
     el.tvCall.classList.remove('hidden');
     el.tvCall.style.animation = 'none'; void el.tvCall.offsetWidth; el.tvCall.style.animation = '';

@@ -1,6 +1,5 @@
-# subor.jpg=https://adresa-fotky (jeden riadok na lekára alebo sestru); prázdne = len výpis stránky
-# 2026-11-17: sestry z mamkrcovezily.sk/nas-tim
-fetykova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/Daniela-Fetykova-zdravotna-sestra-cievne-01.jpg
-kopcakova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/Natalia-Kopcakova-zdravotna-sestra-01.jpg
-cibulova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/08/AB_04936_Aneta_Barcova_fotograf-%E2%80%93-kopia-scaled.jpg
-sotakova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/11/web_AB_01432_Aneta_Barcova_fotograf.jpg
+# subor.jpg=https://adresa-fotky (jeden riadok na lekára); prázdne = len výpis stránky
+kubikova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/MUDr.-Maria-Kubikova-lekarka-cievne-01.jpg
+kudela.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/MUDr.-Filip-Kudela-lekar-cievne-02.jpg
+koval.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/03/MUDr.-Dominik-Koval-lekar-cievne-03-scaled.jpg
+roskovicova.jpg=https://mamkrcovezily.sk/wp-content/uploads/2026/11/web_AB_01342_Aneta_Barcova_fotograf.jpg
