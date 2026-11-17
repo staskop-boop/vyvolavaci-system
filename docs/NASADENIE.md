@@ -55,7 +55,8 @@ prihlásia cez `https://vyvolavaci.adna.sk` aj cez `http://IP:8080` v LAN (bez `
 2. Na serveri ako root: `curl -fsSL https://raw.githubusercontent.com/staskop-boop/vyvolavaci-system/main/deploy/lokalny/instaluj.sh -o /tmp/adna-instaluj.sh && sudo bash /tmp/adna-instaluj.sh`
    – Docker, kód do `/opt/adna`, server na porte 8080, služba `cloudflared` (token zo Zero Trust → Networks →
    Tunnels → `vyvolavaci-lokal` sa vkladá skryto), denná záloha a aktualizácia z `main` každých 5 minút.
-3. Keď v ambulancii nikto nevyvoláva: `sudo /opt/adna/deploy/lokalny/prenos-udajov.sh` – prihlásením správcu
+3. Keď v ambulancii nikto nevyvoláva: `sudo bash /opt/adna/deploy/lokalny/prenos-udajov.sh` (funguje aj pre server
+   spustený priamo cez Node.js ako služba systemd – spôsob inštalácie si zistí sám) – prihlásením správcu
    stiahne databázu zo starého servera (kontá, nastavenia, pacienti, história) a nahradí ňou databázu nového.
 4. Hneď potom workflow **Nasadenie** s `server = lokalny` a `prepnut_dns` – prepne CNAME na nový tunel (len ak je
    pripojený). Návrat späť: `server = hetzner` a `prepnut_dns`.

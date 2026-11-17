@@ -4,7 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const express = require('express');
 // identifikátor spustenia servera – po aktualizácii (reštarte) sa zmení a obrazovka v čakárni sa sama obnoví
-const BOOT_ID = Date.now().toString(36);
+const BOOT_ID = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);   // + náhoda: dva servery spustené naraz sa musia líšiť (prenos údajov)
 const { WebSocketServer } = require('ws');
 const config = require('./config');
 const db = require('./db');
