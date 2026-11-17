@@ -79,6 +79,8 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
       await p.fill('#un', n); await p.fill('#pw', 'Heslo-' + n); await p.keyboard.press('Enter');
       await p.waitForSelector('#m-doc');                 // povinné: kto dnes ordinuje
       await p.click(`button[data-doc="${n === 'ambulancia1' ? 'MUDr. Pavel Staško, PhD., MHA, MPH' : 'MUDr. Adela Czetöová'}"]`);
+      // 2026-11-17: ráno aj sestra – v ambulancii 1 Fetyková, v ambulancii 2 zastupujúca sestra bez fotky (meno nezadané)
+      if (n === 'ambulancia1') await p.click('button[data-nurse="Daniela Fetyková"]');
       await p.click('#m-ok');
       await p.waitForFunction(() => !document.querySelector('.modal') && /MUDr/.test(document.getElementById('btn-doctor').textContent));
     }
@@ -97,8 +99,12 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
     await tv.waitForFunction(() => window.__adnaTest.states > 0);
     await s2.click('#btn-next');
     await tv.waitForFunction(() => document.getElementById('callCode').textContent === 'A');
-    assert.ok(await tv.locator('#callPoint.left').isVisible(), 'Ambulancia č. 2 → lekárka ukazuje vľavo');
-    assert.match(await tv.locator('#tvCallSub').innerText(), /Dvere č. 2 vľavo · MUDr. Czetöová vás čaká/);
+    assert.ok(await tv.locator('#callPoint.left').isVisible(), 'Ambulancia č. 2 → ukazuje vľavo');
+    // 1. vyvolanie je k sestre – bez zadaného mena a fotky ilustrácia „Sestra“
+    assert.match(await tv.locator('#tvCallSub').innerText(), /Dvere č. 2 vľavo · Sestra vás čaká/);
+    await tv.waitForFunction(() => /sestra\.svg$/.test(document.getElementById('callDocImg').src));
+    assert.ok(await tv.locator('#callDocImg').isVisible(), 'náhradný obrázok sestry');
+    assert.equal(await tv.locator('#callDocCap').innerText(), 'Sestra · dvere č. 2 vľavo');
     assert.match(await tv.locator('#tvCallCode').getAttribute('class'), /c1/, 'Ambulancia 2 = sivá');
     await sleep(600);
     await tv.screenshot({ path: path.join(SHOTS, 'tv22-vyvolanie-vlavo.png') });
@@ -107,21 +113,39 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
     assert.deepEqual(await tv.evaluate(() => window.__adnaTest.shown), ['A', '1'], 'kto vyvolá prvý, ten sa zobrazí prvý');
     await tv.waitForFunction(() => window.__said.length >= 2, null, { timeout: 4000 });
     const said = await tv.evaluate(() => window.__said);
-    assert.match(said[0][0], /^Písmeno á, .*ambulanci\S* číslo dva\b.*\.$/, 'hlásenie po signáli: ' + said[0][0]);
-    assert.match(said[1][0], /^Číslo jeden, .*ambulanci\S* číslo jeden\b.*\.$/, 'hlásenie po signáli: ' + said[1][0]);
+    assert.match(said[0][0], /^Písmeno á, .*ambulanci\S* číslo dva\b.*\.$/i, 'hlásenie po signáli: ' + said[0][0]);
+    assert.match(said[1][0], /^Číslo jeden, .*ambulanci\S* číslo jeden\b.*\.$/i, 'hlásenie po signáli: ' + said[1][0]);
     assert.notEqual(said[0][0].slice(said[0][0].indexOf(',')).replace('dva', 'X'), said[1][0].slice(said[1][0].indexOf(',')).replace('jeden', 'X'), 'náhodná veta sa hneď neopakuje');
     assert.match(said[0][1], /Viktoria/, 'prirodzený slovenský hlas');
     assert.ok(!(await tv.locator('#voiceWarn').isVisible()));
     assert.equal(await tv.locator('#callRoom').innerText(), 'Ambulancia č. 1');
-    assert.match(await tv.locator('#callSub').innerText(), /MUDr. Pavel Staško.*Dvere č. 1 · vpravo/);
-    assert.ok(await tv.locator('#callPoint.right').isVisible(), 'Ambulancia č. 1 → lekár ukazuje vpravo');
-    assert.ok(await tv.locator('#callDocImg').isVisible(), 'fotka lekára');
+    assert.match(await tv.locator('#callSub').innerText(), /Sestra Daniela Fetyková.*Dvere č. 1 · vpravo/);
+    assert.match(await tv.locator('#tvCallSub').innerText(), /Sestra Fetyková vás čaká/);
+    assert.ok(await tv.locator('#callPoint.right').isVisible(), 'Ambulancia č. 1 → ukazuje vpravo');
+    assert.ok(await tv.locator('#callDocImg').isVisible(), 'fotka sestry');
+    assert.match(await tv.locator('#callDocImg').getAttribute('src'), /fetykova\.jpg$/);
     await sleep(600);
     await tv.screenshot({ path: path.join(SHOTS, 'tv22-vyvolanie-vpravo.png') });
     assert.equal(await tv.locator('#roomRows .tile').first().innerText(), 'A', 'druhá ambulancia: práve vyšetruje A');
     const chips = await tv.$$eval('#queueList li', (l) => l.map((li) => [li.querySelector('.c-code').textContent, li.className]));
     assert.match(chips.find((c) => c[0] === 'B')[1], /c1/, 'čísla ambulancie 2 sivým rámom');
     assert.match(chips.find((c) => c[0] === '2')[1], /c0/, 'čísla ambulancie 1 červeným rámom');
+  });
+
+  await step('2. vyvolanie k lekárovi: sestra pošle pacienta von, TV ukáže lekára s fotkou', async () => {
+    await s1.locator('#tbl-called tr', { hasText: '1' }).getByRole('button', { name: '→ K lekárovi' }).click();
+    await s1.locator('#tbl-doctor tr', { hasText: '1' }).waitFor();
+    await tv.waitForFunction(() => /Na lekára čakajú/.test(document.getElementById('roomRows').textContent), null, { timeout: 20000 });
+    await sleep(400);
+    await tv.screenshot({ path: path.join(SHOTS, 'tv24-caka-na-lekara.png') });
+    await s1.screenshot({ path: path.join(SHOTS, 'sestra24-caka-na-lekara.png') });
+    await s1.locator('#tbl-doctor tr', { hasText: '1' }).getByRole('button', { name: /Vyvolať k lekárovi/ }).click();
+    if (await s1.locator('#m-ok').count()) await s1.click('#m-ok');
+    await tv.waitForFunction(() => /MUDr\. Staško vás čaká/.test(document.getElementById('tvCallSub').textContent), null, { timeout: 12000 });
+    assert.match(await tv.locator('#callSub').innerText(), /MUDr. Pavel Staško.*Dvere č. 1 · vpravo/);
+    assert.match(await tv.locator('#callDocImg').getAttribute('src'), /stasko\.jpg$/);
+    await sleep(600);
+    await tv.screenshot({ path: path.join(SHOTS, 'tv24-vyvolanie-lekar.png') });
   });
 
   await step('predĺžený výkon: sestra 1 nahlási 1,5 h → oznam a meškanie len pri jej pacientoch', async () => {

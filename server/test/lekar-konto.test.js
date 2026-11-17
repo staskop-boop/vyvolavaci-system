@@ -31,11 +31,16 @@ test('lekár vyvoláva a vybavuje, ale nepridáva pacientov ani nemení oznamy',
   assert.equal((await lekar.post(`/api/staff/rooms/${room.id}/doctor`, { name: 'Niekto iný' })).status, 403);
   const t = await reg();
   assert.equal((await lekar.post(`/api/staff/tickets/${t.id}/planned`, { plannedTime: '23:00' })).status, 403);
+  // 2026-11-17: pacient ide najprv k sestre; lekár si volá až tých, ktorých sestra poslala k lekárovi
+  assert.equal((await lekar.post('/api/staff/call-next', { roomId: room.id })).status, 409, 'na lekára zatiaľ nikto nečaká');
+  assert.equal((await admin.post(`/api/staff/tickets/${t.id}/call`, { roomId: room.id })).status, 200);
+  assert.equal((await lekar.post(`/api/staff/tickets/${t.id}/to-doctor`, {})).status, 403, 'k lekárovi posiela sestra');
+  assert.equal((await admin.post(`/api/staff/tickets/${t.id}/to-doctor`, {})).status, 200);
   const c = await lekar.post('/api/staff/call-next', { roomId: room.id });
   assert.equal(c.status, 200, JSON.stringify(c.data));
   assert.equal(c.data.call.doctorName, 'MUDr. Ján Kúdela', 'meno lekára sa ukáže na TV');
   assert.equal((await lekar.post(`/api/staff/tickets/${t.id}/done`)).status, 200);
-  const ev = s.store.db.prepare("SELECT doctor FROM ticket_events WHERE ticket_id = ? AND type = 'call'").get(t.id);
+  const ev = s.store.db.prepare("SELECT doctor FROM ticket_events WHERE ticket_id = ? AND type = 'call' AND stage = 'doctor'").get(t.id);
   assert.equal(ev.doctor, 'MUDr. Ján Kúdela');
 });
 
@@ -45,6 +50,7 @@ test('môj prehľad: lekár vidí len svoje údaje, sestra/správca nie', async 
   await admin.post(`/api/staff/rooms/${st.rooms[1].id}/doctor`, { name: 'MUDr. Iný Lekár' });
   const t2 = await reg();
   await admin.post(`/api/staff/tickets/${t2.id}/call`, { roomId: st.rooms[1].id });
+  await admin.post(`/api/staff/tickets/${t2.id}/to-doctor`, { direct: true });   // priamo k lekárovi, bez čakania
   const r = await lekar.get(`/api/staff/my-stats?from=${st.day}&to=${st.day}`);
   assert.equal(r.status, 200);
   assert.equal(r.data.doctor, 'MUDr. Ján Kúdela');

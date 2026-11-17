@@ -94,6 +94,10 @@ function migrate(db) {
   if (!cols.includes('staff_note')) db.exec('ALTER TABLE tickets ADD COLUMN staff_note TEXT');
   // 2026-11-17 (Pali): typ pacienta (napr. Vstupné vyšetrenie varixy) – vyberá sestra, na TV sa neukazuje
   if (!cols.includes('patient_type')) db.exec('ALTER TABLE tickets ADD COLUMN patient_type TEXT');
+  // 2026-11-17 (Pali): dva kroky – pacient ide najprv k sestre (plánovaný čas = vstup k sestre), potom ho volá lekár.
+  // stage = 'nurse' (čaká na sestru / je u sestry) | 'doctor' (čaká na lekára / je u lekára); to_doctor_at = kedy ho sestra poslala k lekárovi
+  if (!cols.includes('stage')) db.exec("ALTER TABLE tickets ADD COLUMN stage TEXT NOT NULL DEFAULT 'nurse'");
+  if (!cols.includes('to_doctor_at')) db.exec('ALTER TABLE tickets ADD COLUMN to_doctor_at TEXT');
   if (!cols.includes('home_room_id')) db.exec('ALTER TABLE tickets ADD COLUMN home_room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');
   // v2.2: smer k ambulancii zo stredu čakárne (šípka na TV): right | left | straight | ''
   const rcols = db.prepare('PRAGMA table_info(rooms)').all().map((c) => c.name);
@@ -106,6 +110,9 @@ function migrate(db) {
   // v3.2: lekár, ktorý ordinoval pri vyvolaní (pre štatistiky – zoznam lekárov v nastaveniach nie je historický)
   const ecols = db.prepare('PRAGMA table_info(ticket_events)').all().map((c) => c.name);
   if (!ecols.includes('doctor')) db.exec('ALTER TABLE ticket_events ADD COLUMN doctor TEXT');
+  // 2026-11-17: krok vyvolania (nurse | doctor; staršie záznamy NULL = jeden krok) a sestra, ktorá v ambulancii slúžila
+  if (!ecols.includes('stage')) db.exec('ALTER TABLE ticket_events ADD COLUMN stage TEXT');
+  if (!ecols.includes('nurse')) db.exec('ALTER TABLE ticket_events ADD COLUMN nurse TEXT');
   const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   // v2.1: konto sestry je priradené k pracovisku (ambulancii); null = všetky pracoviská
   if (!ucols.includes('room_id')) db.exec('ALTER TABLE users ADD COLUMN room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');

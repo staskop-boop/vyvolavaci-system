@@ -251,3 +251,21 @@ Podklad: `docs/dizajn-v3/DIZAJN-MANUAL.md` a `tokens.css`. Obrazovka je pevná p
 - TV po signáli marimba (~1,45 s) prečíta cez Web Speech API slovenským hlasom: „Číslo dvadsaťpäť, ambulancia jedna.“,
   „Písmeno bé, ambulancia dva.“, „Označenie ká dvanásť, …“. Výber hlasu: ženský sk-* „Online (Natural)“ (Viktória) → iný ženský (Laura, Google) → mužský len ako záloha.
   Bez slovenského hlasu sa nehlási a v lište TV je štítok „Chýba slovenský hlas“. `?hlas=test` = skúšobné hlásenie.
+
+## Dva kroky: sestra → lekár (2026-11-17)
+
+Pacient ide najprv k sestre (plánovaný čas = čas vstupu k sestre), sestra ho po vyšetrení pošle von a lekár si ho vyvolá znova.
+
+* `tickets.stage` = `nurse` (čaká na sestru / je u sestry) | `doctor` (čaká na lekára / je u lekára); `tickets.to_doctor_at` = kedy ho sestra poslala.
+  `ticket_events.stage` a `ticket_events.nurse` – krok vyvolania a sestra v ambulancii (staršie záznamy NULL = jeden krok).
+* Ráno sa pre ambulanciu zadá lekár aj sestra: `POST /api/staff/rooms/:id/nurse {name}` (prázdne = bez sestry), nastavenie `nurseList` (mená na výber).
+* `POST /api/staff/call-next {roomId, stage}` – `stage: 'nurse'` (predvolené) z radu k sestre podľa termínu, `'doctor'` z radu k lekárovi podľa `to_doctor_at`.
+  Lekárske konto volá vždy z radu lekára; `POST /api/staff/tickets/:id/call` z lekárskeho konta berie pacienta rovno k lekárovi.
+* `POST /api/staff/tickets/:id/to-doctor {direct}` (len sestra) – pacient u sestry: `direct: false` → späť do čakárne, rad lekára tej istej ambulancie;
+  `direct: true` → ide k lekárovi hneď, ostáva vyvolaný, TV nič nehlási. Udalosť `to_doctor` (pri priamom s poznámkou `priamo`).
+* TV: `call`/`current`/`recent[]` majú `stage` a `nurseName` (pri sestre) alebo `doctorName` (pri lekárovi). `queue[]` obsahuje len rad k sestre;
+  `rooms[]` má `nurseName`, `doctorQueue` (čísla čakajúce na lekára), `currentStage`; `doctorQueueCount`.
+  Fotka sestry: `assets/doctors/<priezvisko>.jpg`, inak ilustrácia `assets/doctors/sestra.svg` s nápisom „Sestra“.
+* Štatistiky `GET /api/admin/stats?groupBy=doctor|nurse|room`: lekárovi sa pri dvoch krokoch počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho
+  (meškanie oproti termínu nie); sestre čakanie od príchodu, meškanie oproti termínu a čas u nej. Nové polia `avgNurse`, `avgDoctorWait`, `avgDoctor`,
+  `toDoctor`, `direct`, `twoStepSince`. Pacient vybavený len u sestry sa lekárovi nepočíta.

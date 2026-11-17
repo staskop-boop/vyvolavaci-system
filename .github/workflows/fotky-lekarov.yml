@@ -28,6 +28,9 @@ jobs:
             curl -fsSL -m 30 -A 'Mozilla/5.0' "$url" -o p.html || continue
             grep -oiE '<img[^>]+>' p.html | head -80
             grep -oiE '(MUDr\.|Mgr\.|Bc\.)[^<]{3,80}' p.html | sort -u | head -40
+            echo "-- texty nadpisov (mená sestier bez titulu) --"
+            grep -oiE '<h[1-6][^>]*>[^<]{3,80}</h[1-6]>' p.html | sed 's/<[^>]*>//g' | sort -u | head -80
+            grep -oiE '[^<>]{0,60}(sestra|sestri)[^<>]{0,60}' p.html | sort -u | head -40
           done
           echo "== obrázky na úvodnej stránke =="; grep -oiE '<img[^>]+>' home.html | head -80
           grep -oiE '(MUDr\.|Mgr\.)[^<]{3,80}' home.html | sort -u | head -40

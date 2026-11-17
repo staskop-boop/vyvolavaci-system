@@ -368,6 +368,7 @@
   const fmtMin = (m) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}` : `${m} min`);
   // v2: poradie = plánovaný čas (ak je zadaný), inak čas príchodu – rovnako ako na serveri
   const orderKey = (t) => t.plannedAt || t.createdAt;
+  const byDocOrder = (a, b) => String(a.toDoctorAt || a.createdAt).localeCompare(String(b.toDoctorAt || b.createdAt)) || a.seq - b.seq;
   const byOrder = (a, b) => orderKey(a).localeCompare(orderKey(b)) || a.seq - b.seq;
   /** Odchýlka od plánovaného času v minútach (kladné = meškanie). */
   function plannedBadge(t, now) {
@@ -415,10 +416,16 @@
     document.getElementById('who').innerHTML = `<b>${esc(S.user.doctorName || S.user.username)}</b>${S.user.roomId ? ' · ' + esc(roomName(S.user.roomId)) : ''}`;
     const all = showAll();
     const mine = (t) => all || mineFilter(t);
-    const waiting = st.tickets.filter((t) => t.status === 'waiting' && mine(t)).sort(byOrder);
+    const isDocAcc = !!S.user.doctorName;
+    // 2026-11-17: dva kroky – rad k sestre (podľa termínu) a rad k lekárovi (podľa toho, kedy ich sestra poslala)
+    const waitingNurse = st.tickets.filter((t) => t.status === 'waiting' && (t.stage || 'nurse') === 'nurse' && mine(t)).sort(byOrder);
+    const waitingDoc = st.tickets.filter((t) => t.status === 'waiting' && t.stage === 'doctor' && mine(t)).sort(byDocOrder);
+    // hlavný rad: sestra volá k sebe, lekár k sebe
+    const waiting = isDocAcc ? waitingDoc : waitingNurse;
     const called = st.tickets.filter((t) => t.status === 'called' && (all || t.roomId === S.roomId || mineFilter(t))).sort((a, b) => (b.calledAt || '').localeCompare(a.calledAt || ''));
     const finished = st.tickets.filter((t) => (t.status === 'done' || t.status === 'absent') && (all || t.roomId === S.roomId || mineFilter(t))).sort((a, b) => (b.finishedAt || '').localeCompare(a.finishedAt || ''));
-    const nWaitAll = st.tickets.filter((t) => t.status === 'waiting').length;
+    const nWaitAll = st.tickets.filter((t) => t.status === 'waiting' && (isDocAcc ? t.stage === 'doctor' : (t.stage || 'nurse') === 'nurse')).length;
+    const nurseNow = (st.nurses || {})[S.roomId] || null;
     const delay = (st.settings.roomDelays || {})[S.roomId];
     const doctor = (st.doctors || {})[S.roomId] || null;
     const closedHere = isClosed(S.roomId);
@@ -453,22 +460,33 @@
       ${st.previousDayOpen.count} nevybavených čísel. Do dnešného zoznamu sa neprenášajú.</div>
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
-    const waitRows = waiting.map((t, i) => `<tr data-ticket="${t.id}">
+    const waitRows = waitingNurse.map((t, i) => `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="nw t-plan">${plannedBadge(t, now)}</td>
       <td class="nw t-arr">${esc(fmtTime(t.createdAt))}</td><td class="nw t-wait">${esc(fmtWait(t.createdAt, now))}</td>
       <td class="actions"><div class="acts">
-        <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis}>Vyvolať${i > 0 ? '…' : ''}</button>
+        <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="${isDocAcc ? 'Pacienta si vezmete rovno k sebe (bez sestry)' : 'Vyvolať k sestre'}">${isDocAcc ? 'Vyvolať k sebe' : 'Vyvolať'}${i > 0 || isDocAcc ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
         ${nurse ? `<button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, čas objednania alebo ambulanciu (napr. pacienta prevezme druhá ambulancia)">✎ Upraviť</button>
         <button class="btn btn-sm btn-danger needs-online" data-act="cancel" data-id="${t.id}" ${dis} title="Zmazať chybne zadaného pacienta">✕ Zmazať</button>` : ''}
         ${t.source === 'card' ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="reprint" data-id="${t.id}" ${dis} title="Znovu vytlačiť lístok">Tlač</button>`}
       </div></td></tr>`).join('');
 
+    const docRows = waitingDoc.map((t, i) => `<tr data-ticket="${t.id}">
+      <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      <td class="nw">${esc(fmtTime(t.toDoctorAt))}</td><td class="nw">${esc(fmtWait(t.toDoctorAt || t.createdAt, now))}</td>
+      <td class="actions"><div class="acts">
+        <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
+        <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
+      </div></td></tr>`).join('');
+
+    const stagePill = (t) => (t.stage === 'doctor' ? '<span class="stage-pill doc">u lekára</span>' : '<span class="stage-pill nurse">u sestry</span>');
     const calledRows = called.map((t) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="c-room">${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
+      <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
       <td class="c-count">${t.callCount}×</td>
       <td class="actions"><div class="acts">
-        <button class="btn btn-sm btn-primary needs-online" data-act="done" data-id="${t.id}" ${dis}>✓ Vybavený</button>
+        ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-doctor" data-id="${t.id}" ${dis} title="Pacient ide von do čakárne a lekár si ho vyvolá – na TV sa ukáže lekár">→ K lekárovi</button>
+        <button class="btn btn-sm btn-dark needs-online" data-act="to-doctor-direct" data-id="${t.id}" ${dis} title="Pacient ide k lekárovi hneď, bez čakania v čakárni">→ Priamo k lekárovi</button>` : ''}
+        <button class="btn btn-sm ${nurse && t.stage !== 'doctor' ? '' : 'btn-primary'} needs-online" data-act="done" data-id="${t.id}" ${dis} title="${t.stage === 'doctor' ? 'Pacient je vybavený' : 'Pacient odchádza bez lekára'}">✓ Vybavený${nurse && t.stage !== 'doctor' ? ' bez lekára' : ''}</button>
         <button class="btn btn-sm btn-dark needs-online" data-act="recall" data-id="${t.id}" ${dis}>Zopakovať</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis}>Vrátiť</button>
@@ -486,17 +504,28 @@
     if (next) {
       const pills = hasPriv(next) ? [identPill(next)] : [];
       pills.push(`<span class="pill">príchod ${esc(fmtTime(next.createdAt))}</span>`, `<span class="pill">čaká ${esc(fmtWait(next.createdAt, now))}</span>`);
-      if (next.plannedAt) {
+      if (next.plannedAt && !isDocAcc) {
         const late = Math.round((now - Date.parse(next.plannedAt)) / 60000);
         const tol = st.settings.onTimeMinutes || 0;
         pills.push(late > tol ? `<span class="pill late">mešká sa ${esc(fmtMin(late))}</span>` : `<span class="pill ok">v čase</span>`);
       }
-      heroInfo = `<div class="hero-kicker">Ďalší na rade</div>
-        <div class="hero-main">${next.plannedAt ? 'Termín ' + esc(fmtTime(next.plannedAt)) : 'Bez termínu'}${waiting.length > 1 ? ` · potom ešte ${waiting.length - 1}` : ''}</div>
+      heroInfo = `<div class="hero-kicker">${isDocAcc ? 'Ďalší na rade k lekárovi' : 'Ďalší na rade k sestre'}</div>
+        <div class="hero-main">${isDocAcc ? 'Od sestry ' + esc(fmtTime(next.toDoctorAt)) : next.plannedAt ? 'Termín ' + esc(fmtTime(next.plannedAt)) : 'Bez termínu'}${waiting.length > 1 ? ` · potom ešte ${waiting.length - 1}` : ''}</div>
         <div class="hero-meta">${pills.join('')}</div>`;
     } else {
-      heroInfo = `<div class="hero-kicker">Ďalší na rade</div><div class="hero-main">Nikto nečaká</div>
-        <div class="hero-meta"><span class="pill">${S.user.doctorName ? 'Pacientov zaraďuje sestra' : 'Pacienta pridáte tlačidlom „+ Pacient“'}</span></div>`;
+      heroInfo = `<div class="hero-kicker">${isDocAcc ? 'Ďalší na rade k lekárovi' : 'Ďalší na rade k sestre'}</div><div class="hero-main">${isDocAcc ? 'Na lekára nikto nečaká' : 'Nikto nečaká'}</div>
+        <div class="hero-meta"><span class="pill">${isDocAcc ? 'Pacientov k vám posiela sestra' : 'Pacienta pridáte tlačidlom „+ Pacient“'}</span></div>`;
+    }
+
+    function nurseSection() {
+      return `<div><div class="section-title"><h2>${isDocAcc ? 'Čakajú na sestru' : 'Čakajúci'} (${waitingNurse.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
+        ${waitingNurse.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
+          : '<div class="empty">Nikto nečaká.</div>'}</div>`;
+    }
+    function docSection() {
+      return `<div><div class="section-title"><h2>Čakajú na lekára (${waitingDoc.length})</h2><span class="hint">po vyšetrení u sestry</span></div>
+        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Od sestry</th><th>Čaká</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
+          : `<div class="empty">${isDocAcc ? 'Sestra k vám zatiaľ nikoho neposlala.' : 'Nikto nečaká na lekára.'}</div>`}</div>`;
     }
 
     // zachovanie pozície posúvania pri prekreslení
@@ -513,6 +542,7 @@
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
         <div class="rb-btns">
           <button class="btn needs-online ${doctor || S.user.doctorName || closedHere ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : S.user.doctorName ? '👩‍⚕️ ' + esc(S.user.doctorName) : closedHere ? 'Dnes neordinuje nikto' : '⚠ Zadať lekára'}</button>
+          ${S.user.doctorName ? '' : `<button class="btn needs-online ${nurseNow || closedHere ? '' : 'need'}" id="btn-nurse" ${dis} title="Sestra, ktorej meno a fotka sa ukáže na TV pri prvom vyvolaní pacienta">${nurseNow ? '🩺 ' + esc(nurseNow) : closedHere ? 'Sestra –' : '⚠ Zadať sestru'}</button>`}
           <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
           <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
           ${nurse ? `<button class="btn needs-online ${st.dayEnd ? 'on' : ''}" id="btn-day-end" ${dis} title="Dnes už nových pacientov neprijímame – tablet prestane vydávať čísla, TV ukáže oznam">🏁 ${st.dayEnd ? 'Deň je ukončený' : 'Ukončiť deň'}</button>` : ''}
@@ -540,17 +570,14 @@
           : '<div class="empty">Momentálne nie je nikto vyvolaný.</div>'}
       </section>
 
-      <section class="card a-waiting"><div class="section-title"><h2>Čakajúci (${waiting.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
-        ${waiting.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
-          : '<div class="empty">Nikto nečaká.</div>'}
-      </section>
+      <section class="card a-waiting stack">${isDocAcc ? docSection() + nurseSection() : nurseSection() + docSection()}</section>
 
       <div class="stack a-side">
         <div class="counts">
-          <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>čaká${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
+          <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>${isDocAcc ? 'čaká na vás' : 'čaká na sestru'}${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
+          <div class="count"><b id="cnt-doctor">${isDocAcc ? waitingNurse.length : waitingDoc.length}</b><span>${isDocAcc ? 'čaká na sestru' : 'čaká na lekára'}</span></div>
           <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
-          <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení</span></div>
-          <div class="count"><b>${finished.filter((t) => t.status === 'absent').length}</b><span>neprítomní</span></div>
+          <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
         </div>
         <section class="card"><div class="section-title"><h2>Vybavení a neprítomní</h2></div>
           ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Ambulancia</th><th>Čas</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
@@ -567,16 +594,18 @@
     if (defBox) defBox.onchange = () => { lsSet(LS_ROOM, defBox.checked ? String(S.roomId) : null); renderQueue(); };
     document.getElementById('btn-card').onclick = () => addCard();
     document.getElementById('btn-delay').onclick = () => reportDelay();
+    const bn = document.getElementById('btn-nurse');
+    if (bn) bn.onclick = () => askDoctor(false);
     document.getElementById('btn-announce').onclick = () => announce();
     const isDoc = !!S.user.doctorName;
     document.getElementById('btn-doctor').onclick = isDoc ? () => toast('Vaše meno sa na TV nastaví samo pri prvom vyvolaní.', 'ok') : () => askDoctor(false);
     // povinný údaj na začiatku dňa: bez lekára sa okno nedá zavrieť (lekárske konto sa nastaví samo)
     const de = document.getElementById('btn-day-end');
     if (de) de.onclick = () => (st.dayEnd ? reopenDay() : endDay());
-    if (!isDoc && !doctor && !closedHere && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
+    if (!isDoc && (!doctor || !nurseNow) && !closedHere && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
     document.getElementById('show-all').onchange = (e) => { lsSet(LS_ALL, e.target.checked ? '1' : null); renderQueue(); };
     document.getElementById('btn-next').onclick = () => act(
-      () => api('/api/staff/call-next', { body: { roomId: S.roomId } }),
+      () => api('/api/staff/call-next', { body: { roomId: S.roomId, stage: isDocAcc ? 'doctor' : 'nurse' } }),
       (r) => `Vyvolané ${r.ticket.code} – ${r.ticket.roomName}`);
   }
 
@@ -590,6 +619,8 @@
     switch (b.dataset.act) {
       case 'call': return callTicket(t);
       case 'recall': return act(() => api(`/api/staff/tickets/${id}/recall`, { body: {} }), `Vyvolanie ${code} zopakované`);
+      case 'to-doctor': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: {} }), `${code}: ide do čakárne, čaká na lekára`);
+      case 'to-doctor-direct': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: { direct: true } }), `${code}: priamo k lekárovi`);
       case 'done': return act(() => api(`/api/staff/tickets/${id}/done`, { body: {} }), `${code}: Vybavený`);
       case 'absent': return act(() => api(`/api/staff/tickets/${id}/absent`, { body: {} }), `${code}: Neprítomný`);
       case 'requeue': {
@@ -627,9 +658,11 @@
     delete document.getElementById('modal-root').dataset.closed;
     const list = (S.staff.settings.doctorList || []);
     const cur = (S.staff.doctors || {})[S.roomId] || '';
+    const nlist = (S.staff.settings.nurseList || []);
+    const ncur = (S.staff.nurses || {})[S.roomId] || '';
     try {
       const res = await modal({
-        title: required ? `Dobré ráno – kto dnes ordinuje v ambulancii ${roomName(S.roomId)}?` : `Lekár – ${roomName(S.roomId)}`,
+        title: required ? `Dobré ráno – kto dnes slúži v ambulancii ${roomName(S.roomId)}?` : `Sestra a lekár – ${roomName(S.roomId)}`,
         okText: 'Uložiť',
         cancelText: required ? 'Neskôr' : 'Zrušiť',
         body: `<p class="hint">Meno sa ukáže na obrazovke v čakárni pri vyvolaní pacienta. Počas dňa ho môžete kedykoľvek zmeniť tlačidlom s menom lekára.</p>
@@ -637,17 +670,26 @@
             <input id="m-doc" list="m-doc-list" maxlength="60" value="${esc(cur)}" autocomplete="off" placeholder="napr. MUDr. Ján Novák" autofocus>
             <datalist id="m-doc-list">${list.map((n) => `<option value="${esc(n)}">`).join('')}</datalist></div>
           ${list.length ? `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:10px">${list.map((n) => `<button type="button" class="btn btn-sm" data-doc="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
+          <div class="field" style="margin-top:16px"><label for="m-nurse">Sestra (pacient ide najprv k nej – na TV sa pri prvom vyvolaní ukáže jej meno a fotka)</label>
+            <input id="m-nurse" list="m-nurse-list" maxlength="60" value="${esc(ncur)}" autocomplete="off" placeholder="napr. Daniela Fetyková alebo meno zastupujúcej sestry">
+            <datalist id="m-nurse-list">${nlist.map((n) => `<option value="${esc(n)}">`).join('')}</datalist>
+            <span class="hint">Zastupujúca sestra alebo externistka bez fotky sa na TV ukáže s ilustračným obrázkom a označením „Sestra“.</span></div>
+          ${nlist.length ? `<div class="row" style="flex-wrap:wrap;gap:8px;margin-top:10px">${nlist.map((n) => `<button type="button" class="btn btn-sm" data-nurse="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
           <div class="closed-pick"><button type="button" class="btn btn-sm btn-dark" id="m-closed">Dnes v tejto ambulancii neordinuje nikto</button>
             <span class="hint">Ambulancia sa dnes nebude zobrazovať na obrazovke v čakárni ani vo výbere ambulancie.</span></div>`,
         onOk: async (root) => {
           if (root.dataset.closed) { delete root.dataset.closed; return api(`/api/staff/rooms/${S.roomId}/closed`, { body: { closed: true } }); }
           const name = root.querySelector('#m-doc').value.trim();
           if (name.length < 2) throw new Error('Zadajte meno lekára – je to povinný údaj pre dnešný deň.');
-          return api(`/api/staff/rooms/${S.roomId}/doctor`, { body: { name } });
+          const nurse = root.querySelector('#m-nurse').value.trim();
+          if (nurse.length === 1) throw new Error('Zadajte celé meno sestry.');
+          const r = await api(`/api/staff/rooms/${S.roomId}/doctor`, { body: { name } });
+          if (nurse !== ncur) await api(`/api/staff/rooms/${S.roomId}/nurse`, { body: { name: nurse } });
+          return r;
         },
       });
       if (res && res.roomsClosed) toast(`${roomName(S.roomId)}: dnes neordinuje nikto – na TV sa nezobrazuje.`, 'ok');
-      else if (res) toast('Lekár bol uložený.', 'ok');
+      else if (res) toast('Sestra a lekár boli uložení.', 'ok');
       else if (required) toast('Bez zadaného lekára sa na TV ukáže len názov ambulancie.', 'error');
     } finally { S.askingDoctor = false; S.doctorAsked = true; }
   }
@@ -671,6 +713,7 @@
   }
 
   // výber lekára kliknutím na meno v okne
+  document.addEventListener('click', (e) => { const b = e.target.closest('button[data-nurse]'); if (b) { const i = document.getElementById('m-nurse'); if (i) { i.value = b.dataset.nurse; i.focus(); } } });
   document.addEventListener('click', (e) => { const b = e.target.closest('button[data-doc]'); if (b) { const i = document.getElementById('m-doc'); if (i) { i.value = b.dataset.doc; i.focus(); } } });
 
   /** v2.3: mimoriadny oznam – zobrazí sa na TV v čakárni, kým ho niektorá sestra nezruší. */
@@ -807,7 +850,8 @@
   async function callTicket(t) {
     if (!t) return;
     if (!S.roomId) { toast('Vyberte ambulanciu.', 'error'); return; }
-    const waiting = S.staff.tickets.filter((x) => x.status === 'waiting' && (showAll() || mineFilter(x))).sort(byOrder);
+    const st2 = t.stage === 'doctor' ? 'doctor' : 'nurse';
+    const waiting = S.staff.tickets.filter((x) => x.status === 'waiting' && (x.stage || 'nurse') === st2 && (showAll() || mineFilter(x))).sort(st2 === 'doctor' ? byDocOrder : byOrder);
     const outOfOrder = waiting.length && waiting[0].id !== t.id;
     if (!outOfOrder) {
       return act(() => api(`/api/staff/tickets/${t.id}/call`, { body: { roomId: S.roomId } }), (r) => `Vyvolané ${r.ticket.code} – ${r.ticket.roomName}`);
@@ -840,7 +884,7 @@
 
   // ---------- história ----------
   const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Vybavený', absent: 'Neprítomný',
-    requeue: 'Vrátený medzi čakajúcich', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
+    requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
 
   async function renderHistory() {
     $view.innerHTML = '<div class="center-msg">Načítava sa história…</div>';
@@ -903,17 +947,20 @@
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (čaká ešte ${r.waiting})</span></div>
         <div class="stats-kpi"><b>${t.done}</b><span>vybavených · ${t.absent} neprítomných</span></div>
-        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu po sestru</span></div>
         <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgDoctorWait)}</b><span>priemerné čakanie na lekára</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>vyvolaných načas (do 5 min)</span></div>
       </section>
       ${r.rooms.length ? `<section class="card"><h2>Podľa ambulancie</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
         <th>Ambulancia</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
-        <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
+        <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø u sestry</th><th class="num">Ø čakanie na lekára</th><th class="num">Ø u lekára</th><th class="num">Ø celá návšteva</th></tr></thead><tbody>
         ${r.rooms.map((d) => `<tr><td class="doc">${esc(d.name)}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
           <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td>
-          <td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td><td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}
-        </tbody></table></div></section>` : '<section class="card"><div class="empty">Dnes zatiaľ nebol vyvolaný žiadny pacient.</div></section>'}</div>`;
+          <td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td><td class="num">${pct(d.onTime, d.planned)}</td>
+          <td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}
+        </tbody></table></div>
+        <p class="hint">Čakanie a meškanie = po vstup k sestre (čas objednania je čas vstupu k sestre). U sestry = od vyvolania po „K lekárovi“. Čakanie na lekára = od „K lekárovi“ po vyvolanie lekárom (priamo k lekárovi = 0). Celá návšteva = od vstupu k sestre po „Vybavený“.</p></section>` : '<section class="card"><div class="empty">Dnes zatiaľ nebol vyvolaný žiadny pacient.</div></section>'}</div>`;
     document.getElementById('btn-today-refresh').onclick = renderToday;
   }
 
@@ -950,10 +997,10 @@
     out.innerHTML = `<div class="stack">
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (vybavení ${t.done})</span></div>
-        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta<br>(celá ambulancia ${mins(c.avgWait)})</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta na vás<br>(celá ambulancia ${mins(c.avgWait)})</span></div>
         <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu<br>(celá ambulancia ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov vyvolaných načas (do 5 min)</span></div>
-        <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia u vás</span></div>
       </section>
       <section class="card"><h2>Po dňoch</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
         <th>Deň</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
@@ -961,7 +1008,9 @@
         ${r.days.map((d) => `<tr><td class="doc">${esc(fmtDay(d.day))}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
           <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
           <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
-        <p class="hint">Čakanie = od príchodu pacienta po prvé vyvolanie. Meškanie = vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, od príchodu). Vyšetrenie = od vyvolania po „Vybavený“.</p>
+        <p class="hint">Od 17. 11. 2026 ide pacient najprv k sestre a potom k vám. Čakanie = od chvíle, keď ho sestra poslala k lekárovi, po vaše vyvolanie (priamo k lekárovi = 0).
+          Vyšetrenie = od vášho vyvolania po „Vybavený“. Meškanie oproti termínu patrí k vstupu k sestre, preto sa vám pri dvoch krokoch nepripisuje.
+          Staršie dni: čakanie od príchodu po prvé vyvolanie, meškanie oproti plánovanému času.</p>
       </section>
       ${r.comparison && r.comparison.length > 1 ? `<section class="card"><div class="section-title"><h2>Porovnanie s ostatnými lekármi</h2><span class="hint">Anonymne – mená ostatných lekárov nevidíte</span></div>
         <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Poradie</th><th>Lekár</th><th class="num">Pacienti</th><th class="num">Ø čakanie</th>
@@ -984,7 +1033,9 @@
     if (!S.statsTo) S.statsTo = today;
     if (!S.statsFrom) { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - 29); S.statsFrom = isoDay(d); }
     $view.innerHTML = `<div class="stack">
-      <section class="card stack"><div class="section-title"><h2>Štatistiky lekárov</h2><span class="hint">Vidí len správca</span></div>
+      <section class="card stack"><div class="section-title"><h2>Štatistiky</h2><span class="hint">Vidí len správca</span></div>
+        <div class="row" role="group" aria-label="Zobraziť podľa" style="gap:8px;flex-wrap:wrap">${[['doctor', 'Lekári'], ['nurse', 'Sestry'], ['room', 'Ambulancie']].map(([k, l]) =>
+          `<button class="btn btn-sm ${(S.statsGroup || 'doctor') === k ? 'btn-primary' : ''}" type="button" data-group="${k}">${l}</button>`).join('')}</div>
         <form class="stats-filter" id="stats-form">
           <div class="field"><label for="st-from">Od</label><input type="date" id="st-from" value="${esc(S.statsFrom)}" max="${esc(today)}"></div>
           <div class="field"><label for="st-to">Do</label><input type="date" id="st-to" value="${esc(S.statsTo)}" max="${esc(today)}"></div>
@@ -997,13 +1048,15 @@
       <div id="stats-out"><div class="center-msg">Načítavajú sa štatistiky…</div></div></div>`;
     const form = document.getElementById('stats-form');
     form.onsubmit = (e) => { e.preventDefault(); S.statsFrom = val('st-from'); S.statsTo = val('st-to'); renderStats(); };
+    $view.querySelectorAll('[data-group]').forEach((b) => { b.onclick = () => { S.statsGroup = b.dataset.group; renderStats(); }; });
+    const grp = S.statsGroup || 'doctor';
     form.querySelectorAll('[data-range]').forEach((b) => { b.onclick = () => {
       const d = new Date(today + 'T12:00:00');
       if (b.dataset.range === 'month') d.setDate(1); else d.setDate(d.getDate() - Number(b.dataset.range));
       S.statsFrom = isoDay(d); S.statsTo = today; renderStats();
     }; });
     let r;
-    try { r = await api(`/api/admin/stats?from=${encodeURIComponent(S.statsFrom)}&to=${encodeURIComponent(S.statsTo)}`); }
+    try { r = await api(`/api/admin/stats?from=${encodeURIComponent(S.statsFrom)}&to=${encodeURIComponent(S.statsTo)}&groupBy=${grp}`); }
     catch (e) { handleError(e); document.getElementById('stats-out').innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
     const t = r.total;
     const out = document.getElementById('stats-out');
@@ -1013,7 +1066,9 @@
       <td class="num">${mins(d.avgWait)}</td><td class="num">${mins(d.medianWait)}</td>
       <td class="num">${d.planned}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
       <td class="num">${pct(d.onTime, d.planned)}</td><td class="num ${d.late15 ? 'bad' : ''}">${d.planned ? d.late15 : '–'}</td>
-      <td class="num">${mins(d.avgExam)}</td></tr>`;
+      <td class="num">${mins(d.avgExam)}</td>${grp === 'room' ? `<td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td>` : ''}</tr>`;
+    const G = { doctor: { who: 'Lekár', wait: 'Ø čakanie na lekára', exam: 'Ø u lekára' }, nurse: { who: 'Sestra', wait: 'Ø čakanie', exam: 'Ø u sestry' },
+      room: { who: 'Ambulancia', wait: 'Ø čakanie', exam: 'Ø celá návšteva' } }[grp];
     out.innerHTML = `<div class="stack">
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov</span></div>
@@ -1023,12 +1078,14 @@
         <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
       </section>
       <section class="card"><div class="stats-scroll"><table class="stats-table"><thead><tr>
-        <th>Lekár</th><th class="num">Dni</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th>
-        <th class="num">Ø čakanie</th><th class="num">Medián čak.</th>
+        <th>${G.who}</th><th class="num">Dni</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th>
+        <th class="num">${G.wait}</th><th class="num">Medián čak.</th>
         <th class="num">S plán. časom</th><th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Mešk. &gt; 15 min</th>
-        <th class="num">Ø vyšetrenie</th></tr></thead>
+        <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}</tr></thead>
         <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
-        <p class="hint">Čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
+        <p class="hint">${r.twoStepSince ? `Od ${esc(fmtDay(r.twoStepSince))} má návšteva dva kroky – najprv sestra (čas objednania = vstup k sestre), potom lekár.
+          Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho; meškanie oproti termínu a čakanie od príchodu patria sestre a ambulancii.
+          Pacient vybavený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
           Vyšetrenie = od vyvolania po „Vybavený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
           ${r.doctorDataSince ? `Lekári sa ukladajú od ${esc(fmtDay(r.doctorDataSince))}; staršie vyvolania sú v riadku „Lekár nebol zadaný“.` : 'Pri vyvolaniach zatiaľ nebol zadaný lekár – nastavte ho v Zozname tlačidlom Lekár.'}</p>
       </section></div>`;
@@ -1112,6 +1169,8 @@
           <span class="hint">Väčšina TV prehrávačov vloženie do cudzej stránky nepovoľuje – pozri návod k obrazovke.</span></div>
         <div class="field"><label for="tv-doctors">Lekári na výber (jeden na riadok) – sestra vyberie, kto dnes ordinuje</label>
           <textarea id="tv-doctors" rows="5">${esc((s.doctorList || []).join('\n'))}</textarea></div>
+        <div class="field"><label for="tv-nurses">Sestry na výber (jedna na riadok) – fotka sa hľadá podľa priezviska v assets/doctors, inak ilustrácia „Sestra“</label>
+          <textarea id="tv-nurses" rows="4">${esc((s.nurseList || []).join('\n'))}</textarea></div>
         <h3>Hlavička a informácie pre pacientov</h3>
         <div class="form-grid">
           <div class="field"><label for="sc-title">Nadpis</label><input type="text" id="sc-title" maxlength="60" value="${esc(s.screen.title)}"></div>
@@ -1226,7 +1285,7 @@
         if (p.length >= 3) return { name: p[0], tag: p[1], url: p.slice(2).join('|') };
         return p.length === 2 ? { name: p[0], url: p[1] } : { name: l, url: l };
       });
-      saveSettings({ doctorList: val('tv-doctors').split('\n').map((l) => l.trim()).filter(Boolean), queueCount: Number(val('tv-queue')), onTimeMinutes: Number(val('tv-tol')), tvSource: val('tv-src'),
+      saveSettings({ doctorList: val('tv-doctors').split('\n').map((l) => l.trim()).filter(Boolean), nurseList: val('tv-nurses').split('\n').map((l) => l.trim()).filter(Boolean), queueCount: Number(val('tv-queue')), onTimeMinutes: Number(val('tv-tol')), tvSource: val('tv-src'),
         voice: { enabled: chk('vo-on'), room: chk('vo-room'), rate: Number(val('vo-rate')), style: val('vo-style') },
         screen: { title: val('sc-title'), address: val('sc-addr'), phone: val('sc-phone'), tvLabel: val('sc-tvlabel'), theme: val('sc-theme'),
           info: val('sc-info').split('\n').map((l) => l.trim()).filter(Boolean),
