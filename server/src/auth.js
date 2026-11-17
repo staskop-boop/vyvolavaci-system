@@ -180,6 +180,8 @@ class Auth {
   updateUser(id, b, actingUserId) {
     const u = this.db.prepare('SELECT * FROM users WHERE id = ?').get(Number(id));
     if (!u) return { error: 'Konto neexistuje.', status: 404 };
+    // heslo overiť skôr, než sa čokoľvek uloží – inak sa uložila len časť zmien a heslo nie
+    if (b.password) { const pe = validatePassword(b.password); if (pe) return { error: pe }; }
     let doctorName = u.doctor_name || null;
     if ('doctorName' in b) { const dn = this.doctorOk(b.doctorName); if (dn.error) return dn; doctorName = dn.doctorName; }
     let role = b.role != null ? (b.role === 'admin' ? 'admin' : 'staff') : u.role;
@@ -192,7 +194,6 @@ class Auth {
     if (!active && u.id === actingUserId) return { error: 'Vlastné konto nemôžete vypnúť.' };
     this.db.prepare('UPDATE users SET role = ?, active = ?, room_id = ?, doctor_name = ? WHERE id = ?').run(role, active, roomId, doctorName, u.id);
     if (b.password) {
-      const pe = validatePassword(b.password); if (pe) return { error: pe };
       this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(b.password), u.id);
     }
     if (b.password || !active || role !== u.role || doctorName !== (u.doctor_name || null)) this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);

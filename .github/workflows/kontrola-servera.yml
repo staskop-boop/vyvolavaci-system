@@ -25,6 +25,10 @@ jobs:
           done
           echo "app.js bez cache: $(curl -fsS -m 20 "https://vyvolavaci.adna.sk/sestra/app.js?t=$(date +%s)" | grep -c moveTicket)"
           echo "app.js v repozitári: $(grep -c moveTicket apps/sestra/web/app.js 2>/dev/null || echo '?')"
+          echo "Hlasitosť vyvolania (PR #37): $(echo "$S" | jq -c '.soundVolume')"
+          echo "Oprava prihlásenia (PR #38): $(echo "$SESTRA" | grep -c "prihlasujete sa ako")"
+          # jeden chybný pokus z IP GitHubu – blokácia je po novom len pre konto + IP, prihlásenie v ambulancii neovplyvní
+          echo "Konto czetoova (pokus so zlým heslom): $(curl -sS -m 20 -H 'Content-Type: application/json' -d '{"username":"Czetöová","password":"kontrola-zle-heslo"}' https://vyvolavaci.adna.sk/api/auth/login)"
           if echo "$S" | jq -e '.rooms[0] | has("calledToday")' >/dev/null && echo "$SESTRA" | grep -q "m-ann-clear"; then
             echo "Server slúži aktuálnu verziu obrazovky."
           else
