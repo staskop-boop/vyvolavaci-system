@@ -629,7 +629,8 @@
   /** v2.3: mimoriadny oznam – zobrazí sa na TV v čakárni, kým ho niektorá sestra nezruší. */
   async function announce() {
     const cur = S.staff.announcement;
-    const presets = ['Z technických príčin sa ordinovanie oneskoruje. Ďakujeme za pochopenie.',
+    const presets = ['V oboch ambulanciách práve prebiehajú zákroky, preto sa vyšetrenia mierne oneskoria. Ďakujeme za pochopenie.',
+      'Z technických príčin sa ordinovanie oneskoruje. Ďakujeme za pochopenie.',
       'Dnes ordinujeme len do 12:00. Ďakujeme za pochopenie.', 'Prosíme pacientov, aby si pripravili kartičku poistenca.',
       'Lekár bol odvolaný k akútnemu pacientovi. Vrátime sa čo najskôr.'];
     const res = await modal({
