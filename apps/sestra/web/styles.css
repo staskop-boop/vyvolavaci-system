@@ -83,7 +83,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 
 /* ---------- prehľad (dashboard) ---------- */
 .dash { display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas: "room room" "counts counts" "hero now" "queues queues" "finished finished"; }
+  grid-template-areas: "room room" "counts counts" "hero hero" "now now" "queues queues" "finished finished"; }
 .dash > .a-room { grid-area: room; }
 .dash > .a-alerts { grid-area: alerts; } .dash > .a-hero { grid-area: hero; } .dash > .a-now { grid-area: now; }
 .dash > .a-waiting { grid-area: waiting; } .dash > .a-side { grid-area: side; }
@@ -392,14 +392,12 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .a-queues #tbl-waiting td.code { font-size: 26px; }
 
 /* 2026-11-18 (Pali): „Práve v ambulancii“ rozdelené na „U sestry“ a „U lekára“; po lekárovi ide pacient k sestre na ukončenie */
-#tbl-called tr.grp-head, #tbl-called tr.grp-empty { display: block; padding: 0; margin: 14px 0 0; border: 0; background: none; }
-#tbl-called tbody.grp:first-of-type tr.grp-head { margin-top: 0; }
-#tbl-called tr.grp-head td { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
-#tbl-called tbody.g-nurse .grp-title { color: #0b5d3b; } #tbl-called tbody.g-doctor .grp-title { color: var(--black); }
-#tbl-called .grp-n { min-width: 24px; text-align: center; border-radius: 999px; padding: 1px 8px; font-size: 13px; letter-spacing: 0; background: #dff3e8; color: #0b5d3b; }
-#tbl-called tbody.g-doctor .grp-n { background: #111; color: #fff; }
-#tbl-called tr.grp-empty td { color: var(--grey); font-size: 14px; padding: 6px 2px 0; }
-#tbl-called tbody.g-nurse tr[data-ticket] { border-color: #bfe3cf; background: #f1faf5; }
-#tbl-called tbody.g-nurse tr[data-ticket] td.code { background: #0b5d3b; }
-#tbl-called tbody.g-doctor tr[data-ticket] td.code { background: #111; }
+.now-pair { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+@media (max-width: 1180px) { .now-pair { grid-template-columns: minmax(0, 1fr); } }
+.now-pair > .card { min-width: 0; } .now-pair table { display: block; width: 100%; }
+.now-pair .now-nurse h2 { color: #0b5d3b; } .now-pair .now-nurse .live-dot { background: #0b5d3b; }
+.now-pair .now-doctor h2 { color: var(--black); } .now-pair .now-doctor .live-dot { background: #111; }
+.now-pair .now-nurse tr[data-ticket] { border-color: #bfe3cf; background: #f1faf5; }
+.now-pair .now-nurse td.code { background: #0b5d3b !important; }
+.now-pair .now-doctor td.code { background: #111 !important; }
 .stage-pill.fin { box-shadow: inset 0 0 0 1.5px #0b5d3b; }
