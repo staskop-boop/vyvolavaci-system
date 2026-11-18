@@ -430,3 +430,6 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .pohlad-doctor .now-pair, .pohlad-nurse .now-pair, .pohlad-doctor .a-queues, .pohlad-nurse .a-queues { grid-template-columns: minmax(0, 1fr) !important; }
 @media (max-width: 640px) { .viewbar { justify-self: stretch; border-radius: 14px; } .viewbar .vb-lbl { width: 100%; padding: 2px 6px; }
   .viewbar .vb-btn { flex: 1 1 0; padding: 9px 8px; font-size: 14px; } }
+/* dlhý typ pacienta v rade nesmie rozšíriť tabuľku za okraj okna */
+.a-queues td.t-room .ident-pill { max-width: 100%; }
+.a-queues td.t-room { max-width: 16ch; }
