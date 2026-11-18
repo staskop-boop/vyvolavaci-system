@@ -394,7 +394,7 @@
    */
   function identPill(t) {
     if (!t) return '';
-    return (t.patientType ? `<span class="type-pill" title="Typ pacienta – na obrazovke v čakárni sa neukáže">${esc(t.patientType)}</span>` : '')
+    return (t.patientType ? `<span class="type-pill${/^Vstupn/.test(t.patientType) ? ' entry' : ''}" title="Typ pacienta – na obrazovke v čakárni sa neukáže">${esc(t.patientType)}</span>` : '')
       + (t.patientType && t.staffNote ? ' ' : '')
       + (t.staffNote ? `<span class="ident-pill" title="Identifikátor – vidí len personál, na obrazovke v čakárni sa neukáže">🏷 ${esc(t.staffNote)}</span>` : '');
   }
@@ -488,11 +488,12 @@
       ${active.map((r) => `<option value="${r.id}" ${r.id === t.homeRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="" ${t.homeRoomId ? '' : 'selected'}>Ktorákoľvek</option></select>`;
     const docRows = waitingDoc.map((t, i) => `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : (t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
-      <td class="nw">${esc(fmtTime(t.toDoctorAt))}</td><td class="nw">${esc(fmtWait(t.toDoctorAt || t.createdAt, now))}</td>
+      <td class="nw t-plan">${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</td>
+      <td class="nw t-times"><span class="tl"><i>u sestry</i> ${t.nurseCalledAt ? `<b>${esc(fmtTime(t.nurseCalledAt))}</b>` : '<span class="hint" title="Pacient nebol u sestry">—</span>'}</span><span class="tl"><i>k lekárovi</i> <b>${esc(fmtTime(t.toDoctorAt))}</b></span></td><td class="nw">${esc(fmtWait(t.toDoctorAt || t.createdAt, now))}</td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
-        ${nurse ? `<button class="btn btn-sm needs-online" data-act="to-nurse" data-id="${t.id}" ${dis} title="Pacient sa vráti do radu k sestre (tabuľka Čakajúci)">← Späť k sestre</button>
+        ${nurse ? `<button class="btn btn-sm needs-online" data-act="to-nurse" data-id="${t.id}" ${dis} title="Pacient sa vráti do radu k sestre (tabuľka Čakajú na sestru)">← Späť k sestre</button>
         <button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, ambulanciu, typ alebo to, ku komu pacient ide">✎ Upraviť</button>` : ''}
       </div></td></tr>`).join('');
 
@@ -535,13 +536,13 @@
     }
 
     function nurseSection() {
-      return `<div><div class="section-title"><h2>${isDocAcc ? 'Čakajú na sestru' : 'Čakajúci'} (${waitingNurse.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
+      return `<div><div class="section-title"><h2>Čakajú na sestru (${waitingNurse.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
         ${waitingNurse.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
           : '<div class="empty">Nikto nečaká.</div>'}</div>`;
     }
     function docSection() {
       return `<div><div class="section-title"><h2>Čakajú na lekára (${waitingDoc.length})</h2><span class="hint">po sestre alebo rovno k lekárovi</span></div>
-        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>V rade od</th><th>Čaká</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
+        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th title="Čas, na ktorý bol pacient objednaný">Termín</th><th title="Kedy pacienta vyvolala sestra a odkedy čaká na lekára">Vyvolaný</th><th>Čaká</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
           : `<div class="empty">${isDocAcc ? 'Sestra k vám zatiaľ nikoho neposlala.' : 'Nikto nečaká na lekára.'}</div>`}</div>`;
     }
 

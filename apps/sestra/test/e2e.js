@@ -277,6 +277,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await A.click('#btn-card');
     await A.fill('#m-card', 'L5'); await A.fill('#m-time', '10:40');
     assert.equal(await A.inputValue('#m-stage'), 'nurse', 'predvolene ide k sestre');
+    await A.selectOption('#m-type', 'Vstupné vyšetrenie varixy');
     await A.selectOption('#m-stage', 'doctor');
     await A.click('#m-ok');
     await toastWith(A, /L5 zaradený/);
@@ -293,6 +294,11 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-doctor', 'L5').locator('select.room-sel').selectOption('');
     await toastWith(A, /L5: ktorákoľvek ambulancia/);
     await A.waitForFunction(() => { const r = [...document.querySelectorAll('#tbl-doctor tr')].find((x) => x.textContent.includes('L5')); return r && r.querySelector('select.room-sel').value === '' && r.querySelector('select.room-sel').classList.contains('any'); });
+    assert.match(await row(A, 'tbl-doctor', 'L5').locator('td.t-plan').innerText(), /10:40/, 'v rade k lekárovi je termín');
+    assert.match(await A.locator('#tbl-doctor thead').innerText(), /TERMÍN|Termín/);
+    assert.ok(await A.getByRole('heading', { name: /Čakajú na sestru/ }).count(), 'nadpis radu k sestre');
+    assert.ok(await row(A, 'tbl-doctor', 'L5').locator('.type-pill.entry', { hasText: 'Vstupné vyšetrenie varixy' }).count(), 'vstupné vyšetrenie je zelené');
+    assert.equal(await A.locator('.type-pill.entry', { hasText: 'Kontrola' }).count(), 0, 'kontroly ostávajú žlté');
     await shot(A, '13-rychla-zmena-ambulancie');
     await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Neprítomný' }).click();
     await row(A, 'tbl-doctor', 'L5').waitFor({ state: 'detached' });

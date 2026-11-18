@@ -471,13 +471,14 @@ class Store extends EventEmitter {
       plannedAt: t.planned_at ?? null, source: t.source || 'kiosk',
       homeRoomId: t.home_room_id ?? null, homeRoomName: t.home_room_name ?? null,
       stage: t.stage || 'nurse', toDoctorAt: t.to_doctor_at ?? null,
+      nurseCalledAt: t.nurse_called_at ?? null, // 2026-11-18: kedy pacienta (prvýkrát) vyvolala sestra – zobrazuje sa v rade k lekárovi
       print: { status: t.print_status, message: t.print_message, attempts: t.print_attempts, printedAt: t.printed_at },
     };
     if (withNote) { out.staffNote = t.staff_note ?? null; out.patientType = t.patient_type ?? null; }
     return out;
   }
   getTicketRow(id) {
-    return this.db.prepare('SELECT t.*, r.name AS room_name, h.name AS home_room_name FROM tickets t LEFT JOIN rooms r ON r.id = t.room_id LEFT JOIN rooms h ON h.id = t.home_room_id WHERE t.id = ?').get(Number(id));
+    return this.db.prepare(`SELECT t.*, r.name AS room_name, h.name AS home_room_name, (SELECT MIN(e.at) FROM ticket_events e WHERE e.ticket_id = t.id AND e.type = 'call' AND (e.stage = 'nurse' OR e.stage IS NULL)) AS nurse_called_at FROM tickets t LEFT JOIN rooms r ON r.id = t.room_id LEFT JOIN rooms h ON h.id = t.home_room_id WHERE t.id = ?`).get(Number(id));
   }
   getTicket(id, withNote = false) { return this.rowToTicket(this.getTicketRow(id), withNote); }
 
@@ -970,7 +971,7 @@ class Store extends EventEmitter {
   }
 
   listTickets(day, withNote = false) {
-    return this.db.prepare('SELECT t.*, r.name AS room_name, h.name AS home_room_name FROM tickets t LEFT JOIN rooms r ON r.id = t.room_id LEFT JOIN rooms h ON h.id = t.home_room_id WHERE t.day = ? ORDER BY t.seq')
+    return this.db.prepare(`SELECT t.*, r.name AS room_name, h.name AS home_room_name, (SELECT MIN(e.at) FROM ticket_events e WHERE e.ticket_id = t.id AND e.type = 'call' AND (e.stage = 'nurse' OR e.stage IS NULL)) AS nurse_called_at FROM tickets t LEFT JOIN rooms r ON r.id = t.room_id LEFT JOIN rooms h ON h.id = t.home_room_id WHERE t.day = ? ORDER BY t.seq`)
       .all(day).map((t) => this.rowToTicket(t, withNote));
   }
 
