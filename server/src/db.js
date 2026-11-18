@@ -97,6 +97,8 @@ function migrate(db) {
   // 2026-11-17 (Pali): dva kroky – pacient ide najprv k sestre (plánovaný čas = vstup k sestre), potom ho volá lekár.
   // stage = 'nurse' (čaká na sestru / je u sestry) | 'doctor' (čaká na lekára / je u lekára); to_doctor_at = kedy ho sestra poslala k lekárovi
   if (!cols.includes('stage')) db.exec("ALTER TABLE tickets ADD COLUMN stage TEXT NOT NULL DEFAULT 'nurse'");
+  // 2026-11-18: stage 'final' = po lekárovi späť u sestry na ukončenie (platba, papiere); final_at = kedy ho lekár poslal
+  if (!cols.includes('final_at')) db.exec('ALTER TABLE tickets ADD COLUMN final_at TEXT');
   if (!cols.includes('to_doctor_at')) db.exec('ALTER TABLE tickets ADD COLUMN to_doctor_at TEXT');
   if (!cols.includes('home_room_id')) db.exec('ALTER TABLE tickets ADD COLUMN home_room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');
   // v2.2: smer k ambulancii zo stredu čakárne (šípka na TV): right | left | straight | ''

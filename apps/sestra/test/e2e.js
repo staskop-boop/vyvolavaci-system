@@ -395,9 +395,30 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-called', tn).locator('.stage-pill', { hasText: 'u lekára' }).waitFor();
     d = await display();
     assert.equal(d.current.code, tn); assert.equal(d.current.stage, 'doctor'); assert.equal(d.current.doctorName, 'MUDr. Pavel Staško');
-    await row(A, 'tbl-called', tn).getByRole('button', { name: /Vybavený/ }).click();
+    // po lekárovi späť k sestre na ukončenie – „Práve v ambulancii“ je rozdelené na „U sestry“ a „U lekára“
+    const grpRow = (g) => A.locator(`#tbl-called tbody.${g} tr[data-ticket]`, { hasText: tn });
+    await grpRow('g-doctor').waitFor();
+    assert.match(await A.locator('#tbl-called tbody.g-nurse .grp-head').innerText(), /U SESTRY/i);
+    const tn2 = (await kiosk()).ticket.code;
+    await row(A, 'tbl-waiting', tn2).getByRole('button', { name: /^Vyvolať/ }).click();
+    if (await A.locator('#m-ok').count()) await A.click('#m-ok');
+    await A.locator('#tbl-called tbody.g-nurse tr[data-ticket]', { hasText: tn2 }).waitFor();
+    await shot(A, '20-u-sestry-a-u-lekara');
+    await grpRow('g-doctor').getByRole('button', { name: '→ K sestre na ukončenie' }).click();
+    await toastWith(A, /k sestre na ukončenie/);
+    await grpRow('g-nurse').locator('.stage-pill', { hasText: 'ukončenie' }).waitFor();
+    assert.equal(await grpRow('g-doctor').count(), 0);
+    await grpRow('g-nurse').getByRole('button', { name: '← Späť k lekárovi' }).click();
+    await grpRow('g-doctor').waitFor();
+    await grpRow('g-doctor').getByRole('button', { name: '→ K sestre na ukončenie' }).click();
+    await grpRow('g-nurse').locator('.stage-pill', { hasText: 'ukončenie' }).waitFor();
+    await shot(A, '21-ukoncenie-u-sestry');
+    assert.equal(await A.evaluate(() => { const c = document.querySelector('.a-now') || document.querySelector('#tbl-called').closest('.card'); return c.scrollWidth - c.clientWidth; }), 0, 'karta Práve v ambulancii nepretŕča');
+    await grpRow('g-nurse').getByRole('button', { name: /Vybavený/ }).click();
     await row(A, 'tbl-finished', tn).waitFor();
-    ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi');
+    await row(A, 'tbl-called', tn2).getByRole('button', { name: /Vybavený/ }).click();
+    await row(A, 'tbl-finished', tn2).waitFor();
+    ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi, „K sestre na ukončenie“ a „Vybavený“ u sestry');
 
     // 11c. hromadné kontá nastavia heslo aj kontám lekárov, ktoré vznikli bez hesla
     await A.click('.tab[data-view=admin]');

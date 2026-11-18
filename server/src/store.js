@@ -470,7 +470,7 @@ class Store extends EventEmitter {
       roomId: t.room_id, roomName: t.room_name ?? null, version: t.version,
       plannedAt: t.planned_at ?? null, source: t.source || 'kiosk',
       homeRoomId: t.home_room_id ?? null, homeRoomName: t.home_room_name ?? null,
-      stage: t.stage || 'nurse', toDoctorAt: t.to_doctor_at ?? null,
+      stage: t.stage || 'nurse', toDoctorAt: t.to_doctor_at ?? null, finalAt: t.final_at ?? null,
       nurseCalledAt: t.nurse_called_at ?? null, // 2026-11-18: kedy pacienta (prvýkrát) vyvolala sestra – zobrazuje sa v rade k lekárovi
       print: { status: t.print_status, message: t.print_message, attempts: t.print_attempts, printedAt: t.printed_at },
     };
@@ -757,7 +757,7 @@ class Store extends EventEmitter {
    */
   callPerson(roomId, ev) {
     const d = this.roomDisplay(roomId);
-    const stage = ev && ev.stage === 'nurse' ? 'nurse' : 'doctor';
+    const stage = ev && (ev.stage === 'nurse' || ev.stage === 'final') ? 'nurse' : 'doctor';
     return { direction: d.direction, stage,
       doctorName: stage === 'doctor' ? (ev && ev.doctor) || d.doctorName : null,
       nurseName: stage === 'nurse' ? (ev && ev.nurse) || d.nurseName : null };
@@ -829,6 +829,7 @@ class Store extends EventEmitter {
       this.requireToday(row);
       if (row.status !== 'called' || (row.stage || 'nurse') !== 'nurse') {
         if (row.stage === 'doctor') throw conflict(`Číslo ${row.code} už je u lekára alebo naňho čaká.`);
+        if (row.stage === 'final') throw conflict(`Číslo ${row.code} už bolo u lekára a je u sestry na ukončenie.`);
         throw conflict(`Číslo ${row.code} nie je u sestry (stav „${STATUS_TEXT[row.status]}“) – k lekárovi ho pošlete po vyvolaní.`);
       }
       const now = clock.nowIso();
@@ -841,6 +842,41 @@ class Store extends EventEmitter {
           room_id = NULL, called_at = NULL, version = version + 1 WHERE id = ?`).run(now, row.id);
         this.insertCallEvent('to_doctor', row.id, now, row.room_id, userId, null, 'nurse');
       }
+      return row.id;
+    });
+    this.changed('tickets');
+    return { ticket: this.getTicket(id) };
+  }
+
+  /**
+   * 2026-11-18 (Pali): lekár po vyšetrení pošle pacienta späť k sestre na ukončenie (platba, papiere).
+   * Pacient ostáva „vyvolaný“ (je v ambulancii), TV nič nehlási; „Vybavený“ potvrdí až sestra.
+   */
+  sendToFinal(ticketId, userId) {
+    const id = tx(this.db, () => {
+      const row = this.getTicketRow(ticketId);
+      this.requireToday(row);
+      if (row.status !== 'called' || row.stage !== 'doctor') {
+        if (row.stage === 'final' && row.status === 'called') throw conflict(`Číslo ${row.code} už je u sestry na ukončenie.`);
+        throw conflict(`Číslo ${row.code} nie je u lekára – k sestre na ukončenie ho pošlete po vyvolaní lekárom.`);
+      }
+      const now = clock.nowIso();
+      this.db.prepare("UPDATE tickets SET stage = 'final', final_at = ?, version = version + 1 WHERE id = ?").run(now, row.id);
+      this.insertCallEvent('to_final', row.id, now, row.room_id, userId, null, 'final');
+      return row.id;
+    });
+    this.changed('tickets');
+    return { ticket: this.getTicket(id) };
+  }
+  /** Omyl: pacient z „ukončenia u sestry“ späť k lekárovi (ostáva vyvolaný). */
+  backToDoctor(ticketId, userId) {
+    const id = tx(this.db, () => {
+      const row = this.getTicketRow(ticketId);
+      this.requireToday(row);
+      if (row.status !== 'called' || row.stage !== 'final') throw conflict(`Číslo ${row.code} nie je u sestry na ukončenie.`);
+      const now = clock.nowIso();
+      this.db.prepare("UPDATE tickets SET stage = 'doctor', final_at = NULL, version = version + 1 WHERE id = ?").run(row.id);
+      this.insertCallEvent('final_back', row.id, now, row.room_id, userId, null, 'doctor');
       return row.id;
     });
     this.changed('tickets');
@@ -891,7 +927,7 @@ class Store extends EventEmitter {
       }
       const now = clock.nowIso();
       const finished = to === 'done' || to === 'absent' ? now : null;
-      const extra = to === 'waiting' ? ', room_id = NULL, called_at = NULL' : '';
+      const extra = to === 'waiting' ? `, room_id = NULL, called_at = NULL${row.stage === 'final' ? ", stage = 'doctor', final_at = NULL" : ''}` : '';
       const u = this.db.prepare(`UPDATE tickets SET status = ?, finished_at = ?, version = version + 1${extra} WHERE id = ? AND status = ?`).run(to, finished, row.id, row.status);
       if (u.changes === 0) throw conflict(this.conflictMessage(row));
       this.db.prepare('INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id) VALUES (?, ?, ?, ?, ?)').run(row.id, evType, now, row.room_id, userId ?? null);
@@ -1008,7 +1044,7 @@ class Store extends EventEmitter {
     const clinicDelayMinutes = last ? callDelay(last) : 0;
     // v2.1: sklz každého pracoviska zvlášť – podľa jeho posledného vyvolania a hlásenia sestry
     const closed = this.roomsClosedToday();
-    const stageOf = (id) => (this.db.prepare('SELECT stage FROM tickets WHERE id = ?').get(id) || {}).stage || 'nurse';
+    const stageOf = (id) => { const st = (this.db.prepare('SELECT stage FROM tickets WHERE id = ?').get(id) || {}).stage || 'nurse'; return st === 'final' ? 'nurse' : st; };   // ukončenie = pacient je u sestry
     const rooms = this.listRooms({ activeOnly: true }).map((r) => {
       const lr = this.db.prepare(`SELECT e.at, t.planned_at, t.created_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
         WHERE t.day = ? AND e.type = 'call' AND COALESCE(e.stage, 'nurse') = 'nurse' AND e.room_id = ? AND t.planned_at IS NOT NULL ORDER BY e.id DESC LIMIT 1`).get(day, r.id);
@@ -1103,13 +1139,19 @@ class Store extends EventEmitter {
     const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at, to_doctor_at FROM tickets
       WHERE day BETWEEN ? AND ? AND call_count > 0`).all(from, to);
     const evs = this.db.prepare(`SELECT e.ticket_id, e.type, e.at, e.doctor, e.nurse, e.stage, e.note, r.name AS room FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
-      LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse') ORDER BY e.id`).all(from, to);
+      LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse','to_final','final_back') ORDER BY e.id`).all(from, to);
     const byT = new Map();
     for (const e of evs) {
       const x = byT.get(e.ticket_id) || { first: null, lastCall: null, doctor: null, nurse: null, room: null, twoStep: false,
-        nurseCall: null, sent: null, direct: false, doctorStart: null };
+        nurseCall: null, sent: null, direct: false, doctorStart: null, final: null };
       if (e.stage) x.twoStep = true;
-      if (e.type === 'to_nurse') {
+      if (e.type === 'to_final') {
+        x.final = e.at;   // lekár skončil, pacient ide k sestre na ukončenie – čas u lekára sa počíta potiaľto
+      } else if (e.type === 'final_back') {
+        x.final = null;
+      } else if (e.stage === 'final') {
+        // zopakované vyvolanie počas ukončenia u sestry – do časov sestry ani lekára nevstupuje
+      } else if (e.type === 'to_nurse') {
         x.sent = null;   // sestra voľbu „k lekárovi“ vrátila späť – čakanie na lekára sa od nej nepočíta
       } else if (e.type === 'to_doctor') {
         x.sent = e.at;
@@ -1155,7 +1197,7 @@ class Store extends EventEmitter {
         if (two && x.direct) s.direct++;
         if (two && x.doctorStart) {
           const dw = x.direct ? 0 : x.sent ? min(x.doctorStart, x.sent) : null; if (dw != null && ok(dw)) s.doctorWaits.push(dw);
-          if (t.status === 'done' && t.finished_at) { const dt = min(t.finished_at, x.doctorStart); if (ok(dt)) s.doctorTimes.push(dt); }
+          { const end = x.final || (t.status === 'done' ? t.finished_at : null); if (end) { const dt = min(end, x.doctorStart); if (ok(dt)) s.doctorTimes.push(dt); } }
         }
         const doctorView = groupBy === 'doctor' && two;
         // čakanie: lekár = na lekára, ostatní = od príchodu po vstup k sestre
@@ -1169,6 +1211,7 @@ class Store extends EventEmitter {
         }
         // trvanie: lekár = u lekára, sestra = u sestry, ambulancia = celá návšteva od vstupu k sestre
         if (groupBy === 'nurse') { if (two && x.nurseCall && (x.sent || t.status === 'done')) { const nt = min(x.sent || t.finished_at, x.nurseCall); if (ok(nt)) s.exams.push(nt); } }
+        else if (doctorView && x.final) { const ex = min(x.final, x.doctorStart); if (ok(ex)) s.exams.push(ex); }
         else if (t.status === 'done' && t.finished_at) {
           const start = doctorView ? x.doctorStart : two ? visitStart : x.lastCall;
           if (start) { const ex = min(t.finished_at, start); if (ok(ex)) s.exams.push(ex); }

@@ -151,6 +151,9 @@ function createServer(opts = {}) {
   app.post('/api/staff/call-next', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId),
     res.json(store.callNext(req.body?.roomId, req.user.id, req.user.doctorName ? 'doctor' : req.body?.stage === 'doctor' ? 'doctor' : 'nurse'))));
   // 2026-11-17: sestra pošle pacienta k lekárovi – von do čakárne (rad lekára) alebo priamo, bez čakania
+  // 2026-11-18: lekár (alebo sestra) pošle pacienta od lekára k sestre na ukončenie; späť k lekárovi pri omyle
+  app.post('/api/staff/tickets/:id/to-final', requireStaff, (req, res) => res.json(store.sendToFinal(id(req), req.user.id)));
+  app.post('/api/staff/tickets/:id/back-to-doctor', requireStaff, (req, res) => res.json(store.backToDoctor(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/to-doctor', requireNurse, (req, res) => res.json(store.sendToDoctor(id(req), req.user.id, !!req.body?.direct)));
   app.post('/api/staff/tickets/:id/recall', requireStaff, (req, res) => res.json(store.recall(id(req), req.body?.roomId, req.user.id)));
   app.post('/api/staff/tickets/:id/done', requireStaff, (req, res) => res.json(store.done(id(req), req.user.id)));
