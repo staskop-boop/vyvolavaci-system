@@ -407,7 +407,7 @@
     el.rcCount.textContent = rooms.length === 1 ? '1 ambulancia' : `${rooms.length} ambulancie`;
     el.roomRows.innerHTML = rooms.map((r) => {
       const c = roomColor(r.id), door = doorText(r), late = longDelay(r, s);
-      // 2026-11-18 (Pali): interné pohyby sa v čakárni neukazujú – zoznam „Na lekára čakajú“ je preč a po vyvolaní k lekárovi
+      // 2026-11-18 (Pali): interné pohyby sa v čakárni neukazujú (zoznam „Na lekára čakajú“ na Paliho želanie ostáva) – po vyvolaní k lekárovi
       // ostáva lekár aj vtedy, keď pacient ide späť k sestre na ukončenie (server vtedy posiela currentStage = doctor)
       // 2026-11-17: pacient u sestry → avatar sestry (bez fotky ilustrácia), inak lekár ako doteraz
       const atNurse = r.current && r.currentStage === 'nurse';
@@ -423,6 +423,7 @@
         </div>
         ${avatar}
         ${late ? `<div class="r-late">${esc(late)}</div>` : ''}
+        ${!compact && r.doctorQueue && r.doctorQueue.length ? `<div class="r-dq"><span>Na lekára čakajú</span>${r.doctorQueue.slice(0, 6).map((c) => `<b>${esc(c)}</b>`).join('')}${r.doctorQueue.length > 6 ? `<span>+${r.doctorQueue.length - 6}</span>` : ''}</div>` : ''}
       </div>`;
     }).join('');
     // dlhší názov ambulancie sa radšej zmenší, než aby sa zalomil alebo orezal

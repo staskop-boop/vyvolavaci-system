@@ -264,7 +264,7 @@ Pacient ide najprv k sestre (plánovaný čas = čas vstupu k sestre), sestra ho
 * `POST /api/staff/tickets/:id/to-doctor {direct}` (len sestra) – pacient u sestry: `direct: false` → späť do čakárne, rad lekára tej istej ambulancie;
   `direct: true` → ide k lekárovi hneď, ostáva vyvolaný, TV nič nehlási. Udalosť `to_doctor` (pri priamom s poznámkou `priamo`).
 * TV: `call`/`current`/`recent[]` majú `stage` a `nurseName` (pri sestre) alebo `doctorName` (pri lekárovi). `queue[]` obsahuje len rad k sestre;
-  `rooms[]` má `nurseName`, `doctorQueue` (čísla čakajúce na lekára – TV ich od 18. 11. 2026 nezobrazuje), `currentStage` (pri ukončení u sestry ostáva `doctor`); `doctorQueueCount`.
+  `rooms[]` má `nurseName`, `doctorQueue` (čísla čakajúce na lekára), `currentStage` (pri ukončení u sestry ostáva `doctor`); `doctorQueueCount`.
   Fotka sestry: `assets/doctors/<priezvisko>.jpg`, inak ilustrácia `assets/doctors/sestra.svg` s nápisom „Sestra“.
 * Štatistiky `GET /api/admin/stats?groupBy=doctor|nurse|room`: lekárovi sa pri dvoch krokoch počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho
   (meškanie oproti termínu nie); sestre čakanie od príchodu, meškanie oproti termínu a čas u nej. Nové polia `avgNurse`, `avgDoctorWait`, `avgDoctor`,
