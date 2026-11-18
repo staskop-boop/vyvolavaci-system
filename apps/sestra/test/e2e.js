@@ -323,6 +323,18 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
       const he = document.querySelector('.a-hero'); return { same: Math.abs(h.width - n.width) < 2, lineL: Math.abs(h.left - qn.left) < 2, lineR: Math.abs(h.right - qd.right) < 2, over: he.scrollWidth - he.clientWidth }; });
     assert.deepEqual(top, { same: true, lineL: true, lineR: true, over: 0 }, 'horné okná sú rovnako široké: ' + JSON.stringify(top));
     assert.deepEqual(lay, { same: true, left: true, below: true, full: true, first: true, over: '0/0' }, JSON.stringify(lay));
+    // prepínač pohľadu: správca má predvolene obe časti; „Len lekár“ skryje sesterskú časť a lekárska je na celú šírku
+    assert.equal(await A.getAttribute('[data-pohlad=both]', 'aria-pressed'), 'true');
+    await A.click('[data-pohlad=doctor]');
+    await A.locator('.dash.pohlad-doctor').waitFor();
+    const pv = await A.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); return { nurse: r('.q-nurse').width, nowNurse: r('.now-nurse').width, full: Math.abs(r('.q-doctor').width - r('.a-finished').width) < 2 }; });
+    assert.deepEqual(pv, { nurse: 0, nowNurse: 0, full: true }, JSON.stringify(pv));
+    await A.click('[data-pohlad=nurse]');
+    await A.locator('.dash.pohlad-nurse').waitFor();
+    assert.equal(await A.locator('.q-doctor').isVisible(), false);
+    await A.click('[data-pohlad=both]');
+    await A.locator('.dash.pohlad-both').waitFor();
+    ok('prepínač pohľadu Len sestra / Sestra aj lekár / Len lekár');
     await shot(A, '15-vybaveny-v-rade-lekara');
     await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Ukončený' }).click();
     await toastWith(A, /L5: Ukončený/);

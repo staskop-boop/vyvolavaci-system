@@ -83,14 +83,14 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 
 /* ---------- prehľad (dashboard) ---------- */
 .dash { display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-areas: "room room" "counts counts" "hero hero" "now now" "queues queues" "finished finished"; }
+  grid-template-areas: "room room" "counts counts" "hero hero" "viewbar viewbar" "now now" "queues queues" "finished finished"; }
 .dash > .a-room { grid-area: room; }
 .dash > .a-alerts { grid-area: alerts; } .dash > .a-hero { grid-area: hero; } .dash > .a-now { grid-area: now; }
 .dash > .a-waiting { grid-area: waiting; } .dash > .a-side { grid-area: side; }
 .a-alerts:empty { display: none; }
 .dash > .a-hero, .dash > .a-now { align-self: stretch; }
 @media (max-width: 1180px) {
-  .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: "room" "counts" "hero" "now" "queues" "finished"; }
+  .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: "room" "counts" "hero" "viewbar" "now" "queues" "finished"; }
 }
 
 /* ďalší na rade + hlavné akcie: červená karta ako „Vyvolávame“ na TV */
@@ -418,3 +418,18 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .a-queues .acts .btn-sm { padding-left: 6px; padding-right: 6px; font-size: 14px; }
 .a-queues .wait-pill { padding: 1px 6px; }
 #hist-detail td.ev-list { min-width: 380px; line-height: 1.55; } #hist-detail .ev-t { font-weight: 700; color: var(--black); }
+
+/* 2026-11-18 (Pali): prepínač pohľadu Len sestra / Sestra aj lekár / Len lekár */
+.dash > .a-viewbar { grid-area: viewbar; }
+.viewbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px; background: #fff; border: 1px solid #e6dede; border-radius: 999px; justify-self: start; }
+.viewbar .vb-lbl { font-size: 13px; font-weight: 700; color: #6b6b6b; padding: 0 8px 0 10px; text-transform: uppercase; letter-spacing: .04em; }
+.viewbar .vb-btn { border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 9px 16px; font: inherit; font-weight: 700; font-size: 15px; color: var(--black); cursor: pointer; min-height: 40px; }
+.viewbar .vb-btn:hover { background: #f5f0f0; }
+.viewbar .vb-btn.on { background: var(--black); color: #fff; }
+.pohlad-doctor .now-nurse, .pohlad-doctor .q-nurse, .pohlad-nurse .now-doctor, .pohlad-nurse .q-doctor { display: none !important; }
+.pohlad-doctor .now-pair, .pohlad-nurse .now-pair, .pohlad-doctor .a-queues, .pohlad-nurse .a-queues { grid-template-columns: minmax(0, 1fr) !important; }
+@media (max-width: 640px) { .viewbar { justify-self: stretch; border-radius: 14px; } .viewbar .vb-lbl { width: 100%; padding: 2px 6px; }
+  .viewbar .vb-btn { flex: 1 1 0; padding: 9px 8px; font-size: 14px; } }
+/* dlhý typ pacienta v rade nesmie rozšíriť tabuľku za okraj okna */
+.a-queues td.t-room .ident-pill { max-width: 100%; }
+.a-queues td.t-room { max-width: 16ch; }
