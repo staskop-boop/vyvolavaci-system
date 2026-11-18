@@ -82,7 +82,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 .btn svg { flex: none; }
 
 /* ---------- prehľad (dashboard) ---------- */
-.dash { display: grid; gap: 16px; align-items: start; grid-template-columns: minmax(0, 1.55fr) minmax(360px, 1fr);
+.dash { display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas: "counts counts" "room room" "hero now" "queues queues" "finished finished"; }
 .dash > .a-room { grid-area: room; }
 .dash > .a-alerts { grid-area: alerts; } .dash > .a-hero { grid-area: hero; } .dash > .a-now { grid-area: now; }
@@ -375,3 +375,9 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 #tbl-doctor td.t-times .t-plan b { font-size: 14px; }
 #tbl-waiting td.actions .acts { grid-template-columns: repeat(2, max-content); }
 .a-queues select.stage-sel { width: auto; }
+/* 2026-11-18 (Pali): „Ďalší na rade“ a „Práve v ambulancii“ rovnako široké ako okná radov pod nimi */
+.dash .hero { gap: 16px; padding: 20px; }
+.dash .hero .btn-call { min-width: 0; font-size: 19px; padding-left: 16px; padding-right: 16px; white-space: nowrap; }
+.dash .hero-tile { min-width: 120px; height: 110px; font-size: 62px; padding: 0 12px; }
+.dash .hero-tile.long { font-size: 40px; }
+.dash .hero-main { font-size: 22px; }
