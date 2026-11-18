@@ -344,3 +344,12 @@ select.stage-sel { width: auto; min-width: 0; padding: 6px 8px; font-size: 14px;
 
 /* 2026-11-18: rad k lekárovi – tlačidlá v mriežke 2 × 2 ako v tabuľke Čakajúci */
 #tbl-doctor td.actions .acts { display: grid; grid-template-columns: repeat(2, auto); justify-content: end; }
+
+/* 2026-11-18: rýchla zmena ambulancie v rade k lekárovi – štítok ambulancie je výberové pole */
+#tbl-doctor select.room-sel { display: inline-block; width: auto; max-width: 150px; min-width: 0; min-height: 0; padding: 3px 26px 3px 10px; font-size: 14px; font-weight: 700; cursor: pointer; border: 1.5px solid var(--adna-border); }
+select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-offset: 2px; }
+#tbl-doctor td.t-times .tl { display: block; font-size: 14px; line-height: 1.5; }
+#tbl-doctor td.t-times .tl i { font-style: normal; color: var(--grey); display: inline-block; min-width: 68px; }
+#tbl-doctor th, #tbl-doctor td { padding-left: 8px; padding-right: 8px; }
+/* 2026-11-18 (Pali): vstupné vyšetrenia zelenou – text typu ostáva, farba je len pomôcka */
+.type-pill.entry { background: #DDF3E3; color: #14602F; }

@@ -47,3 +47,16 @@ test('voľbu možno zmeniť v oboch smeroch; neznáma hodnota sa odmietne', asyn
   const day = (await admin.get('/api/staff/state')).data.day;
   assert.equal((await admin.get(`/api/admin/stats?from=${day}&to=${day}`)).status, 200);
 });
+
+test('rad k lekárovi: pri pacientovi je termín aj čas vyvolania sestrou', async () => {
+  const a = await admin.post('/api/staff/cards', { cardNo: 'N7', plannedTime: '23:30', roomId: room.id });
+  const b = await admin.post('/api/staff/cards', { cardNo: 'N8', plannedTime: '23:35', roomId: room.id, stage: 'doctor' });
+  assert.equal((await admin.post(`/api/staff/tickets/${a.data.ticket.id}/call`, { roomId: room.id })).status, 200);
+  assert.equal((await admin.post(`/api/staff/tickets/${a.data.ticket.id}/to-doctor`, {})).status, 200);
+  const ts = (await admin.get('/api/staff/state')).data.tickets;
+  const n7 = ts.find((t) => t.code === 'N7'); const n8 = ts.find((t) => t.code === 'N8');
+  assert.equal(n7.stage, 'doctor'); assert.equal(n7.status, 'waiting');
+  assert.ok(n7.plannedAt, 'termín ostáva'); assert.ok(n7.nurseCalledAt, 'čas vyvolania sestrou');
+  assert.ok(n7.toDoctorAt >= n7.nurseCalledAt);
+  assert.equal(n8.nurseCalledAt, null, 'pacient bez sestry nemá čas vyvolania sestrou');
+});
