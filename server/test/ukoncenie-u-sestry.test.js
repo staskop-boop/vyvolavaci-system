@@ -30,10 +30,10 @@ test('sestra → lekár → sestra na ukončenie → ukončený', async () => {
   assert.equal(f.status, 200, JSON.stringify(f.data));
   assert.equal(f.data.ticket.stage, 'final'); assert.equal(f.data.ticket.status, 'called'); assert.ok(f.data.ticket.finalAt);
   assert.equal((await lekar.post(`/api/staff/tickets/${id}/to-final`, {})).status, 409, 'druhýkrát nie');
-  // TV: pacient je v ambulancii u sestry, nie u lekára; žiadne nové vyvolanie
+  // TV: interný pohyb sa neukazuje – ostáva lekár, ku ktorému pacient išiel; žiadne nové vyvolanie
   const d = await display();
   const r = d.rooms.find((x) => x.id === room.id);
-  assert.equal(r.current, 'U1'); assert.equal(r.currentStage, 'nurse');
+  assert.equal(r.current, 'U1'); assert.equal(r.currentStage, 'doctor');
   assert.ok(!JSON.stringify(d).includes('final'), 'obrazovka nový krok nepozná');
   assert.equal((await admin.post(`/api/staff/tickets/${id}/to-doctor`, {})).status, 409);
   const done = await admin.post(`/api/staff/tickets/${id}/done`, {});
