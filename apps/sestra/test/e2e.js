@@ -273,6 +273,26 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-called', 'K9').getByRole('button', { name: 'Vybavený' }).click();
     ok('typ a identifikátor pacienta: ponuka typov, zadanie, úprava, odstránenie; obrazovka ich nemá');
 
+    // 10d. (2026-11-18) voľba „ide k sestre / ide k lekárovi“ pri pridaní, v tabuľke aj v ✎ Upraviť
+    await A.click('#btn-card');
+    await A.fill('#m-card', 'L5'); await A.fill('#m-time', '10:40');
+    assert.equal(await A.inputValue('#m-stage'), 'nurse', 'predvolene ide k sestre');
+    await A.selectOption('#m-stage', 'doctor');
+    await A.click('#m-ok');
+    await toastWith(A, /L5 zaradený/);
+    await row(A, 'tbl-doctor', 'L5').waitFor();
+    assert.equal(await row(A, 'tbl-waiting', 'L5').count(), 0, 'nie je v rade k sestre');
+    await shot(A, '9-ide-k-lekarovi');
+    await row(A, 'tbl-doctor', 'L5').locator('select.stage-sel').selectOption('nurse');
+    await toastWith(A, /L5: ide k sestre/);
+    await row(A, 'tbl-waiting', 'L5').waitFor();
+    await row(A, 'tbl-waiting', 'L5').getByRole('button', { name: 'Upraviť' }).click();
+    await A.selectOption('#m-stage', 'doctor'); await A.click('#m-ok');
+    await row(A, 'tbl-doctor', 'L5').waitFor();
+    await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Neprítomný' }).click();
+    await row(A, 'tbl-doctor', 'L5').waitFor({ state: 'detached' });
+    ok('voľba „ide k sestre / ide k lekárovi“: pri pridaní, v tabuľke čakajúcich aj v úprave');
+
     // 11. história
     await A.click('.tab[data-view=history]');
     await A.locator('#hist-detail table').waitFor();

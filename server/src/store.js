@@ -568,8 +568,16 @@ class Store extends EventEmitter {
    * v2 – sestra dá pacientovi kartičku s číslom a zaradí ho do zoznamu s plánovaným časom vyšetrenia.
    * Rovnaká kartička nemôže byť v jeden deň súčasne medzi čakajúcimi/vyvolanými dvakrát.
    */
-  registerCard(cardNo, plannedTime, userId, roomId, staffNote, patientType) {
+  /** 2026-11-18 (Pali): kam pacient z čakárne ide – 'nurse' = najprv k sestre (predvolené), 'doctor' = rovno k lekárovi. */
+  normStage(v) {
+    if (v == null || v === '') return 'nurse';
+    if (v !== 'nurse' && v !== 'doctor') throw bad('Neznáma voľba – vyberte „k sestre“ alebo „k lekárovi“.');
+    return v;
+  }
+
+  registerCard(cardNo, plannedTime, userId, roomId, staffNote, patientType, stage) {
     const code = this.normCard(cardNo);
+    const stg = this.normStage(stage);
     const note = this.normStaffNote(staffNote);
     const type = this.normPatientType(patientType);
     const day = clock.today();
@@ -583,9 +591,10 @@ class Store extends EventEmitter {
       const { last_seq: seq } = this.db.prepare(`INSERT INTO day_counters (day, last_seq) VALUES (?, 1)
         ON CONFLICT(day) DO UPDATE SET last_seq = last_seq + 1 RETURNING last_seq`).get(day);
       const now = clock.nowIso();
-      const newId = Number(this.db.prepare(`INSERT INTO tickets (day, seq, code, status, created_at, print_status, print_message, planned_at, source, home_room_id, staff_note, patient_type)
-        VALUES (?, ?, ?, 'waiting', ?, 'disabled', 'Pridelila sestra – bez tlače', ?, 'card', ?, ?, ?)`).run(day, seq, code, now, planned, home, note, type).lastInsertRowid);
+      const newId = Number(this.db.prepare(`INSERT INTO tickets (day, seq, code, status, created_at, print_status, print_message, planned_at, source, home_room_id, staff_note, patient_type, stage, to_doctor_at)
+        VALUES (?, ?, ?, 'waiting', ?, 'disabled', 'Pridelila sestra – bez tlače', ?, 'card', ?, ?, ?, ?, ?)`).run(day, seq, code, now, planned, home, note, type, stg, stg === 'doctor' ? now : null).lastInsertRowid);
       this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, user_id, note) VALUES (?, 'created', ?, ?, 'sestra')").run(newId, now, userId ?? null);
+      if (stg === 'doctor') this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note) VALUES (?, 'to_doctor', ?, ?, ?, 'bez sestry')").run(newId, now, home, userId ?? null);
       return newId;
     });
     this.changed('tickets');
@@ -622,6 +631,7 @@ class Store extends EventEmitter {
     const home = b && 'roomId' in b ? (b.roomId != null && b.roomId !== '' ? this.requireRoom(b.roomId).id : null) : row0.home_room_id;
     const note = b && 'staffNote' in b ? this.normStaffNote(b.staffNote) : row0.staff_note;
     const type = b && 'patientType' in b ? this.normPatientType(b.patientType) : row0.patient_type;
+    const stg = b && 'stage' in b ? this.normStage(b.stage) : null;   // null = bez zmeny
     tx(this.db, () => {
       const row = this.getTicketRow(ticketId);
       if (row.status !== 'waiting') throw conflict(`Číslo ${row.code} je v stave „${STATUS_TEXT[row.status]}“ – upraviť možno len čakajúceho pacienta.`);
@@ -636,6 +646,11 @@ class Store extends EventEmitter {
       if (code !== row.code) ev.run(row.id, 'edited', now, null, userId ?? null, `${row.code} → ${code}`);
       if (planned !== row.planned_at) ev.run(row.id, 'planned', now, null, userId ?? null, planned ? String(b.plannedTime).trim() : 'bez času');
       if (home !== row.home_room_id) ev.run(row.id, 'moved', now, home, userId ?? null, home ? this.getRoom(home).name : 'všetky ambulancie');
+      // zmena „ide k sestre“ ↔ „ide k lekárovi“: pacient sa presunie do druhého radu čakajúcich
+      if (stg && stg !== (row.stage || 'nurse')) {
+        this.db.prepare('UPDATE tickets SET stage = ?, to_doctor_at = ? WHERE id = ?').run(stg, stg === 'doctor' ? now : null, row.id);
+        ev.run(row.id, stg === 'doctor' ? 'to_doctor' : 'to_nurse', now, home, userId ?? null, stg === 'doctor' ? 'bez sestry' : null);
+      }
     });
     this.changed('tickets');
     return { ticket: this.getTicket(Number(ticketId), true) };
@@ -1087,13 +1102,15 @@ class Store extends EventEmitter {
     const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at, to_doctor_at FROM tickets
       WHERE day BETWEEN ? AND ? AND call_count > 0`).all(from, to);
     const evs = this.db.prepare(`SELECT e.ticket_id, e.type, e.at, e.doctor, e.nurse, e.stage, e.note, r.name AS room FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
-      LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor') ORDER BY e.id`).all(from, to);
+      LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse') ORDER BY e.id`).all(from, to);
     const byT = new Map();
     for (const e of evs) {
       const x = byT.get(e.ticket_id) || { first: null, lastCall: null, doctor: null, nurse: null, room: null, twoStep: false,
         nurseCall: null, sent: null, direct: false, doctorStart: null };
       if (e.stage) x.twoStep = true;
-      if (e.type === 'to_doctor') {
+      if (e.type === 'to_nurse') {
+        x.sent = null;   // sestra voľbu „k lekárovi“ vrátila späť – čakanie na lekára sa od nej nepočíta
+      } else if (e.type === 'to_doctor') {
         x.sent = e.at;
         if (e.note === 'priamo') { x.direct = true; if (!x.doctorStart) x.doctorStart = e.at; if (e.doctor) x.doctor = e.doctor; }
         if (e.nurse) x.nurse = e.nurse;

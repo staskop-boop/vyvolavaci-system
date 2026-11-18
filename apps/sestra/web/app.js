@@ -411,6 +411,13 @@
   };
   const identBody = (root) => ({ staffNote: root.querySelector('#m-ident').value, patientType: root.querySelector('#m-type').value || null });
 
+  /** 2026-11-18 (Pali): kam pacient z čakárne ide – k sestre (potom k lekárovi), alebo rovno k lekárovi. */
+  const stageField = (cur) => `<div class="field" style="margin-top:14px"><label for="m-stage">Pacient ide</label><select id="m-stage">
+    <option value="nurse" ${cur === 'doctor' ? '' : 'selected'}>k sestre (potom k lekárovi)</option>
+    <option value="doctor" ${cur === 'doctor' ? 'selected' : ''}>rovno k lekárovi (bez sestry)</option></select></div>`;
+  const stageSelect = (t, dis) => `<select class="stage-sel needs-online" data-stage-for="${t.id}" ${dis} aria-label="Kam ide pacient ${esc(t.code)}" title="Zmeniť, ku komu pacient ide">
+    <option value="nurse" ${t.stage === 'doctor' ? '' : 'selected'}>ide k sestre</option><option value="doctor" ${t.stage === 'doctor' ? 'selected' : ''}>ide k lekárovi</option></select>`;
+
   function renderQueue() {
     const st = S.staff;
     if (!st) { $view.innerHTML = '<div class="center-msg">Načítava sa zoznam…</div>'; return; }
@@ -470,7 +477,8 @@
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="${isDocAcc ? 'Pacienta si vezmete rovno k sebe (bez sestry)' : 'Vyvolať k sestre'}">${isDocAcc ? 'Vyvolať k sebe' : 'Vyvolať'}${i > 0 || isDocAcc ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
-        ${nurse ? `<button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, čas objednania alebo ambulanciu (napr. pacienta prevezme druhá ambulancia)">✎ Upraviť</button>
+        ${nurse ? `${stageSelect(t, dis)}
+        <button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, čas objednania alebo ambulanciu (napr. pacienta prevezme druhá ambulancia)">✎ Upraviť</button>
         <button class="btn btn-sm btn-danger needs-online" data-act="cancel" data-id="${t.id}" ${dis} title="Zmazať chybne zadaného pacienta">✕ Zmazať</button>` : ''}
         ${t.source === 'card' ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="reprint" data-id="${t.id}" ${dis} title="Znovu vytlačiť lístok">Tlač</button>`}
       </div></td></tr>`).join('');
@@ -481,6 +489,8 @@
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
+        ${nurse ? `${stageSelect(t, dis)}
+        <button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, ambulanciu, typ alebo to, ku komu pacient ide">✎ Upraviť</button>` : ''}
       </div></td></tr>`).join('');
 
     const stagePill = (t) => (t.stage === 'doctor' ? '<span class="stage-pill doc">u lekára</span>' : '<span class="stage-pill nurse">u sestry</span>');
@@ -527,8 +537,8 @@
           : '<div class="empty">Nikto nečaká.</div>'}</div>`;
     }
     function docSection() {
-      return `<div><div class="section-title"><h2>Čakajú na lekára (${waitingDoc.length})</h2><span class="hint">po vyšetrení u sestry</span></div>
-        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Od sestry</th><th>Čaká</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
+      return `<div><div class="section-title"><h2>Čakajú na lekára (${waitingDoc.length})</h2><span class="hint">po sestre alebo rovno k lekárovi</span></div>
+        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>V rade od</th><th>Čaká</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
           : `<div class="empty">${isDocAcc ? 'Sestra k vám zatiaľ nikoho neposlala.' : 'Nikto nečaká na lekára.'}</div>`}</div>`;
     }
 
@@ -612,6 +622,16 @@
       () => api('/api/staff/call-next', { body: { roomId: S.roomId, stage: isDocAcc ? 'doctor' : 'nurse' } }),
       (r) => `Vyvolané ${r.ticket.code} – ${r.ticket.roomName}`);
   }
+
+  // zmena „ide k sestre / ide k lekárovi“ priamo v tabuľke čakajúcich
+  $view.addEventListener('change', (e) => {
+    const sel = e.target.closest('select[data-stage-for]');
+    if (!sel || !S.staff) return;
+    const t = S.staff.tickets.find((x) => x.id === Number(sel.dataset.stageFor));
+    if (!t) return;
+    act(() => api(`/api/staff/tickets/${t.id}/edit`, { body: { stage: sel.value } }),
+      sel.value === 'doctor' ? `${t.code}: ide rovno k lekárovi` : `${t.code}: ide k sestre`).then((r) => { if (!r) renderQueue(); });
+  });
 
   // akcie v zozname (delegovanie udalostí)
   $view.addEventListener('click', async (e) => {
@@ -781,13 +801,14 @@
           <div class="field"><label for="m-time">Čas objednania (z kalendára)</label><input id="m-time" type="time" step="60" value="" required></div>
         </div>
         <div class="field" style="margin-top:14px"><label for="m-room">Ambulancia</label>${roomSelect(S.roomId)}</div>
+        ${stageField('nurse')}
         ${identField(null)}
         <p class="hint">Podľa času objednania sa počíta poradie a časový sklz (teraz je ${esc(nowHm)}). Pacientovi povedzte (alebo napíšte) pridelené označenie. Na obrazovke v čakárni sa ukáže iba toto označenie a odchýlka od termínu.</p>`,
       onOk: async (root) => {
         if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
         if (!root.querySelector('#m-card').value.trim()) throw new Error('Zadajte číslo alebo písmeno pacienta.');
         if (!root.querySelector('#m-time').value) throw new Error('Zadajte čas objednania z kalendára – podľa neho sa počíta časový sklz.');
-        return api('/api/staff/cards', { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: pickedRoom(root), ...identBody(root) } });
+        return api('/api/staff/cards', { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: pickedRoom(root), stage: root.querySelector('#m-stage').value, ...identBody(root) } });
       },
     });
     if (res && res.ticket) toast(`Pacient ${res.ticket.code} zaradený${res.ticket.plannedAt ? ' na ' + fmtTime(res.ticket.plannedAt) : ''} – ${res.ticket.homeRoomName || 'všetky ambulancie'}`, 'ok');
@@ -813,11 +834,12 @@
         </div>
         <div class="field" style="margin-top:14px"><label for="m-room">Ambulancia</label>${roomSelect(t.homeRoomId)}</div>
         <p class="hint">Keď pacienta prevezme druhá ambulancia, vyberte ju tu – pacient sa presunie do jej zoznamu.</p>
+        ${stageField(t.stage)}
         ${identField(t)}`,
       onOk: async (root) => {
         if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
         if (!root.querySelector('#m-card').value.trim()) throw new Error('Zadajte číslo alebo písmeno pacienta.');
-        return api(`/api/staff/tickets/${t.id}/edit`, { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: pickedRoom(root), ...identBody(root) } });
+        return api(`/api/staff/tickets/${t.id}/edit`, { body: { cardNo: root.querySelector('#m-card').value, plannedTime: root.querySelector('#m-time').value || null, roomId: pickedRoom(root), stage: root.querySelector('#m-stage').value, ...identBody(root) } });
       },
     });
     if (res && res.ticket) toast(`Uložené: ${res.ticket.code}${res.ticket.plannedAt ? ' · ' + fmtTime(res.ticket.plannedAt) : ''} · ${res.ticket.homeRoomName || 'ktorákoľvek ambulancia'}`, 'ok');
@@ -888,7 +910,7 @@
 
   // ---------- história ----------
   const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Vybavený', absent: 'Neprítomný',
-    requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
+    requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', to_nurse: 'Vrátený do radu k sestre', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
 
   async function renderHistory() {
     $view.innerHTML = '<div class="center-msg">Načítava sa história…</div>';
