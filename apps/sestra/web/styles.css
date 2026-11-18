@@ -83,14 +83,14 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 
 /* ---------- prehľad (dashboard) ---------- */
 .dash { display: grid; gap: 16px; align-items: start; grid-template-columns: minmax(0, 1.55fr) minmax(360px, 1fr);
-  grid-template-areas: "room room" "hero now" "waiting side"; }
+  grid-template-areas: "counts counts" "room room" "hero now" "queues queues" "finished finished"; }
 .dash > .a-room { grid-area: room; }
 .dash > .a-alerts { grid-area: alerts; } .dash > .a-hero { grid-area: hero; } .dash > .a-now { grid-area: now; }
 .dash > .a-waiting { grid-area: waiting; } .dash > .a-side { grid-area: side; }
 .a-alerts:empty { display: none; }
 .dash > .a-hero, .dash > .a-now { align-self: stretch; }
 @media (max-width: 1180px) {
-  .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: "room" "hero" "now" "waiting" "side"; }
+  .dash { grid-template-columns: minmax(0, 1fr); grid-template-areas: "counts" "room" "hero" "now" "queues" "finished"; }
 }
 
 /* ďalší na rade + hlavné akcie: červená karta ako „Vyvolávame“ na TV */
@@ -355,3 +355,23 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .type-pill.entry { background: #DDF3E3; color: #14602F; }
 /* 2026-11-18: v rade k lekárovi pribudlo „Vybavený“ – hlavné tlačidlo cez celú šírku, ostatné po dvoch */
 #tbl-doctor td.actions .acts > .btn-primary { grid-column: 1 / -1; }
+
+/* 2026-11-18 (Pali): dve rovnako veľké okná – vľavo rad k sestre, vpravo rad k lekárovi; vybavení dole na celú šírku */
+.dash > .a-counts { grid-area: counts; } .dash > .a-queues { grid-area: queues; } .dash > .a-finished { grid-area: finished; }
+.a-queues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.a-queues > .card { min-width: 0; overflow-x: auto; }
+@media (max-width: 1180px) { .a-queues { grid-template-columns: minmax(0, 1fr); } }
+.a-queues th, .a-queues td { padding-left: 6px; padding-right: 6px; }
+.a-finished .fin-wrap { max-height: 420px; }
+#tbl-finished { width: 100%; }
+.a-queues td.code { font-size: 24px; }
+.a-queues .acts .btn-sm { padding-left: 8px; padding-right: 8px; }
+.a-queues select.stage-sel { width: 100%; padding: 6px 4px; font-size: 13px; }
+#tbl-doctor td.actions .acts { grid-template-columns: repeat(2, max-content); }
+#tbl-doctor td.t-times .tl i { min-width: 66px; }
+#tbl-doctor th, #tbl-doctor td { padding-left: 4px; padding-right: 4px; }
+#tbl-doctor td.actions { padding-right: 0; }
+#tbl-doctor select.room-sel { max-width: 100%; }
+#tbl-doctor td.t-times .t-plan b { font-size: 14px; }
+#tbl-waiting td.actions .acts { grid-template-columns: repeat(2, max-content); }
+.a-queues select.stage-sel { width: auto; }
