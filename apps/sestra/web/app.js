@@ -745,6 +745,7 @@
   async function announce() {
     const cur = S.staff.announcement;
     const presets = ['V oboch ambulanciách práve prebiehajú zákroky, preto sa vyšetrenia mierne oneskoria. Ďakujeme za pochopenie.',
+      'Z dôvodu choroby jedného lekára dnes ordinuje iba jeden lekár. Počítajte, prosím, s dlhším čakaním. Ďakujeme za pochopenie.',
       'Z technických príčin sa ordinovanie oneskoruje. Ďakujeme za pochopenie.',
       'Dnes ordinujeme len do 12:00. Ďakujeme za pochopenie.', 'Prosíme pacientov, aby si pripravili kartičku poistenca.',
       'Lekár bol odvolaný k akútnemu pacientovi. Vrátime sa čo najskôr.'];
