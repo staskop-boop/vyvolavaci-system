@@ -489,7 +489,7 @@
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
-        ${nurse ? `${stageSelect(t, dis)}
+        ${nurse ? `<button class="btn btn-sm needs-online" data-act="to-nurse" data-id="${t.id}" ${dis} title="Pacient sa vráti do radu k sestre (tabuľka Čakajúci)">← Späť k sestre</button>
         <button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, ambulanciu, typ alebo to, ku komu pacient ide">✎ Upraviť</button>` : ''}
       </div></td></tr>`).join('');
 
@@ -644,6 +644,7 @@
       case 'call': return callTicket(t);
       case 'recall': return act(() => api(`/api/staff/tickets/${id}/recall`, { body: {} }), `Vyvolanie ${code} zopakované`);
       case 'to-doctor': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: {} }), `${code}: ide do čakárne, čaká na lekára`);
+      case 'to-nurse': return act(() => api(`/api/staff/tickets/${id}/edit`, { body: { stage: 'nurse' } }), `${code}: späť k sestre`);
       case 'to-doctor-direct': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: { direct: true } }), `${code}: priamo k lekárovi`);
       case 'done': return act(() => api(`/api/staff/tickets/${id}/done`, { body: {} }), `${code}: Vybavený`);
       case 'absent': return act(() => api(`/api/staff/tickets/${id}/absent`, { body: {} }), `${code}: Neprítomný`);

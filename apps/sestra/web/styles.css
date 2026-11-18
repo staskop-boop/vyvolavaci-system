@@ -341,3 +341,6 @@ body.is-doctor #btn-doctor { cursor: default; }
 
 /* 2026-11-18: voľba „ide k sestre / ide k lekárovi“ priamo v riadku čakajúceho */
 select.stage-sel { width: auto; min-width: 0; padding: 6px 8px; font-size: 14px; font-weight: 700; border-radius: 12px; border: 1.5px solid var(--adna-border); background: #fff; color: var(--black); }
+
+/* 2026-11-18: rad k lekárovi – tlačidlá v mriežke 2 × 2 ako v tabuľke Čakajúci */
+#tbl-doctor td.actions .acts { display: grid; grid-template-columns: repeat(2, auto); justify-content: end; }

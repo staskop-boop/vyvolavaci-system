@@ -283,8 +283,8 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-doctor', 'L5').waitFor();
     assert.equal(await row(A, 'tbl-waiting', 'L5').count(), 0, 'nie je v rade k sestre');
     await shot(A, '9-ide-k-lekarovi');
-    await row(A, 'tbl-doctor', 'L5').locator('select.stage-sel').selectOption('nurse');
-    await toastWith(A, /L5: ide k sestre/);
+    await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Späť k sestre' }).click();
+    await toastWith(A, /L5: späť k sestre/);
     await row(A, 'tbl-waiting', 'L5').waitFor();
     await row(A, 'tbl-waiting', 'L5').getByRole('button', { name: 'Upraviť' }).click();
     await A.selectOption('#m-stage', 'doctor'); await A.click('#m-ok');
