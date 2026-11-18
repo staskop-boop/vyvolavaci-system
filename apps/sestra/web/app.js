@@ -477,7 +477,7 @@
       ${delay.text ? esc(delay.text) + '. ' : ''}Oznam sa zruší sám pri vyvolaní ďalšieho pacienta.</div>
       <button class="btn btn-sm needs-online" data-act="delay-clear" ${dis}>Zrušiť oznam</button></div>`);
     if (st.previousDayOpen && !S.user.doctorName) alerts.push(`<div class="alert alert-info"><div class="grow">Z dňa ${esc(fmtDay(st.previousDayOpen.day))} ostalo
-      ${st.previousDayOpen.count} nevybavených čísel. Do dnešného zoznamu sa neprenášajú.</div>
+      ${st.previousDayOpen.count} neukončených čísel. Do dnešného zoznamu sa neprenášajú.</div>
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
     const waitRows = waitingNurse.map((t, i) => `<tr data-ticket="${t.id}">
@@ -500,7 +500,7 @@
       <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${plannedBadge(t, now)}</span><span class="tl"><i>u sestry</i> ${t.nurseCalledAt ? `<b>${esc(fmtTime(t.nurseCalledAt))}</b>` : '<span class="hint" title="Pacient nebol u sestry">—</span>'}</span><span class="tl"><i>k lekárovi</i> <b>${esc(fmtTime(t.toDoctorAt))}</b></span><span class="tl t-wait"><i>čaká</i> ${waitBadge(t, t.toDoctorAt || t.createdAt, now)}</span></td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
-        <button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="Ukončiť pacienta bez vyvolania (napr. pri omyle) – dá sa vrátiť v zozname Vybavení a neprítomní">✓ Vybavený</button>
+        <button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="Ukončiť pacienta bez vyvolania (napr. pri omyle) – dá sa vrátiť v zozname Ukončení a neprítomní">✓ Ukončený</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         ${nurse ? `<button class="btn btn-sm needs-online" data-act="to-nurse" data-id="${t.id}" ${dis} title="Pacient sa vráti do radu k sestre (tabuľka Čakajú na sestru)">← Späť k sestre</button>
         <button class="btn btn-sm needs-online" data-act="edit" data-id="${t.id}" ${dis} title="Upraviť číslo, ambulanciu, typ alebo to, ku komu pacient ide">✎ Upraviť</button>` : ''}
@@ -508,12 +508,12 @@
 
     const stagePill = (t) => (t.stage === 'doctor' ? '<span class="stage-pill doc">u lekára</span>'
       : t.stage === 'final' ? '<span class="stage-pill nurse fin">u sestry · ukončenie</span>' : '<span class="stage-pill nurse">u sestry</span>');
-    // 2026-11-18 (Pali): po lekárovi ide pacient späť k sestre na ukončenie (platba, papiere) – „Vybavený“ potvrdí až sestra
+    // 2026-11-18 (Pali): po lekárovi ide pacient späť k sestre na ukončenie (platba, papiere) – „Ukončený“ potvrdí až sestra
     const finalRow = (t) => `<tr data-ticket="${t.id}" class="is-final">
       <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">od lekára ${esc(fmtTime(t.finalAt))}</td>
       <td class="c-count">${t.callCount}×</td>
       <td class="actions"><div class="acts">
-        ${nurse ? `<button class="btn btn-sm btn-primary needs-online" data-act="done" data-id="${t.id}" ${dis} title="Pacient zaplatil, má papiere a odchádza">✓ Vybavený</button>` : ''}
+        ${nurse ? `<button class="btn btn-sm btn-primary needs-online" data-act="done" data-id="${t.id}" ${dis} title="Pacient zaplatil, má papiere a odchádza">✓ Ukončený</button>` : ''}
         <button class="btn btn-sm needs-online" data-act="back-to-doctor" data-id="${t.id}" ${dis} title="Omyl – pacient je ešte u lekára">← Späť k lekárovi</button>
         ${nurse ? `<button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
@@ -525,7 +525,7 @@
         ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-doctor" data-id="${t.id}" ${dis} title="Pacient ide von do čakárne a lekár si ho vyvolá – na TV sa ukáže lekár">→ K lekárovi</button>
         <button class="btn btn-sm btn-dark needs-online" data-act="to-doctor-direct" data-id="${t.id}" ${dis} title="Pacient ide k lekárovi hneď, bez čakania v čakárni">→ Priamo k lekárovi</button>` : ''}
         ${t.stage === 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-final" data-id="${t.id}" ${dis} title="Vyšetrenie u lekára sa skončilo – pacient ide k sestre (platba, papiere), ukončí ho sestra">→ K sestre na ukončenie</button>` : ''}
-        ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="Pacient odchádza bez lekára">✓ Vybavený bez lekára</button>` : ''}
+        ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="Pacient odchádza bez lekára">✓ Ukončený bez lekára</button>` : ''}
         <button class="btn btn-sm needs-online" data-act="recall" data-id="${t.id}" ${dis} title="Zopakovať vyvolanie na obrazovke">🔔 Zopakovať</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>
@@ -539,7 +539,7 @@
       ${list.length ? `<table><tbody>${list.map(calledRow).join('')}</tbody></table>` : `<div class="empty">${empty}</div>`}</section>`;
     const calledRows = grp('now-nurse', 'Práve u sestry', atNurse, 'U sestry teraz nie je nikto.') + grp('now-doctor', 'Práve u lekára', atDoctor, 'U lekára teraz nie je nikto.');
 
-    // 2026-11-18 (Pali): vybavení a neprítomní dole na celú šírku so všetkými údajmi
+    // 2026-11-18 (Pali): ukončení a neprítomní dole na celú šírku so všetkými údajmi
     const tm = (v) => (v ? esc(fmtTime(v)) : '<span class="hint">—</span>');
     const finRows = finished.slice(0, 60).map((t) => `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
@@ -612,7 +612,7 @@
         <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>${isDocAcc ? 'čaká na vás' : 'čaká na sestru'}${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
         <div class="count"><b id="cnt-doctor">${isDocAcc ? waitingNurse.length : waitingDoc.length}</b><span>${isDocAcc ? 'čaká na sestru' : 'čaká na lekára'}</span></div>
         <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
-        <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
+        <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>ukončení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
       </div>
 
       <section class="hero a-hero" aria-label="Ďalší na rade">
@@ -631,7 +631,7 @@
         <section class="card q-doctor">${docSection()}</section>
       </div>
 
-      <section class="card a-finished"><div class="section-title"><h2>Vybavení a neprítomní (${finished.length})</h2><span class="hint">omylom ukončeného vrátite tlačidlom Vrátiť</span></div>
+      <section class="card a-finished"><div class="section-title"><h2>Ukončení a neprítomní (${finished.length})</h2><span class="hint">omylom ukončeného vrátite tlačidlom Vrátiť</span></div>
         ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Pacient</th><th>Ambulancia</th><th title="Čas, na ktorý bol pacient objednaný">Termín</th><th>Príchod</th><th title="Kedy pacienta vyvolala sestra">U sestry</th><th title="Odkedy čakal na lekára">K lekárovi</th><th title="Kedy pacienta vyvolal lekár">U lekára</th><th title="Kedy ho lekár poslal späť k sestre na ukončenie">Späť u sestry</th><th>Ukončený</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
           : '<div class="empty">Zatiaľ nikto.</div>'}
       </section></div>`;
@@ -693,7 +693,7 @@
       case 'to-final': return act(() => api(`/api/staff/tickets/${id}/to-final`, { body: {} }), `${code}: k sestre na ukončenie`);
       case 'back-to-doctor': return act(() => api(`/api/staff/tickets/${id}/back-to-doctor`, { body: {} }), `${code}: späť k lekárovi`);
       case 'to-doctor-direct': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: { direct: true } }), `${code}: priamo k lekárovi`);
-      case 'done': return act(() => api(`/api/staff/tickets/${id}/done`, { body: {} }), `${code}: Vybavený`);
+      case 'done': return act(() => api(`/api/staff/tickets/${id}/done`, { body: {} }), `${code}: Ukončený`);
       case 'absent': return act(() => api(`/api/staff/tickets/${id}/absent`, { body: {} }), `${code}: Neprítomný`);
       case 'requeue': {
         const ok = await confirmDialog('Vrátiť medzi čakajúcich?', `Číslo ${code} sa vráti do zoznamu čakajúcich podľa pôvodného času príchodu${t && t.status === 'called' ? ' a zmizne z obrazovky v čakárni' : ''}.`, 'Vrátiť');
@@ -958,7 +958,7 @@
   setInterval(() => { if (S.view === 'queue' && S.staff && !document.getElementById('modal-root').children.length) renderQueue(); }, 30000);
 
   // ---------- história ----------
-  const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Vybavený', absent: 'Neprítomný',
+  const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Ukončený', absent: 'Neprítomný',
     requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', to_nurse: 'Vrátený do radu k sestre', to_final: 'Od lekára k sestre na ukončenie', final_back: 'Z ukončenia späť k lekárovi', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
 
   async function renderHistory() {
@@ -968,7 +968,7 @@
     if (!S.historyDay) S.historyDay = days.length ? days[0].day : (S.staff && S.staff.day);
     $view.innerHTML = `<div class="grid2" style="grid-template-columns:280px minmax(0,1fr)">
       <section class="card"><h2>Dni</h2><div class="daylist">${days.length ? days.map((d) => `<button class="btn ${d.day === S.historyDay ? 'active' : ''}" data-day="${esc(d.day)}">
-        <span>${esc(fmtDay(d.day))}</span><span class="hint">${d.total} čísel${(d.waiting + d.called) && d.day !== (S.staff && S.staff.day) ? ` · <span class="open-badge">${d.waiting + d.called} nevybavené</span>` : ''}</span></button>`).join('') : '<div class="empty">Žiadne záznamy.</div>'}</div></section>
+        <span>${esc(fmtDay(d.day))}</span><span class="hint">${d.total} čísel${(d.waiting + d.called) && d.day !== (S.staff && S.staff.day) ? ` · <span class="open-badge">${d.waiting + d.called} neukončené</span>` : ''}</span></button>`).join('') : '<div class="empty">Žiadne záznamy.</div>'}</div></section>
       <section class="card" id="hist-detail"><div class="center-msg">Načítava sa…</div></section></div>`;
     $view.querySelectorAll('.daylist button').forEach((b) => { b.onclick = () => { S.historyDay = b.dataset.day; renderHistory(); }; });
     if (!S.historyDay) { document.getElementById('hist-detail').innerHTML = '<div class="empty">Žiadne záznamy.</div>'; return; }
@@ -982,13 +982,13 @@
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${h.tickets.length} čísel</span></div>
-        ${openPast ? `<div class="alert alert-warn"><div class="grow"><b>${openPast} nevybavené čísla</b> z tohto dňa ostali v stave Čaká alebo Vyvolaný.
+        ${openPast ? `<div class="alert alert-warn"><div class="grow"><b>${openPast} neukončené čísla</b> z tohto dňa ostali v stave Čaká alebo Vyvolaný.
           Do nového dňa sa neprenášajú. Uzavretím ich označíte ako Neprítomný.</div>
-          <button class="btn btn-danger" id="btn-close-past">Uzavrieť nevybavené…</button></div>` : ''}
+          <button class="btn btn-danger" id="btn-close-past">Uzavrieť neukončené…</button></div>` : ''}
         ${h.tickets.length ? `<table><thead><tr><th>Číslo</th><th>Stav</th><th>Príchod</th><th>Ambulancia</th><th>Lístok</th><th>Priebeh</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">V tento deň nie sú žiadne čísla.</div>'}`;
       const bc = document.getElementById('btn-close-past');
       if (bc) bc.onclick = () => modal({
-        title: 'Uzavrieť nevybavené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
+        title: 'Uzavrieť neukončené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
         body: `<p>${openPast} čísel z ${esc(fmtDay(h.day))} bude označených ako <b>Neprítomný</b>. Záznam o uzavretí ostane v histórii.</p>`,
         onOk: async () => {
           const r = await api('/api/staff/close-past-day', { body: { day: h.day } });
@@ -1021,21 +1021,21 @@
         <p class="hint">Len dnešný deň. Údaje sa počítajú z vyvolaných pacientov.</p></section>
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (čaká ešte ${r.waiting})</span></div>
-        <div class="stats-kpi"><b>${t.done}</b><span>vybavených · ${t.absent} neprítomných</span></div>
+        <div class="stats-kpi"><b>${t.done}</b><span>ukončených · ${t.absent} neprítomných</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu po sestru</span></div>
         <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu</span></div>
         <div class="stats-kpi"><b>${mins(t.avgDoctorWait)}</b><span>priemerné čakanie na lekára</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>vyvolaných načas (do 5 min)</span></div>
       </section>
       ${r.rooms.length ? `<section class="card"><h2>Podľa ambulancie</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
-        <th>Ambulancia</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
+        <th>Ambulancia</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
         <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø u sestry</th><th class="num">Ø čakanie na lekára</th><th class="num">Ø u lekára</th><th class="num">Ø celá návšteva</th></tr></thead><tbody>
         ${r.rooms.map((d) => `<tr><td class="doc">${esc(d.name)}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
           <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td>
           <td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td><td class="num">${pct(d.onTime, d.planned)}</td>
           <td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}
         </tbody></table></div>
-        <p class="hint">Čakanie a meškanie = po vstup k sestre (čas objednania je čas vstupu k sestre). U sestry = od vyvolania po „K lekárovi“. Čakanie na lekára = od „K lekárovi“ po vyvolanie lekárom (priamo k lekárovi = 0). Celá návšteva = od vstupu k sestre po „Vybavený“.</p></section>` : '<section class="card"><div class="empty">Dnes zatiaľ nebol vyvolaný žiadny pacient.</div></section>'}</div>`;
+        <p class="hint">Čakanie a meškanie = po vstup k sestre (čas objednania je čas vstupu k sestre). U sestry = od vyvolania po „K lekárovi“. Čakanie na lekára = od „K lekárovi“ po vyvolanie lekárom (priamo k lekárovi = 0). Celá návšteva = od vstupu k sestre po „Ukončený“.</p></section>` : '<section class="card"><div class="empty">Dnes zatiaľ nebol vyvolaný žiadny pacient.</div></section>'}</div>`;
     document.getElementById('btn-today-refresh').onclick = renderToday;
   }
 
@@ -1071,20 +1071,20 @@
     const c = r.clinic;
     out.innerHTML = `<div class="stack">
       <section class="stats-kpis">
-        <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (vybavení ${t.done})</span></div>
+        <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (ukončení ${t.done})</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta na vás<br>(celá ambulancia ${mins(c.avgWait)})</span></div>
         <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu<br>(celá ambulancia ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov vyvolaných načas (do 5 min)</span></div>
         <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia u vás</span></div>
       </section>
       <section class="card"><h2>Po dňoch</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
-        <th>Deň</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
+        <th>Deň</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
         <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
         ${r.days.map((d) => `<tr><td class="doc">${esc(fmtDay(d.day))}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
           <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
           <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
         <p class="hint">Od 17. 11. 2026 ide pacient najprv k sestre a potom k vám. Čakanie = od chvíle, keď ho sestra poslala k lekárovi, po vaše vyvolanie (priamo k lekárovi = 0).
-          Vyšetrenie = od vášho vyvolania po „Vybavený“. Meškanie oproti termínu patrí k vstupu k sestre, preto sa vám pri dvoch krokoch nepripisuje.
+          Vyšetrenie = od vášho vyvolania po „Ukončený“. Meškanie oproti termínu patrí k vstupu k sestre, preto sa vám pri dvoch krokoch nepripisuje.
           Staršie dni: čakanie od príchodu po prvé vyvolanie, meškanie oproti plánovanému času.</p>
       </section>
       ${r.comparison && r.comparison.length > 1 ? `<section class="card"><div class="section-title"><h2>Porovnanie s ostatnými lekármi</h2><span class="hint">Anonymne – mená ostatných lekárov nevidíte</span></div>
@@ -1153,15 +1153,15 @@
         <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
       </section>
       <section class="card"><div class="stats-scroll"><table class="stats-table"><thead><tr>
-        <th>${G.who}</th><th class="num">Dni</th><th class="num">Pacienti</th><th class="num">Vybavení</th><th class="num">Neprítomní</th>
+        <th>${G.who}</th><th class="num">Dni</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th>
         <th class="num">${G.wait}</th><th class="num">Medián čak.</th>
         <th class="num">S plán. časom</th><th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Mešk. &gt; 15 min</th>
         <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}</tr></thead>
         <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
         <p class="hint">${r.twoStepSince ? `Od ${esc(fmtDay(r.twoStepSince))} má návšteva dva kroky – najprv sestra (čas objednania = vstup k sestre), potom lekár.
           Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho; meškanie oproti termínu a čakanie od príchodu patria sestre a ambulancii.
-          Pacient vybavený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
-          Vyšetrenie = od vyvolania po „Vybavený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
+          Pacient ukončený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
+          Vyšetrenie = od vyvolania po „Ukončený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
           ${r.doctorDataSince ? `Lekári sa ukladajú od ${esc(fmtDay(r.doctorDataSince))}; staršie vyvolania sú v riadku „Lekár nebol zadaný“.` : 'Pri vyvolaniach zatiaľ nebol zadaný lekár – nastavte ho v Zozname tlačidlom Lekár.'}</p>
       </section></div>`;
   }
@@ -1315,7 +1315,7 @@
         <p>Ukončenie dňa označí všetky dnešné čakajúce a vyvolané čísla ako <b>Neprítomný</b> a vyčistí obrazovku v čakárni.
           Číslovanie pokračuje – už vydané čísla sa dnes nezopakujú. Nový deň (od polnoci) začína automaticky od A001.</p>
         <p class="hint">Bežné „Ukončiť deň“ (tablet prestane vydávať čísla, TV ukáže oznam) je tlačidlo 🏁 v Zozname.</p>
-        <div class="row"><button class="btn btn-danger" id="btn-close-day">Uzavrieť dnešné nevybavené čísla…</button></div>
+        <div class="row"><button class="btn btn-danger" id="btn-close-day">Uzavrieť dnešné neukončené čísla…</button></div>
         <p>Vymazanie údajov je nevratné. Zvoľte rozsah: história (všetky dni okrem dneška) alebo všetky čísla vrátane dneška.</p>
         <div class="row"><button class="btn btn-danger" id="btn-purge">Vymazať údaje…</button></div>
       </section>
@@ -1440,7 +1440,7 @@
     };
 
     document.getElementById('btn-close-day').onclick = () => modal({
-      title: 'Uzavrieť dnešné nevybavené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
+      title: 'Uzavrieť dnešné neukončené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
       body: `<p>Všetky dnešné čakajúce a vyvolané čísla (${S.staff ? S.staff.counts.waiting + S.staff.counts.called : '?'}) budú označené ako Neprítomný a obrazovka v čakárni sa vyčistí.</p>
         <div class="field"><label for="m-confirm">Pre potvrdenie napíšte UKONČIŤ</label><input type="text" id="m-confirm" autocomplete="off"></div>`,
       onOk: async (root) => {

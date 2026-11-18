@@ -112,9 +112,9 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-called', 'A001').getByText('2×').waitFor();
     ok('„Vyvolať ďalšieho“ vyvolá najdlhšie čakajúceho; zopakovanie sa prejaví na obrazovke');
 
-    // 4. vybavený / neprítomný / vrátiť
-    await row(A, 'tbl-called', 'A001').getByRole('button', { name: 'Vybavený' }).click();
-    await row(A, 'tbl-finished', 'A001').getByText('Vybavený').waitFor();
+    // 4. ukončený / neprítomný / vrátiť
+    await row(A, 'tbl-called', 'A001').getByRole('button', { name: 'Ukončený' }).click();
+    await row(A, 'tbl-finished', 'A001').getByText('Ukončený').waitFor();
     await A.selectOption('#room', { label: 'Ambulancia č. 2' });
     await row(A, 'tbl-waiting', 'A002').getByRole('button', { name: 'Vyvolať' }).click();
     await row(A, 'tbl-called', 'A002').getByText('Ambulancia č. 2').waitFor();
@@ -123,7 +123,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-finished', 'A002').getByRole('button', { name: '↩ Vrátiť', exact: true }).click();
     await A.click('#m-ok');
     await row(A, 'tbl-waiting', 'A002').waitFor();
-    ok('stavy Vybavený, Neprítomný a vrátenie medzi čakajúcich (s potvrdením); výber ambulancie');
+    ok('stavy Ukončený, Neprítomný a vrátenie medzi čakajúcich (s potvrdením); výber ambulancie');
 
     // 5. konflikt dvoch sestier
     const ctxB = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'sk-SK' });
@@ -270,7 +270,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await toastWith(A, /K9: uložené/);
     await row(A, 'tbl-called', 'K9').locator('.ident-pill').waitFor({ state: 'detached' });
     await row(A, 'tbl-called', 'K9').locator('.type-pill', { hasText: 'Kontrola po CLaCS' }).waitFor();
-    await row(A, 'tbl-called', 'K9').getByRole('button', { name: 'Vybavený' }).click();
+    await row(A, 'tbl-called', 'K9').getByRole('button', { name: 'Ukončený' }).click();
     ok('typ a identifikátor pacienta: ponuka typov, zadanie, úprava, odstránenie; obrazovka ich nemá');
 
     // 10d. (2026-11-18) voľba „ide k sestre / ide k lekárovi“ pri pridaní, v tabuľke aj v ✎ Upraviť
@@ -306,7 +306,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     assert.ok(await row(A, 'tbl-doctor', 'L5').locator('.type-pill.entry', { hasText: 'Vstupné vyšetrenie varixy' }).count(), 'vstupné vyšetrenie je zelené');
     assert.equal(await A.locator('.type-pill.entry', { hasText: 'Kontrola' }).count(), 0, 'kontroly ostávajú žlté');
     await shot(A, '13-rychla-zmena-ambulancie');
-    // „Vybavený“ priamo v rade k lekárovi (ukončenie pri omyle, bez vyvolania)
+    // „Ukončený“ priamo v rade k lekárovi (ukončenie pri omyle, bez vyvolania)
     // plný riadok v rade k sestre (ambulancia, typ, identifikátor, termín s meškaním) sa musí zmestiť do okna
     await A.click('#btn-card');
     await A.fill('#m-card', 'W6'); await A.fill('#m-time', '00:05');
@@ -315,7 +315,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-waiting', 'W6').locator('.ident-pill').waitFor();
     assert.match(await row(A, 'tbl-waiting', 'W6').locator('.t-plan').innerText(), /00:05/);
     await shot(A, '16-rozlozenie');
-    // rozloženie: rad k sestre vľavo, rad k lekárovi vpravo, rovnako široké; nič nepretŕča; vybavení dole na celú šírku
+    // rozloženie: rad k sestre vľavo, rad k lekárovi vpravo, rovnako široké; nič nepretŕča; ukončení dole na celú šírku
     const lay = await A.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); const n = r('.q-nurse'), d = r('.q-doctor'), f = r('.a-finished'), c = r('.a-counts'), rb = r('.a-room');
       const over = [...document.querySelectorAll('.a-queues > .card')].map((x) => x.scrollWidth - x.clientWidth).join('/');
       return { same: Math.abs(n.width - d.width) < 2, left: n.left < d.left, below: f.top >= Math.max(n.bottom, d.bottom), full: Math.abs(f.width - (d.right - n.left)) < 2, first: rb.bottom <= c.top && c.bottom <= r('.a-hero').top, over }; });
@@ -324,8 +324,8 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     assert.deepEqual(top, { same: true, lineL: true, lineR: true, over: 0 }, 'horné okná sú rovnako široké: ' + JSON.stringify(top));
     assert.deepEqual(lay, { same: true, left: true, below: true, full: true, first: true, over: '0/0' }, JSON.stringify(lay));
     await shot(A, '15-vybaveny-v-rade-lekara');
-    await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Vybavený' }).click();
-    await toastWith(A, /L5: Vybavený/);
+    await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Ukončený' }).click();
+    await toastWith(A, /L5: Ukončený/);
     await row(A, 'tbl-doctor', 'L5').waitFor({ state: 'detached' });
     ok('voľba „ide k sestre / ide k lekárovi“: pri pridaní, v tabuľke čakajúcich aj v úprave');
 
@@ -417,11 +417,11 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await grpRow('now-nurse').locator('.stage-pill', { hasText: 'ukončenie' }).waitFor();
     await shot(A, '21-ukoncenie-u-sestry');
     assert.equal(await A.evaluate(() => [...document.querySelectorAll('.now-pair > .card')].map((c) => c.scrollWidth - c.clientWidth).join('/')), '0/0', 'karta Práve v ambulancii nepretŕča');
-    await grpRow('now-nurse').getByRole('button', { name: /Vybavený/ }).click();
+    await grpRow('now-nurse').getByRole('button', { name: /Ukončený/ }).click();
     await row(A, 'tbl-finished', tn).waitFor();
-    await row(A, 'tbl-called', tn2).getByRole('button', { name: /Vybavený/ }).click();
+    await row(A, 'tbl-called', tn2).getByRole('button', { name: /Ukončený/ }).click();
     await row(A, 'tbl-finished', tn2).waitFor();
-    ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi, „K sestre na ukončenie“ a „Vybavený“ u sestry');
+    ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi, „K sestre na ukončenie“ a „Ukončený“ u sestry');
 
     // 11c. hromadné kontá nastavia heslo aj kontám lekárov, ktoré vznikli bez hesla
     await A.click('.tab[data-view=admin]');
@@ -440,7 +440,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await A.fill('#m-confirm', 'nie'); await A.click('#m-ok');
     await A.locator('#m-err', { hasText: 'UKONČIŤ' }).waitFor();
     await A.fill('#m-confirm', 'UKONČIŤ'); await A.click('#m-ok');
-    await toastWith(A, /Deň bol ukončený/);   // (Nastavenia → Uzavrieť dnešné nevybavené čísla)
+    await toastWith(A, /Deň bol ukončený/);   // (Nastavenia → Uzavrieť dnešné neukončené čísla)
     assert.equal((await display()).current, null);
     ok('ukončenie dňa vyžaduje napísanie UKONČIŤ; obrazovka sa vyčistí');
 

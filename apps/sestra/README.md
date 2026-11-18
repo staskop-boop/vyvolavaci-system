@@ -67,12 +67,12 @@ nastavíte na serveri príkazom `npm run nastav-heslo`. V prvej verzii je jedno 
 * **Vyvolať** pri konkrétnom čísle – ak nie je na rade, otvorí sa okno s výberom ambulancie a nepovinným
   dôvodom (napr. objednaný pacient). Dôvod vidí len personál v histórii, nikdy sa nezobrazí verejne.
 * **Zopakovať** – znovu zobrazí a zvukom ohlási vyvolané číslo (pacient nereaguje).
-* **Vybavený / Neprítomný** – ukončí vyvolanie.
+* **Ukončený / Neprítomný** – ukončí vyvolanie.
 * **Vrátiť** – vráti číslo medzi čakajúcich podľa pôvodného času príchodu. Použite, ak ste omylom vyvolali
   nesprávne číslo – zmizne aj z obrazovky v čakárni.
 * **Tlač / Znovu vytlačiť lístok** – vytlačí lístok s tým istým číslom (napr. pacient lístok stratil alebo
   tlač zlyhala). Nové číslo sa nikdy nevytvorí.
-* Upozornenia nad zoznamom: zlyhaná alebo neoverená tlač lístka, vypnutá tlač, nevybavené čísla z
+* Upozornenia nad zoznamom: zlyhaná alebo neoverená tlač lístka, vypnutá tlač, neukončené čísla z
   predchádzajúceho dňa (sú v **Histórii**, do nového dňa sa neprenášajú).
 * **🏁 Ukončiť deň** (sestra, správca) – dnes už nových pacientov neprijímame: tablet prestane vydávať
   čísla a obrazovka v čakárni ukáže oznam (kým niekto čaká: „Príjem pacientov je na dnes ukončený…“, potom
@@ -95,7 +95,7 @@ Záložka **Nastavenia**: názvy a poradie ambulancií (pridanie, premenovanie, 
 zariadenia, predpona čísla, čas zobrazenia čísla na tablete, zvuk na obrazovke a **hlasitosť vyvolania**
 (10 – 200 %, predvolene 150 %; tlačidlo *Vyskúšať na TV*), počet naposledy
 vyvolaných čísel, text pokynu, sieťová tlačiareň (IP, port, diakritika, orezanie, zisťovanie stavu,
-*Overiť tlačiareň*, *Skúšobná tlač*), zmena hesla, **Uzavrieť dnešné nevybavené čísla** (potvrdenie slovom UKONČIŤ) a
+*Overiť tlačiareň*, *Skúšobná tlač*), zmena hesla, **Uzavrieť dnešné neukončené čísla** (potvrdenie slovom UKONČIŤ) a
 **Vymazať údaje** (potvrdenie slovom VYMAZAŤ a heslom).
 
 ## Riešenie problémov

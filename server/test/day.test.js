@@ -20,7 +20,7 @@ test('deň sa určuje podľa Europe/Bratislava (aj okolo polnoci a zmeny času)'
   assert.equal(dayOf(new Date('2026-07-01T22:00:00Z')), '2026-07-02');
 });
 
-test('nový deň: číslovanie od A001, staré nevybavené čísla ostanú len v histórii', async () => {
+test('nový deň: číslovanie od A001, staré neukončené čísla ostanú len v histórii', async () => {
   const a = await reg(); await reg(); await reg();
   const st = (await staff.get('/api/staff/state')).data;
   await staff.post('/api/staff/call-next', { roomId: st.rooms[0].id });
@@ -36,7 +36,7 @@ test('nový deň: číslovanie od A001, staré nevybavené čísla ostanú len v
   assert.notEqual(n.data.ticket.day, day1);
   const st2 = (await staff.get('/api/staff/state')).data;
   assert.deepEqual(st2.tickets.map((t) => t.code), ['A001'], 'staré čísla sa neprenášajú');
-  assert.deepEqual(st2.previousDayOpen, { day: day1, count: 3 }, 'personál je upozornený na nevybavené čísla');
+  assert.deepEqual(st2.previousDayOpen, { day: day1, count: 3 }, 'personál je upozornený na neukončené čísla');
   assert.equal((await kiosk.get('/api/display/state')).data.current, null, 'obrazovka začína nový deň uvítaním');
   const old = await staff.post(`/api/staff/tickets/${a.data.ticket.id}/call`, { roomId: st.rooms[0].id });
   assert.equal(old.status, 409);

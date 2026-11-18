@@ -20,7 +20,7 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   await admin.post(`/api/staff/rooms/${r2.id}/doctor`, { name: 'MUDr. Test Druhý' });
   await admin.post(`/api/staff/rooms/${r1.id}/nurse`, { name: 'Daniela Fetyková' });
   const a = await reg(); const b = await reg(); const c = await reg(); const d = await reg();
-  // a: sestra → čakáreň → lekár → vybavený
+  // a: sestra → čakáreň → lekár → ukončený
   await admin.post(`/api/staff/tickets/${a.id}/call`, { roomId: r1.id });
   await admin.post(`/api/staff/tickets/${a.id}/to-doctor`, {});
   await admin.post('/api/staff/call-next', { roomId: r1.id, stage: 'doctor' });
@@ -32,7 +32,7 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   // c: druhá ambulancia, priamo k lekárovi, ešte u neho
   await admin.post(`/api/staff/tickets/${c.id}/call`, { roomId: r2.id });
   await admin.post(`/api/staff/tickets/${c.id}/to-doctor`, { direct: true });
-  // d: vybavený u sestry bez lekára – lekárovi sa nepripíše
+  // d: ukončený u sestry bez lekára – lekárovi sa nepripíše
   await admin.post(`/api/staff/tickets/${d.id}/call`, { roomId: r1.id });
   await admin.post(`/api/staff/tickets/${d.id}/done`);
   // presné časy pre overenie výpočtov
@@ -47,10 +47,10 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   const r = await admin.get(`/api/admin/stats?from=${day}&to=${day}`);
   assert.equal(r.status, 200);
   const prvy = r.data.doctors.find((x) => x.doctor === 'MUDr. Test Prvý');
-  assert.equal(prvy.patients, 2, 'pacient vybavený len u sestry sa lekárovi nepočíta'); assert.equal(prvy.done, 1); assert.equal(prvy.absent, 1);
+  assert.equal(prvy.patients, 2, 'pacient ukončený len u sestry sa lekárovi nepočíta'); assert.equal(prvy.done, 1); assert.equal(prvy.absent, 1);
   assert.equal(prvy.avgWait, 8, 'čakanie na lekára (15 + 0) / 2');
   assert.equal(prvy.planned, 0, 'meškanie oproti termínu sa lekárovi pri dvoch krokoch nepripisuje');
-  assert.equal(prvy.avgExam, 20, 'u lekára od vyvolania lekárom po vybavenie');
+  assert.equal(prvy.avgExam, 20, 'u lekára od vyvolania lekárom po ukončenie');
   assert.equal(prvy.avgNurse, 10); assert.equal(prvy.direct, 1); assert.equal(prvy.toDoctor, 2);
   const druhy = r.data.doctors.find((x) => x.doctor === 'MUDr. Test Druhý');
   assert.equal(druhy.patients, 1); assert.equal(druhy.open, 1);
@@ -90,7 +90,7 @@ test('štatistiky vidí len správca', async () => {
   assert.equal((await kiosk.get(`/api/admin/stats?from=${st.day}&to=${st.day}`)).status, 401);
 });
 
-test('uzavretie nevybavených čísel staršieho dňa', async () => {
+test('uzavretie neukončených čísel staršieho dňa', async () => {
   const day1 = (await admin.get('/api/staff/state')).data.day;
   assert.equal((await admin.post('/api/staff/close-past-day', { day: day1 })).status, 400, 'dnešok sa takto neuzatvára');
   await reg();

@@ -10,7 +10,7 @@
 | 6 | Dve sestry vyvolajú toho istého pacienta | Server pustí iba prvé vyvolanie; druhá sestra dostane hlásenie „Číslo A012 už medzičasom vyvolala iná sestra (Ambulancia č. 1).“ „Vyvolať ďalšieho“ z viacerých PC naraz vyvolá vždy rôznych pacientov. Overené testom. |
 | 7 | Prehliadač zablokuje zvuk | Android TV aplikácia povoľuje zvuk bez kliknutia. V bežnom prehliadači sa zobrazí tlačidlo „Zapnúť zvuk“ (ovládateľné aj diaľkovým ovládačom / Enter) a kým zvuk nie je aktívny, upozornenie „Zvuk nie je aktívny“. |
 | 8 | Počítač sestry sa obnoví alebo reštartuje | Prihlásenie je uložené na serveri (relácia 12 h, prežije aj reštart servera); po otvorení sa načíta úplný stav. Predvolená ambulancia je zapamätaná na danom PC. |
-| 9 | Nový deň, v zozname ostali nevybavené čísla | Číslovanie začína od A001 (podľa Europe/Bratislava). Staré čísla sa do nového zoznamu neprenášajú, ostávajú v histórii; sestra vidí upozornenie „Z dňa … ostalo N nevybavených čísel. Do dnešného zoznamu sa neprenášajú.“ s tlačidlom „Zobraziť v histórii“. Staré číslo nemožno omylom vyvolať. |
+| 9 | Nový deň, v zozname ostali neukončené čísla | Číslovanie začína od A001 (podľa Europe/Bratislava). Staré čísla sa do nového zoznamu neprenášajú, ostávajú v histórii; sestra vidí upozornenie „Z dňa … ostalo N neukončených čísel. Do dnešného zoznamu sa neprenášajú.“ s tlačidlom „Zobraziť v histórii“. Staré číslo nemožno omylom vyvolať. |
 | 10 | Tablet sa po zobrazení čísla vráti na úvodnú obrazovku | Automaticky po nastavenom čase (predvolene 15 s) alebo tlačidlom „Hotovo“; číslo je na vytlačenom lístku a v zozname sestry. Ak tlač zlyhala, tablet to pacientovi povie a sestra vidí upozornenie s tlačidlom „Znovu vytlačiť lístok“. |
 
 Tlač:

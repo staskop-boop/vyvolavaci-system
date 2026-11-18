@@ -76,7 +76,7 @@ const DEFAULT_SETTINGS = {
 };
 
 const DEMO_ROOMS = ['Ambulancia č. 1', 'Ambulancia č. 2', 'USG pracovisko'];
-const STATUS_TEXT = { waiting: 'Čaká', called: 'Vyvolaný', done: 'Vybavený', absent: 'Neprítomný' };
+const STATUS_TEXT = { waiting: 'Čaká', called: 'Vyvolaný', done: 'Ukončený', absent: 'Neprítomný' };
 
 function clampInt(v, min, max, name) {
   const n = Number(v);
@@ -502,7 +502,7 @@ class Store extends EventEmitter {
   }
 
   /**
-   * 2026-11-17 (Pali): sestra dopíše k číslu identifikátor a/alebo typ pacienta (aj k vyvolanému či vybavenému z dneška).
+   * 2026-11-17 (Pali): sestra dopíše k číslu identifikátor a/alebo typ pacienta (aj k vyvolanému či ukončenému z dneška).
    * Mení sa len to, čo je v tele požiadavky.
    */
   setStaffNote(ticketId, b, userId) {
@@ -588,7 +588,7 @@ class Store extends EventEmitter {
       // označenie musí byť jedinečné naprieč pracoviskami – TV je spoločná
       const dup = this.db.prepare(`SELECT t.code, t.status, h.name AS home FROM tickets t LEFT JOIN rooms h ON h.id = t.home_room_id
         WHERE t.day = ? AND t.code = ? AND t.status IN ('waiting','called')`).get(day, code);
-      if (dup) throw conflict(`Označenie ${code} je už v zozname${dup.home ? ` (${dup.home})` : ''} – ${STATUS_TEXT[dup.status]}. Zvoľte iné, alebo najprv pacienta označte ako vybaveného.`);
+      if (dup) throw conflict(`Označenie ${code} je už v zozname${dup.home ? ` (${dup.home})` : ''} – ${STATUS_TEXT[dup.status]}. Zvoľte iné, alebo najprv pacienta označte ako ukončeného.`);
       const { last_seq: seq } = this.db.prepare(`INSERT INTO day_counters (day, last_seq) VALUES (?, 1)
         ON CONFLICT(day) DO UPDATE SET last_seq = last_seq + 1 RETURNING last_seq`).get(day);
       const now = clock.nowIso();
@@ -611,7 +611,7 @@ class Store extends EventEmitter {
     tx(this.db, () => {
       const row = this.getTicketRow(ticketId);
       this.requireToday(row);
-      if (!['waiting', 'called', 'absent'].includes(row.status)) throw conflict(`Číslo ${row.code} je už vybavené – ambulanciu nemožno zmeniť.`);
+      if (!['waiting', 'called', 'absent'].includes(row.status)) throw conflict(`Číslo ${row.code} je už ukončené – ambulanciu nemožno zmeniť.`);
       this.db.prepare('UPDATE tickets SET home_room_id = ?, version = version + 1 WHERE id = ?').run(home ? home.id : null, row.id);
       this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note) VALUES (?, 'moved', ?, ?, ?, ?)")
         .run(row.id, clock.nowIso(), home ? home.id : null, userId ?? null, home ? home.name : 'všetky ambulancie');
@@ -735,7 +735,7 @@ class Store extends EventEmitter {
   conflictMessage(row) {
     switch (row.status) {
       case 'called': return `Číslo ${row.code} už medzičasom vyvolala iná sestra${row.room_name ? ` (${row.room_name})` : ''}.`;
-      case 'done': return `Číslo ${row.code} je už označené ako vybavené.`;
+      case 'done': return `Číslo ${row.code} je už označené ako ukončené.`;
       case 'absent': return `Číslo ${row.code} je označené ako neprítomné.`;
       default: return `Číslo ${row.code} je medzičasom v stave „${STATUS_TEXT[row.status]}“.`;
     }
@@ -850,7 +850,7 @@ class Store extends EventEmitter {
 
   /**
    * 2026-11-18 (Pali): lekár po vyšetrení pošle pacienta späť k sestre na ukončenie (platba, papiere).
-   * Pacient ostáva „vyvolaný“ (je v ambulancii), TV nič nehlási; „Vybavený“ potvrdí až sestra.
+   * Pacient ostáva „vyvolaný“ (je v ambulancii), TV nič nehlási; „Ukončený“ potvrdí až sestra.
    */
   sendToFinal(ticketId, userId) {
     const id = tx(this.db, () => {
@@ -940,7 +940,7 @@ class Store extends EventEmitter {
   absent(id, userId) { return this.transition(id, 'absent', ['waiting', 'called'], userId, 'absent'); }
   requeue(id, userId) { return this.transition(id, 'waiting', ['called', 'absent', 'done'], userId, 'requeue'); }
 
-  /** Uzavrie nevybavené čísla staršieho dňa (čakajúce a vyvolané → Neprítomný). Dnešok sa uzatvára cez closeDay. */
+  /** Uzavrie neukončené čísla staršieho dňa (čakajúce a vyvolané → Neprítomný). Dnešok sa uzatvára cez closeDay. */
   closePastDay(day, userId) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))) throw bad('Neplatný dátum.');
     if (day >= clock.today()) throw bad('Dnešný deň sa ukončuje v Nastaveniach (Ukončiť deň).');
@@ -948,13 +948,13 @@ class Store extends EventEmitter {
       const rows = this.db.prepare("SELECT id FROM tickets WHERE day = ? AND status IN ('waiting','called')").all(day);
       const now = clock.nowIso();
       for (const r of rows) {
-        // finished_at ostáva prázdny – čas „vybavenia“ by skreslil štatistiky
+        // finished_at ostáva prázdny – čas „ukončenia“ by skreslil štatistiky
         this.db.prepare("UPDATE tickets SET status = 'absent', version = version + 1 WHERE id = ?").run(r.id);
         this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, user_id, note) VALUES (?, 'day_closed', ?, ?, 'dodatočné uzavretie dňa')").run(r.id, now, userId ?? null);
       }
       return rows.length;
     });
-    log.info('Uzavreté nevybavené čísla staršieho dňa', { day, closed: n });
+    log.info('Uzavreté neukončené čísla staršieho dňa', { day, closed: n });
     this.changed('tickets');
     return { day, closed: n };
   }
@@ -1029,7 +1029,7 @@ class Store extends EventEmitter {
       if (e.type === 'requeue') { cancelled.add(e.ticket_id); continue; }
       if (cancelled.has(e.ticket_id) || seen.has(e.ticket_id)) continue;
       seen.add(e.ticket_id);
-      // po „vybavený“ (alebo „neprišiel“) ambulancia nikoho nevyšetruje – staré číslo z „Práve vyšetrujeme“ zmizne
+      // po „ukončený“ (alebo „neprišiel“) ambulancia nikoho nevyšetruje – staré číslo z „Práve vyšetrujeme“ zmizne
       if (e.room_id != null && !(e.room_id in roomCurrent)) roomCurrent[e.room_id] = e.status === 'called' ? { code: e.code, at: e.at, ticketId: e.ticket_id } : null;
       if (list.length <= s.recentCount) list.push({ callId: e.id, code: e.code, roomId: e.room_id, roomName: e.room_name, ...this.callPerson(e.room_id, e), at: e.at, repeat: e.type === 'recall' });
     }
@@ -1128,8 +1128,8 @@ class Store extends EventEmitter {
    *
    * Od 17. 11. 2026 má návšteva dva kroky (Pali): najprv sestra (plánovaný čas = vstup k sestre), potom lekár.
    * – sestra / ambulancia: čakanie = vyvolanie k sestre − príchod, meškanie = vyvolanie k sestre − termín (nie skôr ako príchod),
-   *   čas u sestry = poslanie k lekárovi (alebo vybavenie) − vyvolanie k sestre;
-   * – lekár: čakanie = vyvolanie lekárom − poslanie od sestry (priamo k lekárovi = 0), vyšetrenie = vybavenie − začiatok u lekára.
+   *   čas u sestry = poslanie k lekárovi (alebo ukončenie) − vyvolanie k sestre;
+   * – lekár: čakanie = vyvolanie lekárom − poslanie od sestry (priamo k lekárovi = 0), vyšetrenie = ukončenie − začiatok u lekára.
    *   Meškanie oproti termínu sa lekárovi pri dvoch krokoch nepripisuje (termín je čas vstupu k sestre).
    * Staršie záznamy (jeden krok, bez kroku v udalosti) sa počítajú ako doteraz: všetko lekárovi z posledného vyvolania.
    */
