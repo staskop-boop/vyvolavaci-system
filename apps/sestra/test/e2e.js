@@ -289,6 +289,11 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-waiting', 'L5').getByRole('button', { name: 'Upraviť' }).click();
     await A.selectOption('#m-stage', 'doctor'); await A.click('#m-ok');
     await row(A, 'tbl-doctor', 'L5').waitFor();
+    // rýchla zmena ambulancie priamo v riadku
+    await row(A, 'tbl-doctor', 'L5').locator('select.room-sel').selectOption('');
+    await toastWith(A, /L5: ktorákoľvek ambulancia/);
+    await A.waitForFunction(() => { const r = [...document.querySelectorAll('#tbl-doctor tr')].find((x) => x.textContent.includes('L5')); return r && r.querySelector('select.room-sel').value === '' && r.querySelector('select.room-sel').classList.contains('any'); });
+    await shot(A, '13-rychla-zmena-ambulancie');
     await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Neprítomný' }).click();
     await row(A, 'tbl-doctor', 'L5').waitFor({ state: 'detached' });
     ok('voľba „ide k sestre / ide k lekárovi“: pri pridaní, v tabuľke čakajúcich aj v úprave');

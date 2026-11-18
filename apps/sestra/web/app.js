@@ -483,8 +483,11 @@
         ${t.source === 'card' ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="reprint" data-id="${t.id}" ${dis} title="Znovu vytlačiť lístok">Tlač</button>`}
       </div></td></tr>`).join('');
 
+    // 2026-11-18 (Pali): rýchla zmena ambulancie priamo v riadku radu k lekárovi
+    const roomQuick = (t, dis) => `<select class="room-sel amb-pill ${t.homeRoomId ? 'c' + ((Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1) : 'any'} needs-online" data-room-for="${t.id}" ${dis} aria-label="Ambulancia pacienta ${esc(t.code)}" title="Zmeniť ambulanciu">
+      ${active.map((r) => `<option value="${r.id}" ${r.id === t.homeRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="" ${t.homeRoomId ? '' : 'selected'}>Ktorákoľvek</option></select>`;
     const docRows = waitingDoc.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : (t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
       <td class="nw">${esc(fmtTime(t.toDoctorAt))}</td><td class="nw">${esc(fmtWait(t.toDoctorAt || t.createdAt, now))}</td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
@@ -625,6 +628,14 @@
 
   // zmena „ide k sestre / ide k lekárovi“ priamo v tabuľke čakajúcich
   $view.addEventListener('change', (e) => {
+    const rs = e.target.closest('select[data-room-for]');
+    if (rs && S.staff) {
+      const rt = S.staff.tickets.find((x) => x.id === Number(rs.dataset.roomFor));
+      if (!rt) return;
+      act(() => api(`/api/staff/tickets/${rt.id}/room`, { body: { roomId: rs.value ? Number(rs.value) : null } }),
+        `${rt.code}: ${rs.value ? rs.options[rs.selectedIndex].text : 'ktorákoľvek ambulancia'}`).then((r) => { if (!r) renderQueue(); });
+      return;
+    }
     const sel = e.target.closest('select[data-stage-for]');
     if (!sel || !S.staff) return;
     const t = S.staff.tickets.find((x) => x.id === Number(sel.dataset.stageFor));
