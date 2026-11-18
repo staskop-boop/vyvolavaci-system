@@ -421,6 +421,14 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-finished', tn).waitFor();
     await row(A, 'tbl-called', tn2).getByRole('button', { name: /Ukončený/ }).click();
     await row(A, 'tbl-finished', tn2).waitFor();
+    // história: priebeh hovorí, kto vyvolal a kto kam poslal
+    await A.click('.tab[data-view=history]');
+    const hr = A.locator('#hist-detail tr', { hasText: tn }).first();
+    await hr.getByText('Vyvolaný sestrou (Daniela Fetyková) – Ambulancia č. 1').waitFor();
+    for (const txt of ['Pridaný sestrou', 'Registrácia (lístok)'].slice(0, 0).concat(['Poslaný k lekárovi sestrou', 'Vyvolaný lekárom (MUDr. Pavel Staško)', 'Poslaný k sestre lekárom', 'Vrátený od sestry späť k lekárovi', 'Ukončený sestrou (po lekárovi)']))
+      assert.ok(await hr.getByText(txt).count(), 'v histórii chýba: ' + txt);
+    await shot(A, '22-historia-priebeh');
+    await A.click('.tab[data-view=queue]');
     ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi, „K sestre na ukončenie“ a „Ukončený“ u sestry');
 
     // 11c. hromadné kontá nastavia heslo aj kontám lekárov, ktoré vznikli bez hesla

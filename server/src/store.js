@@ -1117,7 +1117,7 @@ class Store extends EventEmitter {
 
   history(day, withNote = false) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ''))) throw bad('Neplatný dátum.');
-    const events = this.db.prepare(`SELECT e.id, e.ticket_id AS ticketId, t.code, e.type, e.at, r.name AS roomName, e.note
+    const events = this.db.prepare(`SELECT e.id, e.ticket_id AS ticketId, t.code, e.type, e.at, r.name AS roomName, e.note, e.stage, e.nurse, e.doctor
       FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id LEFT JOIN rooms r ON r.id = e.room_id
       WHERE t.day = ? ORDER BY e.id`).all(day);
     return { day, tickets: this.listTickets(day, withNote), events };
