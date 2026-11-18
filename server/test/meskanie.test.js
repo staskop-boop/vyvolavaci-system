@@ -40,7 +40,7 @@ test('neskorý príchod nezvýši sklz ambulancie; čakanie po termíne áno', a
   assert.ok(r >= 29 && r <= 31, `5 prišiel včas a čakal 30 min po termíne → sklz ~30 min (je ${r})`);
 });
 
-test('po „vybavený“ ambulancia na TV nikoho nevyšetruje', async () => {
+test('po „ukončený“ ambulancia na TV nikoho nevyšetruje', async () => {
   const st = (await staff.get('/api/staff/state')).data;
   const room = st.rooms[0].id;
   let d = (await staff.get('/api/display/state')).data;

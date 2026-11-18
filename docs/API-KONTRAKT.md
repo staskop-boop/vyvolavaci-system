@@ -27,7 +27,7 @@ print_attempts, printed_at`, `UNIQUE(day, seq)`.
 |---|---|
 | `waiting` | Čaká |
 | `called` | Vyvolaný |
-| `done` | Vybavený |
+| `done` | Ukončený |
 | `absent` | Neprítomný |
 
 Prechody: `waiting → called` (vyvolanie), `called → called` (zopakovanie, `call_count+1`),
@@ -97,7 +97,7 @@ Kódy: `BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED,
 | `POST /api/staff/tickets/:id/call` | `{roomId, note?}` | vyvolať konkrétne číslo (mimo poradia – `note` vidí len personál) |
 | `POST /api/staff/call-next` | `{roomId}` | vyvolať najdlhšie čakajúceho |
 | `POST /api/staff/tickets/:id/recall` | `{roomId?}` | zopakovať vyvolanie |
-| `POST /api/staff/tickets/:id/done` | – | Vybavený |
+| `POST /api/staff/tickets/:id/done` | – | Ukončený |
 | `POST /api/staff/tickets/:id/absent` | – | Neprítomný |
 | `POST /api/staff/tickets/:id/requeue` | – | vrátiť medzi čakajúcich (zachová pôvodný čas príchodu) |
 | `POST /api/staff/tickets/:id/reprint` | – | znovu vytlačiť lístok (nové číslo sa **nevytvára**) |
@@ -163,7 +163,7 @@ StaffState = {
 1. Čísla prideľuje iba server v transakcii `BEGIN IMMEDIATE` (SQLite) – `day_counters` + `UNIQUE(day, seq)`.
 2. Idempotencia registrácie: `UNIQUE(request_id)`.
 3. Vyvolanie je podmienené aktuálnym stavom (`UPDATE … WHERE status='waiting'`); 0 zmenených riadkov = 409.
-4. Deň sa určuje v pásme Europe/Bratislava; staré nevybavené čísla sa do nového dňa neprenášajú,
+4. Deň sa určuje v pásme Europe/Bratislava; staré neukončené čísla sa do nového dňa neprenášajú,
    ostávajú v histórii (`previousDayOpen` upozorní personál).
 5. Klienti nikdy neukladajú stav len lokálne – po reštarte/obnovení načítajú úplný stav zo servera.
 6. Na verejné kanály (`display`, tablet) nikdy neidú poznámky personálu ani iné interné údaje.
@@ -268,4 +268,4 @@ Pacient ide najprv k sestre (plánovaný čas = čas vstupu k sestre), sestra ho
   Fotka sestry: `assets/doctors/<priezvisko>.jpg`, inak ilustrácia `assets/doctors/sestra.svg` s nápisom „Sestra“.
 * Štatistiky `GET /api/admin/stats?groupBy=doctor|nurse|room`: lekárovi sa pri dvoch krokoch počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho
   (meškanie oproti termínu nie); sestre čakanie od príchodu, meškanie oproti termínu a čas u nej. Nové polia `avgNurse`, `avgDoctorWait`, `avgDoctor`,
-  `toDoctor`, `direct`, `twoStepSince`. Pacient vybavený len u sestry sa lekárovi nepočíta.
+  `toDoctor`, `direct`, `twoStepSince`. Pacient ukončený len u sestry sa lekárovi nepočíta.

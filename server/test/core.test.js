@@ -51,7 +51,7 @@ test('bez prihlásenia sa k rozhraniu sestry nedostane nikto', async () => {
   assert.equal(bad.status, 401);
 });
 
-test('vyvolanie, zopakovanie, vybavený, neprítomný, vrátenie medzi čakajúcich', async () => {
+test('vyvolanie, zopakovanie, ukončený, neprítomný, vrátenie medzi čakajúcich', async () => {
   const st = (await staff.get('/api/staff/state')).data;
   const room = st.rooms[0];
   const w = st.tickets.find((t) => t.status === 'waiting');

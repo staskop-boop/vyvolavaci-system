@@ -34,7 +34,7 @@ test('ambulancia pacienta: výber, zmena, zrušenie', async (t) => {
     assert.equal(r.status, 400, 'neplatná ambulancia');
     await admin.post(`/api/staff/tickets/${t5.id}/done`, {});
     r = await admin.post(`/api/staff/tickets/${t5.id}/room`, { roomId: a2.id });
-    assert.equal(r.status, 409, 'vybaveného nemožno presunúť');
+    assert.equal(r.status, 409, 'ukončeného nemožno presunúť');
     const day = (await admin.get('/api/staff/state')).data.day;
     const h = (await admin.get(`/api/staff/history?day=${day}`)).data;
     assert.ok(h.events.some((e) => e.type === 'moved' && e.ticketId === t5.id), 'zmena je v histórii');

@@ -114,7 +114,7 @@
     if (min < 60) return min + ' min';
     return Math.floor(min / 60) + ' h ' + (min % 60) + ' min';
   }
-  const STATUS_TEXT = { waiting: 'Čaká', called: 'Vyvolaný', done: 'Vybavený', absent: 'Neprítomný' };
+  const STATUS_TEXT = { waiting: 'Čaká', called: 'Vyvolaný', done: 'Ukončený', absent: 'Neprítomný' };
   const PRINT_TEXT = { ok: 'Vytlačený', unverified: 'Tlač neoverená', failed: 'Tlač zlyhala', disabled: 'Tlač vypnutá', pending: 'Tlačí sa' };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 

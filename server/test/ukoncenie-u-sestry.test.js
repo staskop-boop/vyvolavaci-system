@@ -1,6 +1,6 @@
 'use strict';
 // 2026-11-18 (Pali): pacient ide od sestry k lekárovi a po vyšetrení späť k sestre na ukončenie (platba, papiere).
-// Lekár ho pošle „k sestre na ukončenie“, „Vybavený“ potvrdí až sestra.
+// Lekár ho pošle „k sestre na ukončenie“, „Ukončený“ potvrdí až sestra.
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
@@ -18,7 +18,7 @@ after(() => s.close());
 const ticket = async (code) => (await admin.get('/api/staff/state')).data.tickets.find((t) => t.code === code);
 const display = async () => (await h.client(s.base).get('/api/display/state')).data;
 
-test('sestra → lekár → sestra na ukončenie → vybavený', async () => {
+test('sestra → lekár → sestra na ukončenie → ukončený', async () => {
   const a = await admin.post('/api/staff/cards', { cardNo: 'U1', plannedTime: '23:00', roomId: room.id });
   const id = a.data.ticket.id;
   assert.equal((await lekar.post(`/api/staff/tickets/${id}/to-final`, {})).status, 409, 'čakajúceho nemožno poslať na ukončenie');

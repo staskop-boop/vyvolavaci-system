@@ -9,7 +9,7 @@ Rozlišujeme tri úrovne:
 
 Prideľovanie čísel A001, A002, …; idempotencia `requestId`; 100 súbežných registrácií = 100 jedinečných
 po sebe idúcich čísel; 20 súbežných opakovaní tej istej požiadavky = 1 číslo; ochrana prihlásením;
-vyvolanie / zopakovanie / vybavený / neprítomný / vrátenie; omylom vyvolané číslo zmizne z obrazovky;
+vyvolanie / zopakovanie / ukončený / neprítomný / vrátenie; omylom vyvolané číslo zmizne z obrazovky;
 poznámka personálu sa nedostane na verejné rozhranie; dve sestry naraz → 200 + 409; 10× súbežne
 „Vyvolať ďalšieho“ → 10 rôznych pacientov; nastavenia a ambulancie; zmena hesla; ukončenie dňa a vymazanie
 s potvrdením; deň podľa Europe/Bratislava (polnoc, letný/zimný čas); nový deň → A001, staré čísla v histórii;
