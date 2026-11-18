@@ -311,7 +311,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     // rozloženie: rad k sestre vľavo, rad k lekárovi vpravo, rovnako široké; nič nepretŕča; vybavení dole na celú šírku
     const lay = await A.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); const n = r('.q-nurse'), d = r('.q-doctor'), f = r('.a-finished'), c = r('.a-counts'), rb = r('.a-room');
       const over = [...document.querySelectorAll('.a-queues > .card')].map((x) => x.scrollWidth - x.clientWidth).join('/');
-      return { same: Math.abs(n.width - d.width) < 2, left: n.left < d.left, below: f.top >= Math.max(n.bottom, d.bottom), full: Math.abs(f.width - (d.right - n.left)) < 2, first: c.bottom <= rb.top, over }; });
+      return { same: Math.abs(n.width - d.width) < 2, left: n.left < d.left, below: f.top >= Math.max(n.bottom, d.bottom), full: Math.abs(f.width - (d.right - n.left)) < 2, first: rb.bottom <= c.top && c.bottom <= r('.a-hero').top, over }; });
     const top = await A.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); const h = r('.a-hero'), n = r('.a-now'), qn = r('.q-nurse'), qd = r('.q-doctor');
       const he = document.querySelector('.a-hero'); return { same: Math.abs(h.width - n.width) < 2, lineL: Math.abs(h.left - qn.left) < 2, lineR: Math.abs(n.right - qd.right) < 2, over: he.scrollWidth - he.clientWidth }; });
     assert.deepEqual(top, { same: true, lineL: true, lineR: true, over: 0 }, 'horné okná sú rovnako široké: ' + JSON.stringify(top));

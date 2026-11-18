@@ -561,12 +561,6 @@
     const roomNow = active[ri];
     const roomNo = roomNow ? ((String(roomNow.name).match(/(\d+)/) || [])[1] || String(ri + 1)) : '–';
     $view.innerHTML = `<div class="dash">
-      <div class="counts a-counts">
-        <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>${isDocAcc ? 'čaká na vás' : 'čaká na sestru'}${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
-        <div class="count"><b id="cnt-doctor">${isDocAcc ? waitingNurse.length : waitingDoc.length}</b><span>${isDocAcc ? 'čaká na sestru' : 'čaká na lekára'}</span></div>
-        <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
-        <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
-      </div>
       <div class="a-room stack"><section class="roombar c${(ri % 3) + 1}" aria-label="Pracovisko">
         <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
@@ -585,6 +579,13 @@
         </div>
       </section>
       ${alerts.length ? `<div class="a-alerts">${alerts.join('')}</div>` : ''}</div>
+
+      <div class="counts a-counts">
+        <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>${isDocAcc ? 'čaká na vás' : 'čaká na sestru'}${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
+        <div class="count"><b id="cnt-doctor">${isDocAcc ? waitingNurse.length : waitingDoc.length}</b><span>${isDocAcc ? 'čaká na sestru' : 'čaká na lekára'}</span></div>
+        <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
+        <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
+      </div>
 
       <section class="hero a-hero" aria-label="Ďalší na rade">
         <div class="hero-tile ${next ? (next.code.length > 3 ? 'long' : '') : 'empty'}">${next ? esc(next.code) : '—'}</div>
