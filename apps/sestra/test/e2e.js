@@ -291,6 +291,13 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await A.selectOption('#m-stage', 'doctor'); await A.click('#m-ok');
     await row(A, 'tbl-doctor', 'L5').waitFor();
     // rýchla zmena ambulancie priamo v riadku
+    // názov ambulancie vrátane čísla sa do poľa zmestí celý (neorezáva sa)
+    assert.ok(await row(A, 'tbl-doctor', 'L5').locator('select.room-sel').evaluate((el) => {
+      const c = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(el);
+      c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      return el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) >= c.measureText(el.options[el.selectedIndex].text).width;
+    }), 'číslo ambulancie je v poli vidieť celé');
+    await shot(A, '14-ambulancia-cela');
     await row(A, 'tbl-doctor', 'L5').locator('select.room-sel').selectOption('');
     await toastWith(A, /L5: ktorákoľvek ambulancia/);
     await A.waitForFunction(() => { const r = [...document.querySelectorAll('#tbl-doctor tr')].find((x) => x.textContent.includes('L5')); return r && r.querySelector('select.room-sel').value === '' && r.querySelector('select.room-sel').classList.contains('any'); });
