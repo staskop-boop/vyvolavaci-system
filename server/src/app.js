@@ -158,7 +158,7 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/requeue', requireStaff, (req, res) => res.json(store.requeue(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/reprint', requireNurse, wrap(async (req, res) => res.json(await store.reprint(id(req), req.user.id))));
   app.post('/api/staff/cards', requireNurse, (req, res) => res.status(201).json(store.registerCard(req.body?.cardNo, req.body?.plannedTime, req.user.id,
-    req.body && 'roomId' in req.body ? req.body.roomId : req.user.roomId, req.body?.staffNote, req.body?.patientType)));
+    req.body && 'roomId' in req.body ? req.body.roomId : req.user.roomId, req.body?.staffNote, req.body?.patientType, req.body?.stage)));
   app.post('/api/staff/tickets/:id/note', requireNurse, (req, res) => res.json(store.setStaffNote(id(req), req.body || {}, req.user.id)));
   app.post('/api/staff/announcement', requireNurse, (req, res) => res.json(store.setAnnouncement(req.body?.text, req.user)));
   app.post('/api/staff/rooms/:id/doctor', requireNurse, (req, res) => res.json(store.setDoctor(id(req), req.body?.name, req.user.id)));
