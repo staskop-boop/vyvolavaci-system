@@ -1044,7 +1044,7 @@ class Store extends EventEmitter {
     const clinicDelayMinutes = last ? callDelay(last) : 0;
     // v2.1: sklz každého pracoviska zvlášť – podľa jeho posledného vyvolania a hlásenia sestry
     const closed = this.roomsClosedToday();
-    const stageOf = (id) => { const st = (this.db.prepare('SELECT stage FROM tickets WHERE id = ?').get(id) || {}).stage || 'nurse'; return st === 'final' ? 'nurse' : st; };   // ukončenie = pacient je u sestry
+    const stageOf = (id) => { const st = (this.db.prepare('SELECT stage FROM tickets WHERE id = ?').get(id) || {}).stage || 'nurse'; return st === 'final' ? 'doctor' : st; };   // 2026-11-18 (Pali): ukončenie u sestry je interný pohyb – na TV ostáva lekár
     const rooms = this.listRooms({ activeOnly: true }).map((r) => {
       const lr = this.db.prepare(`SELECT e.at, t.planned_at, t.created_at FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
         WHERE t.day = ? AND e.type = 'call' AND COALESCE(e.stage, 'nurse') = 'nurse' AND e.room_id = ? AND t.planned_at IS NOT NULL ORDER BY e.id DESC LIMIT 1`).get(day, r.id);

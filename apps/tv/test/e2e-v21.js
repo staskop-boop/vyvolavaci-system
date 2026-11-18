@@ -135,8 +135,9 @@ const hm = (m) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislav
   await step('2. vyvolanie k lekárovi: sestra pošle pacienta von, TV ukáže lekára s fotkou', async () => {
     await s1.locator('#tbl-called tr', { hasText: '1' }).getByRole('button', { name: '→ K lekárovi' }).click();
     await s1.locator('#tbl-doctor tr', { hasText: '1' }).waitFor();
-    await tv.waitForFunction(() => /Na lekára čakajú/.test(document.getElementById('roomRows').textContent), null, { timeout: 20000 });
-    await sleep(400);
+    await sleep(1500);
+    // 2026-11-18 (Pali): interné pohyby pacienta sa na TV neukazujú
+    assert.doesNotMatch(await tv.locator('#roomRows').innerText(), /Na lekára čakajú/i);
     await tv.screenshot({ path: path.join(SHOTS, 'tv24-caka-na-lekara.png') });
     await s1.screenshot({ path: path.join(SHOTS, 'sestra24-caka-na-lekara.png') });
     await s1.locator('#tbl-doctor tr', { hasText: '1' }).getByRole('button', { name: /Vyvolať k lekárovi/ }).click();
