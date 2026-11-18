@@ -120,7 +120,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-called', 'A002').getByText('Ambulancia č. 2').waitFor();
     await row(A, 'tbl-called', 'A002').getByRole('button', { name: 'Neprítomný' }).click();
     await row(A, 'tbl-finished', 'A002').getByText('Neprítomný').waitFor();
-    await row(A, 'tbl-finished', 'A002').getByRole('button', { name: 'Vrátiť', exact: true }).click();
+    await row(A, 'tbl-finished', 'A002').getByRole('button', { name: '↩ Vrátiť', exact: true }).click();
     await A.click('#m-ok');
     await row(A, 'tbl-waiting', 'A002').waitFor();
     ok('stavy Vybavený, Neprítomný a vrátenie medzi čakajúcich (s potvrdením); výber ambulancie');
