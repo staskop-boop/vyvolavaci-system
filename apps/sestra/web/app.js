@@ -24,6 +24,12 @@
 
   // ---------- pomocné ----------
   function lsGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+  const LS_POHLAD = 'adna-pohlad-';
+  function pohladGet() {
+    const v = lsGet(LS_POHLAD + S.user.username);
+    if (v === 'nurse' || v === 'doctor' || v === 'both') return v;
+    return S.user.doctorName ? 'doctor' : S.user.role === 'admin' ? 'both' : 'nurse';
+  }
   function lsSet(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} }
 
   function toast(msg, kind) {
@@ -588,7 +594,10 @@
     const ri = Math.max(0, active.findIndex((r) => r.id === S.roomId));
     const roomNow = active[ri];
     const roomNo = roomNow ? ((String(roomNow.name).match(/(\d+)/) || [])[1] || String(ri + 1)) : '–';
-    $view.innerHTML = `<div class="dash">
+    // 2026-11-18 (Pali): prepínač pohľadu – lekár vidí len lekársku časť, sestra len sesterskú, alebo obe;
+    // predvolené podľa typu konta, voľba sa pamätá pre konto na tomto zariadení
+    const pohlad = pohladGet();
+    $view.innerHTML = `<div class="dash pohlad-${pohlad}">
       <div class="a-room stack"><section class="roombar c${(ri % 3) + 1}" aria-label="Pracovisko">
         <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
@@ -624,6 +633,12 @@
         </div>
       </section>
 
+      <div class="a-viewbar viewbar" role="group" aria-label="Pohľad">
+        <span class="vb-lbl">Pohľad</span>
+        ${[['nurse', '🩺 Len sestra'], ['both', 'Sestra aj lekár'], ['doctor', '👩‍⚕️ Len lekár']].map(([k, l]) =>
+          `<button type="button" class="vb-btn ${pohlad === k ? 'on' : ''}" data-pohlad="${k}" aria-pressed="${pohlad === k}">${l}</button>`).join('')}
+      </div>
+
       <div class="a-now now-pair" id="tbl-called">${calledRows}</div>
 
       <div class="a-queues">
@@ -654,6 +669,7 @@
     const de = document.getElementById('btn-day-end');
     if (de) de.onclick = () => (st.dayEnd ? reopenDay() : endDay());
     if (!isDoc && (!doctor || !nurseNow) && !closedHere && !off && S.roomId && !S.doctorAsked && !document.getElementById('modal-root').children.length && !S.askingDoctor) askDoctor(true);
+    document.querySelectorAll('[data-pohlad]').forEach((b) => { b.onclick = () => { lsSet(LS_POHLAD + S.user.username, b.dataset.pohlad); renderQueue(); }; });
     document.getElementById('show-all').onchange = (e) => { lsSet(LS_ALL, e.target.checked ? '1' : null); renderQueue(); };
     document.getElementById('btn-next').onclick = () => act(
       () => api('/api/staff/call-next', { body: { roomId: S.roomId, stage: isDocAcc ? 'doctor' : 'nurse' } }),
