@@ -307,6 +307,13 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     assert.equal(await A.locator('.type-pill.entry', { hasText: 'Kontrola' }).count(), 0, 'kontroly ostávajú žlté');
     await shot(A, '13-rychla-zmena-ambulancie');
     // „Vybavený“ priamo v rade k lekárovi (ukončenie pri omyle, bez vyvolania)
+    // plný riadok v rade k sestre (ambulancia, typ, identifikátor, termín s meškaním) sa musí zmestiť do okna
+    await A.click('#btn-card');
+    await A.fill('#m-card', 'W6'); await A.fill('#m-time', '00:05');
+    await A.selectOption('#m-type', 'Vstupné vyšetrenie varixy'); await A.fill('#m-ident', 'Skúšobná Dlhšia');
+    await A.click('#m-ok');
+    await row(A, 'tbl-waiting', 'W6').locator('.ident-pill').waitFor();
+    assert.match(await row(A, 'tbl-waiting', 'W6').locator('.t-plan').innerText(), /00:05/);
     await shot(A, '16-rozlozenie');
     // rozloženie: rad k sestre vľavo, rad k lekárovi vpravo, rovnako široké; nič nepretŕča; vybavení dole na celú šírku
     const lay = await A.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); const n = r('.q-nurse'), d = r('.q-doctor'), f = r('.a-finished'), c = r('.a-counts'), rb = r('.a-room');

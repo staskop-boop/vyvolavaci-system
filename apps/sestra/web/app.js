@@ -472,8 +472,8 @@
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
     const waitRows = waitingNurse.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="nw t-plan">${plannedBadge(t, now)}</td>
-      <td class="nw t-arr">${esc(fmtTime(t.createdAt))}</td><td class="nw t-wait">${esc(fmtWait(t.createdAt, now))}</td>
+      <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${plannedBadge(t, now)}</span><span class="tl t-arr"><i>príchod</i> <b>${esc(fmtTime(t.createdAt))}</b></span><span class="tl t-wait"><i>čaká</i> <b>${esc(fmtWait(t.createdAt, now))}</b></span></td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="${isDocAcc ? 'Pacienta si vezmete rovno k sebe (bez sestry)' : 'Vyvolať k sestre'}">${isDocAcc ? 'Vyvolať k sebe' : 'Vyvolať'}${i > 0 || isDocAcc ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
@@ -543,7 +543,7 @@
 
     function nurseSection() {
       return `<div><div class="section-title"><h2>Čakajú na sestru (${waitingNurse.length})</h2><span class="hint">${esc(fmtDay(st.day))}</span></div>
-        ${waitingNurse.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Termín</th><th>Príchod</th><th>Čaká</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
+        ${waitingNurse.length ? `<table id="tbl-waiting"><thead><tr><th>Číslo</th><th>Ambulancia</th><th title="Termín objednania, príchod a čakanie">Časy</th><th></th></tr></thead><tbody>${waitRows}</tbody></table>`
           : '<div class="empty">Nikto nečaká.</div>'}</div>`;
     }
     function docSection() {
