@@ -301,13 +301,18 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-doctor', 'L5').locator('select.room-sel').selectOption('');
     await toastWith(A, /L5: ktorákoľvek ambulancia/);
     await A.waitForFunction(() => { const r = [...document.querySelectorAll('#tbl-doctor tr')].find((x) => x.textContent.includes('L5')); return r && r.querySelector('select.room-sel').value === '' && r.querySelector('select.room-sel').classList.contains('any'); });
-    assert.match(await row(A, 'tbl-doctor', 'L5').locator('td.t-plan').innerText(), /10:40/, 'v rade k lekárovi je termín');
-    assert.match(await A.locator('#tbl-doctor thead').innerText(), /TERMÍN|Termín/);
+    assert.match(await row(A, 'tbl-doctor', 'L5').locator('.t-plan').innerText(), /10:40/, 'v rade k lekárovi je termín');
     assert.ok(await A.getByRole('heading', { name: /Čakajú na sestru/ }).count(), 'nadpis radu k sestre');
     assert.ok(await row(A, 'tbl-doctor', 'L5').locator('.type-pill.entry', { hasText: 'Vstupné vyšetrenie varixy' }).count(), 'vstupné vyšetrenie je zelené');
     assert.equal(await A.locator('.type-pill.entry', { hasText: 'Kontrola' }).count(), 0, 'kontroly ostávajú žlté');
     await shot(A, '13-rychla-zmena-ambulancie');
     // „Vybavený“ priamo v rade k lekárovi (ukončenie pri omyle, bez vyvolania)
+    await shot(A, '16-rozlozenie');
+    // rozloženie: rad k sestre vľavo, rad k lekárovi vpravo, rovnako široké; nič nepretŕča; vybavení dole na celú šírku
+    const lay = await A.evaluate(() => { const r = (q) => document.querySelector(q).getBoundingClientRect(); const n = r('.q-nurse'), d = r('.q-doctor'), f = r('.a-finished'), c = r('.a-counts'), rb = r('.a-room');
+      const over = [...document.querySelectorAll('.a-queues > .card')].map((x) => x.scrollWidth - x.clientWidth).join('/');
+      return { same: Math.abs(n.width - d.width) < 2, left: n.left < d.left, below: f.top >= Math.max(n.bottom, d.bottom), full: Math.abs(f.width - (d.right - n.left)) < 2, first: c.bottom <= rb.top, over }; });
+    assert.deepEqual(lay, { same: true, left: true, below: true, full: true, first: true, over: '0/0' }, JSON.stringify(lay));
     await shot(A, '15-vybaveny-v-rade-lekara');
     await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Vybavený' }).click();
     await toastWith(A, /L5: Vybavený/);

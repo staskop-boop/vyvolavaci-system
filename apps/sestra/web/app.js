@@ -488,8 +488,7 @@
       ${active.map((r) => `<option value="${r.id}" ${r.id === t.homeRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="" ${t.homeRoomId ? '' : 'selected'}>Ktorákoľvek</option></select>`;
     const docRows = waitingDoc.map((t, i) => `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : (t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
-      <td class="nw t-plan">${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</td>
-      <td class="nw t-times"><span class="tl"><i>u sestry</i> ${t.nurseCalledAt ? `<b>${esc(fmtTime(t.nurseCalledAt))}</b>` : '<span class="hint" title="Pacient nebol u sestry">—</span>'}</span><span class="tl"><i>k lekárovi</i> <b>${esc(fmtTime(t.toDoctorAt))}</b></span></td><td class="nw">${esc(fmtWait(t.toDoctorAt || t.createdAt, now))}</td>
+      <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</span><span class="tl"><i>u sestry</i> ${t.nurseCalledAt ? `<b>${esc(fmtTime(t.nurseCalledAt))}</b>` : '<span class="hint" title="Pacient nebol u sestry">—</span>'}</span><span class="tl"><i>k lekárovi</i> <b>${esc(fmtTime(t.toDoctorAt))}</b></span><span class="tl t-wait"><i>čaká</i> <b>${esc(fmtWait(t.toDoctorAt || t.createdAt, now))}</b></span></td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
         <button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="Ukončiť pacienta bez vyvolania (napr. pri omyle) – dá sa vrátiť v zozname Vybavení a neprítomní">✓ Vybavený</button>
@@ -512,9 +511,15 @@
         ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
       </div></td></tr>`).join('');
 
-    const finRows = finished.slice(0, 30).map((t) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
-      <td>${esc(t.roomName || '')}</td><td>${esc(fmtTime(t.finishedAt))}</td>
+    // 2026-11-18 (Pali): vybavení a neprítomní dole na celú šírku so všetkými údajmi
+    const tm = (v) => (v ? esc(fmtTime(v)) : '<span class="hint">—</span>');
+    const finRows = finished.slice(0, 60).map((t) => `<tr data-ticket="${t.id}">
+      <td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
+      <td class="f-pat">${hasPriv(t) ? identPill(t) : '<span class="hint">—</span>'}</td>
+      <td>${esc(t.roomName || t.homeRoomName || '')}</td>
+      <td class="nw">${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</td>
+      <td class="nw">${tm(t.createdAt)}</td><td class="nw">${tm(t.nurseCalledAt)}</td><td class="nw">${tm(t.toDoctorAt)}</td>
+      <td class="nw">${tm(t.stage === 'doctor' ? t.calledAt : null)}</td><td class="nw"><b>${tm(t.finishedAt)}</b></td>
       <td class="actions"><button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">Vrátiť</button></td></tr>`).join('');
 
     // ďalší na rade – veľká karta s hlavnou akciou
@@ -543,7 +548,7 @@
     }
     function docSection() {
       return `<div><div class="section-title"><h2>Čakajú na lekára (${waitingDoc.length})</h2><span class="hint">po sestre alebo rovno k lekárovi</span></div>
-        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th title="Čas, na ktorý bol pacient objednaný">Termín</th><th title="Kedy pacienta vyvolala sestra a odkedy čaká na lekára">Vyvolaný</th><th>Čaká</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
+        ${waitingDoc.length ? `<table id="tbl-doctor"><thead><tr><th>Číslo</th><th>Ambulancia</th><th title="Termín objednania, vyvolanie sestrou, zaradenie k lekárovi a čakanie">Časy</th><th></th></tr></thead><tbody>${docRows}</tbody></table>`
           : `<div class="empty">${isDocAcc ? 'Sestra k vám zatiaľ nikoho neposlala.' : 'Nikto nečaká na lekára.'}</div>`}</div>`;
     }
 
@@ -556,6 +561,12 @@
     const roomNow = active[ri];
     const roomNo = roomNow ? ((String(roomNow.name).match(/(\d+)/) || [])[1] || String(ri + 1)) : '–';
     $view.innerHTML = `<div class="dash">
+      <div class="counts a-counts">
+        <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>${isDocAcc ? 'čaká na vás' : 'čaká na sestru'}${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
+        <div class="count"><b id="cnt-doctor">${isDocAcc ? waitingNurse.length : waitingDoc.length}</b><span>${isDocAcc ? 'čaká na sestru' : 'čaká na lekára'}</span></div>
+        <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
+        <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
+      </div>
       <div class="a-room stack"><section class="roombar c${(ri % 3) + 1}" aria-label="Pracovisko">
         <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
@@ -589,20 +600,15 @@
           : '<div class="empty">Momentálne nie je nikto vyvolaný.</div>'}
       </section>
 
-      <section class="card a-waiting stack">${isDocAcc ? docSection() + nurseSection() : nurseSection() + docSection()}</section>
+      <div class="a-queues">
+        <section class="card q-nurse">${nurseSection()}</section>
+        <section class="card q-doctor">${docSection()}</section>
+      </div>
 
-      <div class="stack a-side">
-        <div class="counts">
-          <div class="count c-wait"><b id="cnt-waiting">${waiting.length}</b><span>${isDocAcc ? 'čaká na vás' : 'čaká na sestru'}${!all && nWaitAll > waiting.length ? ` (spolu ${nWaitAll})` : ''}</span></div>
-          <div class="count"><b id="cnt-doctor">${isDocAcc ? waitingNurse.length : waitingDoc.length}</b><span>${isDocAcc ? 'čaká na sestru' : 'čaká na lekára'}</span></div>
-          <div class="count"><b>${called.length}</b><span>vyvolaní</span></div>
-          <div class="count c-done"><b>${finished.filter((t) => t.status === 'done').length}</b><span>vybavení · ${finished.filter((t) => t.status === 'absent').length} neprít.</span></div>
-        </div>
-        <section class="card"><div class="section-title"><h2>Vybavení a neprítomní</h2></div>
-          ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Ambulancia</th><th>Čas</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
-            : '<div class="empty">Zatiaľ nikto.</div>'}
-        </section>
-      </div></div>`;
+      <section class="card a-finished"><div class="section-title"><h2>Vybavení a neprítomní (${finished.length})</h2><span class="hint">omylom ukončeného vrátite tlačidlom Vrátiť</span></div>
+        ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Pacient</th><th>Ambulancia</th><th title="Čas, na ktorý bol pacient objednaný">Termín</th><th>Príchod</th><th title="Kedy pacienta vyvolala sestra">U sestry</th><th title="Odkedy čakal na lekára">K lekárovi</th><th title="Kedy pacienta vyvolal lekár">U lekára</th><th>Ukončený</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
+          : '<div class="empty">Zatiaľ nikto.</div>'}
+      </section></div>`;
     const fin2 = document.querySelector('.fin-wrap');
     if (fin2) fin2.scrollTop = finScroll;
     window.scrollTo(0, scroll);
