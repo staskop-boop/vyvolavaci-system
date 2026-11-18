@@ -307,7 +307,10 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     assert.ok(await row(A, 'tbl-doctor', 'L5').locator('.type-pill.entry', { hasText: 'Vstupné vyšetrenie varixy' }).count(), 'vstupné vyšetrenie je zelené');
     assert.equal(await A.locator('.type-pill.entry', { hasText: 'Kontrola' }).count(), 0, 'kontroly ostávajú žlté');
     await shot(A, '13-rychla-zmena-ambulancie');
-    await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Neprítomný' }).click();
+    // „Vybavený“ priamo v rade k lekárovi (ukončenie pri omyle, bez vyvolania)
+    await shot(A, '15-vybaveny-v-rade-lekara');
+    await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Vybavený' }).click();
+    await toastWith(A, /L5: Vybavený/);
     await row(A, 'tbl-doctor', 'L5').waitFor({ state: 'detached' });
     ok('voľba „ide k sestre / ide k lekárovi“: pri pridaní, v tabuľke čakajúcich aj v úprave');
 
