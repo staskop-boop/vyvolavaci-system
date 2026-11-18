@@ -417,3 +417,4 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 #tbl-doctor td.t-times .t-plan .delta { display: block; width: max-content; margin: 0 0 2px 68px; }
 .a-queues .acts .btn-sm { padding-left: 6px; padding-right: 6px; font-size: 14px; }
 .a-queues .wait-pill { padding: 1px 6px; }
+#hist-detail td.ev-list { min-width: 380px; line-height: 1.55; } #hist-detail .ev-t { font-weight: 700; color: var(--black); }

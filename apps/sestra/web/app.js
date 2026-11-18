@@ -961,6 +961,35 @@
   const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Ukončený', absent: 'Neprítomný',
     requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', to_nurse: 'Vrátený do radu k sestre', to_final: 'Od lekára k sestre na ukončenie', final_back: 'Z ukončenia späť k lekárovi', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
 
+  /**
+   * 2026-11-18 (Pali): priebeh v histórii presnejšie – kto pacienta vyvolal (sestra / lekár) a kto ho kam poslal.
+   * Mená sú mená personálu z udalosti; `prev` = predchádzajúce udalosti toho istého čísla.
+   */
+  function evLine(e, prev) {
+    const who = (n) => (n ? ` (${esc(n)})` : '');
+    const room = e.roomName ? ' – ' + esc(e.roomName) : '';
+    const lastStage = () => { for (let i = prev.length - 1; i >= 0; i--) { const t = prev[i].type;
+      if (t === 'to_final') return 'final'; if (t === 'final_back' || t === 'to_doctor') return 'doctor'; if (t === 'to_nurse') return 'nurse';
+      if ((t === 'call' || t === 'recall') && prev[i].stage) return prev[i].stage; } return null; };
+    const wasCalled = () => { for (let i = prev.length - 1; i >= 0; i--) { const t = prev[i].type; if (t === 'call' || t === 'recall') return true; if (t === 'to_doctor' || t === 'requeue' || t === 'to_nurse') return false; } return false; };
+    switch (e.type) {
+      case 'created': return e.note === 'sestra' ? 'Pridaný sestrou' : 'Registrácia (lístok)';
+      case 'call': case 'recall': {
+        const again = e.type === 'recall' ? 'Zopakované vyvolanie ' : 'Vyvolaný ';
+        const txt = e.stage === 'nurse' ? `${again}sestrou${who(e.nurse)}` : e.stage === 'doctor' ? `${again}lekárom${who(e.doctor)}` : (e.type === 'recall' ? 'Zopakované vyvolanie' : 'Vyvolanie');
+        return txt + room + (e.note && e.type === 'call' ? ` <span class="ev-note">(${esc(e.note)})</span>` : '');
+      }
+      case 'to_doctor': return e.note === 'bez sestry' ? 'Zaradený rovno k lekárovi (bez sestry)' : 'Poslaný k lekárovi sestrou – čaká na lekára';
+      case 'to_nurse': return 'Vrátený do radu k sestre';
+      case 'to_final': return 'Poslaný k sestre lekárom – na ukončenie';
+      case 'final_back': return 'Vrátený od sestry späť k lekárovi';
+      case 'done': { const st = lastStage(), c = wasCalled();
+        return st === 'final' ? 'Ukončený sestrou (po lekárovi)' : st === 'doctor' ? (c ? 'Ukončený u lekára' : 'Ukončený v rade k lekárovi (bez vyvolania)') : st === 'nurse' ? 'Ukončený sestrou (bez lekára)' : 'Ukončený'; }
+      case 'absent': { const st = lastStage(); return 'Neprítomný' + (st === 'doctor' ? ' (pri lekárovi)' : st ? ' (pri sestre)' : ''); }
+      default: return esc(EV_TEXT[e.type] || e.type) + (e.note && (e.type === 'day_closed' || e.type === 'moved' || e.type === 'edited') ? ` <span class="ev-note">(${esc(e.note)})</span>` : '');
+    }
+  }
+
   async function renderHistory() {
     $view.innerHTML = '<div class="center-msg">Načítava sa história…</div>';
     let days;
@@ -978,7 +1007,7 @@
       for (const e of h.events) (evBy[e.ticketId] = evBy[e.ticketId] || []).push(e);
       const rows = h.tickets.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
         <td>${esc(fmtTime(t.createdAt))}</td><td>${esc(t.roomName || '')}</td><td>${printBadge(t.print)}</td>
-        <td class="hint">${(evBy[t.id] || []).map((e) => `${esc(fmtTime(e.at))} ${esc(EV_TEXT[e.type] || e.type)}${e.roomName && /call/.test(e.type) ? ' – ' + esc(e.roomName) : ''}${e.note && (e.type === 'call' || e.type === 'day_closed' || e.type === 'moved' || e.type === 'edited') ? ` <span class="ev-note">(${esc(e.note)})</span>` : ''}`).join('<br>')}</td></tr>`).join('');
+        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `<span class="ev-t">${esc(fmtTime(e.at))}</span> ${evLine(e, arr.slice(0, k))}`).join('<br>')}</td></tr>`).join('');
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${h.tickets.length} čísel</span></div>
