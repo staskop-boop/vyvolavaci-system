@@ -208,11 +208,9 @@ td.nw, td.code { white-space: nowrap; }
   #tbl-waiting thead { display: none; }
   #tbl-waiting tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 12px; row-gap: 4px; align-items: center; padding: 10px 4px; border-bottom: 1px solid #f1e6e6; }
   #tbl-waiting td { padding: 0; border: 0; background: none !important; box-shadow: none !important; }
-  #tbl-waiting td.t-plan { grid-column: 2 / 4; }
+  #tbl-waiting td.t-times { grid-column: 2 / 4; }
   #tbl-waiting td.t-room { grid-column: 2 / 4; }
   #tbl-waiting td.code { grid-row: 1 / 3; }
-  #tbl-waiting td.t-arr::before { content: "príchod "; color: var(--grey); font-size: 13px; }
-  #tbl-waiting td.t-wait::before { content: "čaká "; color: var(--grey); font-size: 13px; }
   #tbl-waiting td.t-src { display: none; }
   #tbl-waiting td.actions { grid-column: 1 / -1; padding-top: 4px; }
   #tbl-waiting td.actions .acts { justify-content: stretch; }
@@ -381,3 +379,14 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .dash .hero-tile { min-width: 120px; height: 110px; font-size: 62px; padding: 0 12px; }
 .dash .hero-tile.long { font-size: 40px; }
 .dash .hero-main { font-size: 22px; }
+
+/* 2026-11-18 (Pali): rad k sestre – časy pod sebou v jednom stĺpci ako v rade k lekárovi, aby sa riadok zmestil do okna */
+#tbl-waiting td.t-times .tl { display: block; font-size: 14px; line-height: 1.6; }
+#tbl-waiting td.t-times .tl i { font-style: normal; color: var(--grey); display: inline-block; min-width: 58px; }
+#tbl-waiting td.t-times .t-plan b { font-size: 16px; }
+#tbl-waiting th, #tbl-waiting td { padding-left: 4px; padding-right: 4px; }
+.a-queues td.t-room { white-space: normal; }
+.a-queues td.t-room > * { margin: 2px 0; }
+.a-queues td.actions { width: 1%; white-space: nowrap; }
+#tbl-waiting td.t-times .t-plan .delta { display: block; width: max-content; margin: 0 0 2px 62px; }
+.a-queues #tbl-waiting td.code { font-size: 26px; }
