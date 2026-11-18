@@ -516,7 +516,7 @@
         ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-doctor" data-id="${t.id}" ${dis} title="Pacient ide von do čakárne a lekár si ho vyvolá – na TV sa ukáže lekár">→ K lekárovi</button>
         <button class="btn btn-sm btn-dark needs-online" data-act="to-doctor-direct" data-id="${t.id}" ${dis} title="Pacient ide k lekárovi hneď, bez čakania v čakárni">→ Priamo k lekárovi</button>` : ''}
         ${t.stage === 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-final" data-id="${t.id}" ${dis} title="Vyšetrenie u lekára sa skončilo – pacient ide k sestre (platba, papiere), ukončí ho sestra">→ K sestre na ukončenie</button>` : ''}
-        ${nurse ? `<button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="${t.stage === 'doctor' ? 'Ukončiť hneď, bez návratu k sestre' : 'Pacient odchádza bez lekára'}">✓ Vybavený${t.stage !== 'doctor' ? ' bez lekára' : ''}</button>` : ''}
+        ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm needs-online" data-act="done" data-id="${t.id}" ${dis} title="Pacient odchádza bez lekára">✓ Vybavený bez lekára</button>` : ''}
         <button class="btn btn-sm needs-online" data-act="recall" data-id="${t.id}" ${dis} title="Zopakovať vyvolanie na obrazovke">🔔 Zopakovať</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis}>Vrátiť</button>
@@ -525,9 +525,10 @@
 
     // 2026-11-18 (Pali): „Práve v ambulancii“ rozdelené – kto je u sestry (aj na ukončení) a kto u lekára
     const atNurse = called.filter((t) => t.stage !== 'doctor'), atDoctor = called.filter((t) => t.stage === 'doctor');
-    const grp = (cls, title, list, empty) => `<tbody class="grp ${cls}"><tr class="grp-head"><td colspan="5"><span class="grp-title">${title}</span> <span class="grp-n">${list.length}</span></td></tr>
-      ${list.length ? list.map(calledRow).join('') : `<tr class="grp-empty"><td colspan="5">${empty}</td></tr>`}</tbody>`;
-    const calledRows = grp('g-nurse', 'U sestry', atNurse, 'U sestry teraz nie je nikto.') + grp('g-doctor', 'U lekára', atDoctor, 'U lekára teraz nie je nikto.');
+    // 2026-11-18 (Pali): každý má samostatné okno – pacient sa zobrazuje v okne toho, u koho práve je
+    const grp = (cls, title, list, empty) => `<section class="card now ${cls}"><div class="panel-title"><h2><span class="live-dot" aria-hidden="true"></span>${title} (${list.length})</h2></div>
+      ${list.length ? `<table><tbody>${list.map(calledRow).join('')}</tbody></table>` : `<div class="empty">${empty}</div>`}</section>`;
+    const calledRows = grp('now-nurse', 'Práve u sestry', atNurse, 'U sestry teraz nie je nikto.') + grp('now-doctor', 'Práve u lekára', atDoctor, 'U lekára teraz nie je nikto.');
 
     // 2026-11-18 (Pali): vybavení a neprítomní dole na celú šírku so všetkými údajmi
     const tm = (v) => (v ? esc(fmtTime(v)) : '<span class="hint">—</span>');
@@ -614,10 +615,7 @@
         </div>
       </section>
 
-      <section class="card now a-now"><div class="panel-title"><h2><span class="live-dot" aria-hidden="true"></span>Práve v ambulancii (${called.length})</h2></div>
-        ${called.length ? `<table id="tbl-called"><thead><tr><th>Číslo</th><th>Ambulancia</th><th>Vyvolaný</th><th>Počet</th><th></th></tr></thead>${calledRows}</table>`
-          : '<div class="empty">Momentálne nie je nikto vyvolaný.</div>'}
-      </section>
+      <div class="a-now now-pair" id="tbl-called">${calledRows}</div>
 
       <div class="a-queues">
         <section class="card q-nurse">${nurseSection()}</section>
