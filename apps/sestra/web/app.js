@@ -501,7 +501,7 @@
         ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-doctor" data-id="${t.id}" ${dis} title="Pacient ide von do čakárne a lekár si ho vyvolá – na TV sa ukáže lekár">→ K lekárovi</button>
         <button class="btn btn-sm btn-dark needs-online" data-act="to-doctor-direct" data-id="${t.id}" ${dis} title="Pacient ide k lekárovi hneď, bez čakania v čakárni">→ Priamo k lekárovi</button>` : ''}
         <button class="btn btn-sm ${nurse && t.stage !== 'doctor' ? '' : 'btn-primary'} needs-online" data-act="done" data-id="${t.id}" ${dis} title="${t.stage === 'doctor' ? 'Pacient je vybavený' : 'Pacient odchádza bez lekára'}">✓ Vybavený${nurse && t.stage !== 'doctor' ? ' bez lekára' : ''}</button>
-        <button class="btn btn-sm btn-dark needs-online" data-act="recall" data-id="${t.id}" ${dis}>Zopakovať</button>
+        <button class="btn btn-sm needs-online" data-act="recall" data-id="${t.id}" ${dis} title="Zopakovať vyvolanie na obrazovke">🔔 Zopakovať</button>
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis}>Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis}>Vrátiť</button>
         ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
