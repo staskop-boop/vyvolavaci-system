@@ -279,3 +279,6 @@ h2 { margin: 0; }
   .live-dot, .pulse, .kenburns, .cc-point, .greeting, .bulb, .flake, .tv-banner { animation: none !important; }
   .flake { display: none; }
 }
+/* 2026-11-18: pri piatich číslach v „Nasledujú“ sa text meškania prekrýval – čísla sa delia o šírku rovnomerne a text sa zalomí */
+.left:not(.calling) .chips .chip { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; }
+.left:not(.calling) .chips .c-delta { white-space: normal; font-size: 15px; }
