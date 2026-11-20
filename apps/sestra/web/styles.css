@@ -351,6 +351,9 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 #tbl-doctor th, #tbl-doctor td { padding-left: 8px; padding-right: 8px; }
 /* 2026-11-18 (Pali): vstupné vyšetrenia zelenou – text typu ostáva, farba je len pomôcka */
 .type-pill.entry { background: #DDF3E3; color: #14602F; }
+/* 2026-11-20 (Pali): nové výkony (Vstup, hemoroidy) modrým pozadím */
+.type-pill.blue, #m-type option.blue { background: #DCEBFB; color: #0B4A8B; }
+#m-type option.entry { background: #DDF3E3; color: #14602F; }
 /* 2026-11-18: v rade k lekárovi pribudlo „Ukončený“ – hlavné tlačidlo cez celú šírku, ostatné po dvoch */
 #tbl-doctor td.actions .acts > .btn-primary { grid-column: 1 / -1; }
 

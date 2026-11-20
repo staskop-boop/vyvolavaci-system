@@ -247,7 +247,9 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await A.click('#btn-card');
     await A.fill('#m-card', 'K9'); await A.fill('#m-time', '10:30'); await A.fill('#m-ident', 'Pacient Skúšobný');
     const types = await A.locator('#m-type option').allTextContents();
-    assert.equal(types[1], 'Vstupné vyšetrenie varixy'); assert.equal(types.at(-1), 'AVF');
+    assert.equal(types[1], 'Vstupné vyšetrenie varixy'); assert.equal(types[8], 'AVF');
+    assert.deepEqual(types.slice(9), ['Vstup', 'Vstup hemoroidy', 'Kontrola hemoroidy', 'Pooperačná kontrola hemoroidy'], 'nové výkony v ponuke');
+    assert.equal(await A.locator('#m-type option.blue').count(), 4, 'nové výkony sú v ponuke modré');
     await A.selectOption('#m-type', 'Kontrola po CLaCS');
     await shot(A, '8-pridat-typ');
     await A.click('#m-ok');
