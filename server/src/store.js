@@ -98,6 +98,8 @@ function str(v, max, name, { allowEmpty = false } = {}) {
 const PATIENT_TYPES = [
   'Vstupné vyšetrenie varixy', 'Kontrola varixy', 'Kontrola po OP varixy', 'Kontrola po CLaCS',
   'Vstupné angio', 'Kontrola angio', 'Kontrola po OP hemoroidy', 'AVF',
+  // 2026-11-20 (Pali): nové výkony – v aplikácii Sestra majú modrý štítok
+  'Vstup', 'Vstup hemoroidy', 'Kontrola hemoroidy', 'Pooperačná kontrola hemoroidy',
 ];
 
 class Store extends EventEmitter {

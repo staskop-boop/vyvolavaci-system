@@ -407,9 +407,12 @@
    * 2026-11-17: typ a identifikátor pacienta (prichádzajú zo servera len prihlásenému personálu – sestry, lekári, správca;
    * obrazovka v čakárni ani tablet ich nemajú).
    */
+  /** 2026-11-20 (Pali): nové výkony majú modré pozadie štítka. */
+  const BLUE_TYPES = ['Vstup', 'Vstup hemoroidy', 'Kontrola hemoroidy', 'Pooperačná kontrola hemoroidy'];
+  const typeClass = (x) => (BLUE_TYPES.includes(x) ? ' blue' : /^Vstupn/.test(x) ? ' entry' : '');
   function identPill(t) {
     if (!t) return '';
-    return (t.patientType ? `<span class="type-pill${/^Vstupn/.test(t.patientType) ? ' entry' : ''}" title="Typ pacienta – na obrazovke v čakárni sa neukáže">${esc(t.patientType)}</span>` : '')
+    return (t.patientType ? `<span class="type-pill${typeClass(t.patientType)}" title="Typ pacienta – na obrazovke v čakárni sa neukáže">${esc(t.patientType)}</span>` : '')
       + (t.patientType && t.staffNote ? ' ' : '')
       + (t.staffNote ? `<span class="ident-pill" title="Identifikátor – vidí len personál, na obrazovke v čakárni sa neukáže">🏷 ${esc(t.staffNote)}</span>` : '');
   }
@@ -419,7 +422,7 @@
     const cur = t && t.patientType;
     return `<div class="row" style="margin-top:14px">
       <div class="field"><label for="m-type">Typ pacienta</label><select id="m-type"><option value="" ${cur ? '' : 'selected'}>— nevybraný —</option>
-        ${types.map((x) => `<option ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+        ${types.map((x) => `<option class="${typeClass(x).trim()}" ${x === cur ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
       <div class="field"><label for="m-ident">Identifikátor pacienta (nepovinné)</label>
         <input id="m-ident" autocomplete="off" maxlength="60" placeholder="napr. meno alebo poznámka" value="${esc((t && t.staffNote) || '')}"></div></div>
     <p class="hint">Typ a identifikátor vidí len personál v tejto aplikácii (sestry, lekári). Na obrazovke v čakárni ani na tablete sa neukážu. Identifikátor sa po skončení dňa vymaže.</p>`;

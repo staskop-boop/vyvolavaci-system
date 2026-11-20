@@ -47,7 +47,10 @@ test('sestra zadá identifikátor pri pridaní pacienta a vidí ho v zozname', a
   assert.equal(r.data.ticket.patientType, 'Kontrola varixy');
   const st = (await sestra.get('/api/staff/state')).data;
   assert.equal(st.patientTypes[0], 'Vstupné vyšetrenie varixy', 'najčastejší typ je prvý');
-  assert.equal(st.patientTypes.at(-1), 'AVF', 'najmenej častý typ je posledný');
+  assert.equal(st.patientTypes[7], 'AVF', 'AVF je za pôvodnými typmi');
+  for (const x of ['Vstup', 'Vstup hemoroidy', 'Kontrola hemoroidy', 'Pooperačná kontrola hemoroidy']) assert.ok(st.patientTypes.includes(x), `nový výkon v ponuke: ${x}`);
+  const r2 = await sestra.post('/api/staff/cards', { cardNo: 'ID3', plannedTime: '23:20', roomId: room.id, patientType: 'Vstup hemoroidy' });
+  assert.equal(r2.data.ticket.patientType, 'Vstup hemoroidy', 'nový výkon sa dá uložiť');
   const t = st.tickets.find((x) => x.code === 'ID1');
   assert.equal(t.staffNote, MENO); assert.equal(t.patientType, 'Kontrola varixy');
   const a = (await admin.get('/api/staff/state')).data.tickets.find((x) => x.code === 'ID1');
