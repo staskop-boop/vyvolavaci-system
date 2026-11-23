@@ -452,3 +452,8 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .ident-pill { padding: 3px 12px; background: #fff; color: var(--black); border: 2px solid var(--red); font-size: 17px; font-weight: 800; max-width: 26ch; }
 .hero-meta .ident-pill { font-size: 20px; max-width: 32ch; }
 .a-queues td.t-room .ident-pill { white-space: normal; overflow-wrap: anywhere; border-radius: 14px; line-height: 1.25; }
+/* 2026-11-23 (Pali): štatistiky – meškanie červeným, v čase čiernym, predstih zeleným (vždy tučne a s textom) */
+.d-late { color: var(--adna-danger); font-weight: 800; }
+.d-ok { color: var(--black); font-weight: 800; }
+.d-early { color: #14602F; font-weight: 800; }
+.stats-table td .d-late, .stats-table td .d-ok, .stats-table td .d-early { white-space: nowrap; }

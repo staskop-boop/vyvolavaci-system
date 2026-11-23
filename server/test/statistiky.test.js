@@ -61,7 +61,7 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   const n = await admin.get(`/api/admin/stats?from=${day}&to=${day}&groupBy=nurse`);
   const fet = n.data.doctors.find((x) => x.doctor === 'Daniela Fetyková');
   assert.equal(fet.patients, 3, 'a, b aj d boli u sestry');
-  assert.equal(fet.planned, 1); assert.equal(fet.avgDelay, 20, 'vstup k sestre 20 min po termíne');
+  assert.equal(fet.planned, 1); assert.equal(fet.avgDelay, 20, 'vstup k sestre 20 min po termíne'); assert.equal(fet.avgDiff, 20, 'rozdiel oproti termínu so znamienkom');
   assert.equal(fet.late15, 1);
   assert.ok(n.data.doctors.some((x) => x.doctor === 'Sestra nebola zadaná'));
 
