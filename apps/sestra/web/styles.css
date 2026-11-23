@@ -436,3 +436,8 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 /* dlhý typ pacienta v rade nesmie rozšíriť tabuľku za okraj okna */
 .a-queues td.t-room .ident-pill { max-width: 100%; }
 .a-queues td.t-room { max-width: 16ch; }
+
+/* 2026-11-23 (Pali): priebežné štatistiky počas dňa */
+.live-stamp { color: #14602F; font-weight: 600; }
+.live-now h2 { margin-bottom: 10px; }
+.stats-kpi.live { background: #F4F8FD; border-color: #C9DDF3; }

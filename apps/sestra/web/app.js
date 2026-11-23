@@ -322,6 +322,7 @@
           pickRoom();
           if (S.view === 'queue') renderQueue();
           else if (first) go(S.view);
+          else liveStatsSoon();
         }
       },
     });
@@ -1095,17 +1096,46 @@
       .map((n) => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
   };
 
+  // ---------- priebežný stav (2026-11-23) ----------
+  const clock = () => new Date().toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  /** Koľko pacientov je práve kde – z aktuálneho stavu, ktorý chodí cez WebSocket. */
+  function liveNow() {
+    const ts = (S.staff && S.staff.tickets) || [];
+    const w = ts.filter((t) => t.status === 'waiting'), c = ts.filter((t) => t.status === 'called');
+    const oldest = (list, f) => { const xs = list.map(f).filter(Boolean).sort(); return xs.length ? Math.max(0, Math.round((Date.now() - new Date(xs[0]).getTime()) / 60000)) : null; };
+    const wn = w.filter((t) => (t.stage || 'nurse') === 'nurse'), wd = w.filter((t) => t.stage === 'doctor');
+    const k = (n, label, extra) => `<div class="stats-kpi live"><b>${n}</b><span>${label}${extra != null && n ? `<br>najdlhšie ${fmtMin(extra)}` : ''}</span></div>`;
+    return `<section class="card live-now" id="live-now"><h2>Práve teraz</h2><div class="stats-kpis">
+      ${k(wn.length, 'čaká na sestru', oldest(wn, (t) => t.createdAt))}
+      ${k(c.filter((t) => t.stage !== 'doctor' && t.stage !== 'final').length, 'u sestry')}
+      ${k(wd.length, 'čaká na lekára', oldest(wd, (t) => t.toDoctorAt))}
+      ${k(c.filter((t) => t.stage === 'doctor').length, 'u lekára')}
+      ${k(c.filter((t) => t.stage === 'final').length, 'u sestry na ukončení')}
+      ${k(ts.filter((t) => t.status === 'done').length, 'ukončených dnes')}</div></section>`;
+  }
+  let liveTimer = null;
+  function liveRefresh() {
+    if (!S.user || document.hidden) return;
+    const today = (S.staff && S.staff.day) || isoDay(new Date());
+    if (S.view === 'stats' && S.statsTo >= today && document.getElementById('stats-out')) loadStats(true);
+    else if (S.view === 'today' && document.getElementById('btn-today-refresh')) renderToday(true);
+  }
+  function liveStatsSoon() { clearTimeout(liveTimer); liveTimer = setTimeout(liveRefresh, 1500); }
+  setInterval(liveRefresh, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) liveStatsSoon(); });
+
   // ---------- dnešné štatistiky (sestra) ----------
-  async function renderToday() {
-    $view.innerHTML = '<div class="center-msg">Načítava sa…</div>';
+  async function renderToday(silent) {
+    if (silent !== true) $view.innerHTML = '<div class="center-msg">Načítava sa…</div>';
     let r;
     try { r = await api('/api/staff/today-stats'); }
-    catch (e) { handleError(e); $view.innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
+    catch (e) { if (silent === true) return; handleError(e); $view.innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
     if (S.view !== 'today') return;
     const t = r.total;
     $view.innerHTML = `<div class="stack">
       <section class="card"><div class="section-title"><h2>Dnešné štatistiky – ${esc(fmtDay(r.day))}</h2><button class="btn btn-sm" id="btn-today-refresh">Obnoviť</button></div>
-        <p class="hint">Len dnešný deň. Údaje sa počítajú z vyvolaných pacientov.</p></section>
+        <p class="hint">Len dnešný deň. Údaje sa počítajú z vyvolaných pacientov. <span class="live-stamp" id="live-stamp">● Aktualizované ${esc(clock())} – obnovuje sa automaticky</span></p></section>
+      ${liveNow()}
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (čaká ešte ${r.waiting})</span></div>
         <div class="stats-kpi"><b>${t.done}</b><span>ukončených · ${t.absent} neprítomných</span></div>
@@ -1123,7 +1153,7 @@
           <td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}
         </tbody></table></div>
         <p class="hint">Čakanie a meškanie = po vstup k sestre (čas objednania je čas vstupu k sestre). U sestry = od vyvolania po „K lekárovi“. Čakanie na lekára = od „K lekárovi“ po vyvolanie lekárom (priamo k lekárovi = 0). Celá návšteva = od vstupu k sestre po „Ukončený“.</p></section>` : '<section class="card"><div class="empty">Dnes zatiaľ nebol vyvolaný žiadny pacient.</div></section>'}</div>`;
-    document.getElementById('btn-today-refresh').onclick = renderToday;
+    document.getElementById('btn-today-refresh').onclick = () => renderToday();
   }
 
   // ---------- môj prehľad (konto lekára) ----------
@@ -1217,12 +1247,23 @@
       if (b.dataset.range === 'month') d.setDate(1); else d.setDate(d.getDate() - Number(b.dataset.range));
       S.statsFrom = isoDay(d); S.statsTo = today; renderStats();
     }; });
+    await loadStats(false);
+  }
+
+  /** 2026-11-23 (Pali): priebežné štatistiky – keď obdobie siaha po dnešok, tabuľka sa obnovuje sama (pri každej zmene a raz za minútu). */
+  async function loadStats(silent) {
+    const today = (S.staff && S.staff.day) || isoDay(new Date());
+    const grp = S.statsGroup || 'doctor';
+    const live = S.statsTo >= today;
+    const key = `${S.statsFrom}|${S.statsTo}|${grp}`;
     let r;
     try { r = await api(`/api/admin/stats?from=${encodeURIComponent(S.statsFrom)}&to=${encodeURIComponent(S.statsTo)}&groupBy=${grp}`); }
-    catch (e) { handleError(e); document.getElementById('stats-out').innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
-    const t = r.total;
+    catch (e) { if (silent) return; handleError(e); const o = document.getElementById('stats-out'); if (o) o.innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
     const out = document.getElementById('stats-out');
-    if (!t.patients) { out.innerHTML = '<section class="card"><div class="empty">V tomto období nebol vyvolaný žiadny pacient.</div></section>'; return; }
+    if (S.view !== 'stats' || !out || key !== `${S.statsFrom}|${S.statsTo}|${S.statsGroup || 'doctor'}`) return;
+    const t = r.total;
+    const head = live ? `<p class="hint live-stamp" id="live-stamp">● Aktualizované ${esc(clock())} – obnovuje sa automaticky</p>${liveNow()}` : '';
+    if (!t.patients) { out.innerHTML = `<div class="stack">${head}<section class="card"><div class="empty">V tomto období nebol vyvolaný žiadny pacient.</div></section></div>`; return; }
     const row = (d, cls = '') => `<tr class="${cls}"><td class="doc">${esc(d.doctor)}${d.rooms && d.rooms.length && !cls ? `<div class="hint">${esc(d.rooms.join(', '))}</div>` : ''}</td>
       <td class="num">${d.days}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}${d.open ? ` <span class="hint">(+${d.open} nevyb.)</span>` : ''}</td>
       <td class="num">${mins(d.avgWait)}</td><td class="num">${mins(d.medianWait)}</td>
@@ -1231,7 +1272,7 @@
       <td class="num">${mins(d.avgExam)}</td>${grp === 'room' ? `<td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td>` : ''}</tr>`;
     const G = { doctor: { who: 'Lekár', wait: 'Ø čakanie na lekára', exam: 'Ø u lekára' }, nurse: { who: 'Sestra', wait: 'Ø čakanie', exam: 'Ø u sestry' },
       room: { who: 'Ambulancia', wait: 'Ø čakanie', exam: 'Ø celá návšteva' } }[grp];
-    out.innerHTML = `<div class="stack">
+    out.innerHTML = `<div class="stack">${head}
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu</span></div>
