@@ -353,6 +353,14 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     // 11b. 2026-11-17: Ukončiť deň, ambulancia bez lekára, hlasitosť vyvolania
     await A.click('.tab[data-view=queue]');
     await A.click('#btn-day-end'); await A.click('#m-ok');
+    // 2026-11-23 (Pali): poďakovanie s ohňostrojom pre toho, kto deň ukončil
+    await A.locator('#fin #fin-title', { hasText: 'deň je za tebou' }).waitFor();
+    assert.equal(await A.locator('#fin .fin-tile').count(), 3);
+    await A.waitForTimeout(1800);
+    assert.ok(await A.evaluate(() => { const c = document.getElementById('fin-canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; }), 'ohňostroj sa kreslí');
+    await shot(A, '26-ukoncenie-dna-ohnostroj');
+    await A.click('#fin-close');
+    await A.locator('#fin').waitFor({ state: 'detached' });
     await toastWith(A, /Deň je ukončený/);
     await A.locator('.alert.day-end').waitFor();
     assert.ok((await display()).dayEnd, 'TV vie o ukončení dňa');
