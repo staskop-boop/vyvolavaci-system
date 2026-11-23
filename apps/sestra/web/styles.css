@@ -137,9 +137,10 @@ main { max-width: 1600px; margin: 0 auto; padding: 20px; outline: none; }
 #tbl-called td.c-count { grid-area: count; color: var(--grey); font-weight: 700; font-size: 15px; }
 #tbl-called td.actions { grid-area: acts; padding-top: 10px; }
 /* 2026-11-18 (Pali): tlačidlá usporiadané do pevnej mriežky – hlavné akcie po dvoch v riadku, vedľajšie po troch pod nimi */
-#tbl-called td.actions .acts { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
-#tbl-called td.actions .btn { margin: 0; padding: 11px 8px; grid-column: span 3; min-width: 0; white-space: normal; line-height: 1.2; }
-#tbl-called td.actions .btn[data-act=absent], #tbl-called td.actions .btn[data-act=requeue], #tbl-called td.actions .btn[data-act=note] { grid-column: span 2; padding: 8px 6px; font-size: 14px; border: 1.5px solid var(--adna-border); background: #fff; }
+#tbl-called td.actions .acts { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 8px; }
+#tbl-called td.actions .btn { margin: 0; padding: 11px 8px; grid-column: span 6; min-width: 0; white-space: normal; line-height: 1.2; }
+/* 2026-11-23 (Pali): vedľajšie akcie v jednom riadku po štyroch – aj „Zmeniť ambulanciu“ (nie osamote pod nimi) */
+#tbl-called td.actions .btn[data-act=absent], #tbl-called td.actions .btn[data-act=requeue], #tbl-called td.actions .btn[data-act=note], #tbl-called td.actions .btn[data-act=move-room] { grid-column: span 3; padding: 8px 6px; font-size: 14px; border: 1.5px solid var(--adna-border); background: #fff; }
 @media (max-width: 520px) { #tbl-called td.c-room { font-size: 16px; } #tbl-called td.code { min-width: 84px; } }
 
 /* čísla dňa */
@@ -412,6 +413,9 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .dash .btn[data-act=absent] { background: var(--act-warn-bg); color: var(--act-warn); border-color: #ecd29a !important; }
 .dash .btn[data-act=to-nurse], .dash .btn[data-act=back-to-doctor], .dash .btn[data-act=requeue] { background: var(--act-back-bg); color: var(--act-back); border-color: #c4d3e4 !important; }
 .dash .btn[data-act=edit], .dash .btn[data-act=note], .dash .btn[data-act=reprint] { background: #fff; color: var(--black); border-color: #cfcfcf !important; }
+/* 2026-11-23 (Pali): „Zmeniť ambulanciu“ výrazne – čierny obrys a tučné písmo (sekundárna čierna AdNa) */
+.dash .btn[data-act=move-room] { background: #fff; color: var(--black); border: 1.5px solid var(--black) !important; font-weight: 800; }
+.dash .btn[data-act=move-room]:hover:not(:disabled) { background: var(--black); color: #fff; }
 .dash .btn[data-act=recall] { background: #fff; color: var(--red-dark); border-color: #efb7b0; }
 .dash .btn[data-act=to-final] { background: var(--act-ok); color: #fff; border-color: var(--act-ok); box-shadow: 0 6px 16px rgba(30,123,69,0.22); }
 .dash .btn[data-act]:hover:not(:disabled) { filter: brightness(0.96); }
@@ -441,3 +445,6 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .live-stamp { color: #14602F; font-weight: 600; }
 .live-now h2 { margin-bottom: 10px; }
 .stats-kpi.live { background: #F4F8FD; border-color: #C9DDF3; }
+/* 2026-11-23: bez Identifikátora a zmeny ambulancie (konto lekára) – dve vedľajšie akcie na celý riadok; na mobile po dvoch */
+#tbl-called td.actions .acts:not(:has([data-act=note])) .btn[data-act=absent], #tbl-called td.actions .acts:not(:has([data-act=note])) .btn[data-act=requeue] { grid-column: span 6; }
+@media (max-width: 520px) { #tbl-called td.actions .btn[data-act=absent], #tbl-called td.actions .btn[data-act=requeue], #tbl-called td.actions .btn[data-act=note], #tbl-called td.actions .btn[data-act=move-room] { grid-column: span 6; } }

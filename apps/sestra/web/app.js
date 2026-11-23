@@ -527,7 +527,7 @@
         <button class="btn btn-sm needs-online" data-act="back-to-doctor" data-id="${t.id}" ${dis} title="Omyl – pacient je ešte u lekára">← Späť k lekárovi</button>
         ${nurse ? `<button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
-        ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
+        ${nurse ? `<button class="btn btn-sm needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
       </div></td></tr>`;
     const calledRow = (t) => (t.stage === 'final' ? finalRow(t) : `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
@@ -541,7 +541,7 @@
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>
         ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
-        ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
+        ${nurse ? `<button class="btn btn-sm needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
       </div></td></tr>`);
 
     // 2026-11-18 (Pali): „Práve v ambulancii“ rozdelené – kto je u sestry (aj na ukončení) a kto u lekára
@@ -561,7 +561,7 @@
       <td class="nw">${tm(t.createdAt)}</td><td class="nw">${tm(t.nurseCalledAt)}</td><td class="nw">${tm(t.toDoctorAt)}</td>
       <td class="nw">${tm(t.stage === 'doctor' || t.stage === 'final' ? t.calledAt : null)}</td><td class="nw">${tm(t.finalAt)}</td><td class="nw"><b>${tm(t.finishedAt)}</b></td>
       <td class="actions"><div class="acts"><button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>
-        ${nurse && t.status !== 'cancelled' ? `<button class="btn btn-sm btn-ghost needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Opraviť ambulanciu, v ktorej pacient bol (aj v štatistikách)">⇄ Ambulancia</button>` : ''}</div></td></tr>`).join('');
+        ${nurse && t.status !== 'cancelled' ? `<button class="btn btn-sm needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Opraviť ambulanciu, v ktorej pacient bol (aj v štatistikách)">⇄ Ambulancia</button>` : ''}</div></td></tr>`).join('');
 
     // ďalší na rade – veľká karta s hlavnou akciou
     const next = waiting[0] || null;
