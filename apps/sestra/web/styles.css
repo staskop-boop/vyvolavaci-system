@@ -448,3 +448,7 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 /* 2026-11-23: bez Identifikátora a zmeny ambulancie (konto lekára) – dve vedľajšie akcie na celý riadok; na mobile po dvoch */
 #tbl-called td.actions .acts:not(:has([data-act=note])) .btn[data-act=absent], #tbl-called td.actions .acts:not(:has([data-act=note])) .btn[data-act=requeue] { grid-column: span 6; }
 @media (max-width: 520px) { #tbl-called td.actions .btn[data-act=absent], #tbl-called td.actions .btn[data-act=requeue], #tbl-called td.actions .btn[data-act=note], #tbl-called td.actions .btn[data-act=move-room] { grid-column: span 6; } }
+/* 2026-11-23 (Pali): identifikátor (meno) pacienta výraznejšie – väčšie tučné písmo, plný červený rámik */
+.ident-pill { padding: 3px 12px; background: #fff; color: var(--black); border: 2px solid var(--red); font-size: 17px; font-weight: 800; max-width: 26ch; }
+.hero-meta .ident-pill { font-size: 20px; max-width: 32ch; }
+.a-queues td.t-room .ident-pill { white-space: normal; overflow-wrap: anywhere; border-radius: 14px; line-height: 1.25; }
