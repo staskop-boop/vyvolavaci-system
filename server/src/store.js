@@ -1273,7 +1273,7 @@ class Store extends EventEmitter {
     const median = (a) => { if (!a.length) return null; const b = [...a].sort((p, q) => p - q); const m = b.length >> 1; return Math.round(b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2); };
     const out = (s) => ({ doctor: s.doctor, patients: s.patients, done: s.done, absent: s.absent, open: s.open, days: s.days.size, rooms: [...s.rooms],
       avgWait: avg(s.waits), medianWait: median(s.waits), maxWait: s.waits.length ? Math.round(Math.max(...s.waits)) : null,
-      planned: s.delays.length, avgDelay: avg(s.delays.map((d) => Math.max(0, d))), maxDelay: s.delays.length ? Math.round(Math.max(0, ...s.delays)) : null,
+      planned: s.delays.length, avgDiff: avg(s.delays), avgDelay: avg(s.delays.map((d) => Math.max(0, d))), maxDelay: s.delays.length ? Math.round(Math.max(0, ...s.delays)) : null,
       onTime: s.onTime, late15: s.late15, avgExam: avg(s.exams), medianExam: median(s.exams),
       avgNurse: avg(s.nurseTimes), avgDoctorWait: avg(s.doctorWaits), avgDoctor: avg(s.doctorTimes), toDoctor: s.toDoctor, direct: s.direct });
     const doctors = [...groups.values()].filter((s) => s !== all).map(out)
@@ -1288,7 +1288,7 @@ class Store extends EventEmitter {
     const day = clock.today();
     const r = this.doctorStats(day, day, 'room');
     const strip = (d) => ({ name: d.doctor, patients: d.patients, done: d.done, absent: d.absent, open: d.open, avgWait: d.avgWait, maxWait: d.maxWait,
-      planned: d.planned, avgDelay: d.avgDelay, maxDelay: d.maxDelay, onTime: d.onTime, late15: d.late15, avgExam: d.avgExam,
+      planned: d.planned, avgDiff: d.avgDiff, avgDelay: d.avgDelay, maxDelay: d.maxDelay, onTime: d.onTime, late15: d.late15, avgExam: d.avgExam,
       avgNurse: d.avgNurse, avgDoctorWait: d.avgDoctorWait, avgDoctor: d.avgDoctor, toDoctor: d.toDoctor, direct: d.direct });
     const waiting = this.db.prepare("SELECT COUNT(*) AS n FROM tickets WHERE day = ? AND status = 'waiting'").get(day).n;
     return { day, total: strip(r.total), rooms: r.doctors.map(strip).sort((a, b) => a.name.localeCompare(b.name, 'sk')), waiting };
@@ -1307,7 +1307,7 @@ class Store extends EventEmitter {
       if (d) days.push({ day, ...d });
     }
     // Porovnanie s ostatnými lekármi BEZ mien a ambulancií – poradie podľa meškania, aby sa z neho nedalo uhádnuť, o koho ide.
-    const anon = (d) => ({ patients: d.patients, done: d.done, avgWait: d.avgWait, planned: d.planned, avgDelay: d.avgDelay, onTime: d.onTime, avgExam: d.avgExam,
+    const anon = (d) => ({ patients: d.patients, done: d.done, avgWait: d.avgWait, planned: d.planned, avgDiff: d.avgDiff, avgDelay: d.avgDelay, onTime: d.onTime, avgExam: d.avgExam,
       avgDoctorWait: d.avgDoctorWait, avgDoctor: d.avgDoctor });
     const me = pick(all);
     const rows = all.doctors.filter((d) => d.doctor !== 'Lekár nebol zadaný').map((d) => ({ ...anon(d), me: d.doctor === name }))

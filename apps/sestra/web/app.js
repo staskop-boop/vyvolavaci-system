@@ -1140,7 +1140,7 @@
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (čaká ešte ${r.waiting})</span></div>
         <div class="stats-kpi"><b>${t.done}</b><span>ukončených · ${t.absent} neprítomných</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu po sestru</span></div>
-        <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu</span></div>
+        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti plánu</span></div>
         <div class="stats-kpi"><b>${mins(t.avgDoctorWait)}</b><span>priemerné čakanie na lekára</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>vyvolaných načas (do 5 min)</span></div>
       </section>
@@ -1148,7 +1148,7 @@
         <th>Ambulancia</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
         <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø u sestry</th><th class="num">Ø čakanie na lekára</th><th class="num">Ø u lekára</th><th class="num">Ø celá návšteva</th></tr></thead><tbody>
         ${r.rooms.map((d) => `<tr><td class="doc">${esc(d.name)}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
-          <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td>
+          <td class="num">${mins(d.avgWait)}</td><td class="num">${delayHtml(d)}</td>
           <td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td><td class="num">${pct(d.onTime, d.planned)}</td>
           <td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}
         </tbody></table></div>
@@ -1190,7 +1190,7 @@
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (ukončení ${t.done})</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta na vás<br>(celá ambulancia ${mins(c.avgWait)})</span></div>
-        <div class="stats-kpi"><b class="${t.avgDelay > 15 ? 'bad' : ''}">${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánu<br>(celá ambulancia ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
+        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti plánu<br>(celá ambulancia ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov vyvolaných načas (do 5 min)</span></div>
         <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia u vás</span></div>
       </section>
@@ -1198,7 +1198,7 @@
         <th>Deň</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
         <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
         ${r.days.map((d) => `<tr><td class="doc">${esc(fmtDay(d.day))}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
-          <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
+          <td class="num">${mins(d.avgWait)}</td><td class="num">${delayHtml(d)}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
           <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
         <p class="hint">Od 17. 11. 2026 ide pacient najprv k sestre a potom k vám. Čakanie = od chvíle, keď ho sestra poslala k lekárovi, po vaše vyvolanie (priamo k lekárovi = 0).
           Vyšetrenie = od vášho vyvolania po „Ukončený“. Meškanie oproti termínu patrí k vstupu k sestre, preto sa vám pri dvoch krokoch nepripisuje.
@@ -1208,7 +1208,7 @@
         <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Poradie</th><th>Lekár</th><th class="num">Pacienti</th><th class="num">Ø čakanie</th>
           <th class="num">Ø meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
           ${r.comparison.map((d) => `<tr class="${d.me ? 'me-row' : ''}"><td class="num">${d.rank}.</td><td class="doc">${esc(d.label)}</td><td class="num">${d.patients}</td>
-            <td class="num">${mins(d.avgWait)}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td>
+            <td class="num">${mins(d.avgWait)}</td><td class="num">${delayHtml(d)}</td>
             <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
         <p class="hint">Poradie je podľa priemerného meškania (najmenšie prvé). Ostatní lekári sú označení písmenami a neuvádza sa ich ambulancia.</p>
       </section>` : ''}</div>`;
@@ -1216,6 +1216,14 @@
 
   // ---------- štatistiky lekárov (len správca) ----------
   const isoDay = (d) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bratislava' }).format(d);
+  /** 2026-11-23 (Pali): priemer oproti termínu – meškanie červeným, v čase čiernym, predstih (nadbehnuté) zeleným; vždy tučne a s textom. */
+  const delayHtml = (d) => {
+    if (!d || !d.planned) return '<b>–</b>';
+    const v = d.avgDiff != null ? d.avgDiff : d.avgDelay;
+    if (v > 0) return `<b class="d-late" title="Priemerné meškanie oproti termínu">mešká ${mins(v)}</b>`;
+    if (v < 0) return `<b class="d-early" title="Priemerne skôr, než bol termín">predstih ${mins(-v)}</b>`;
+    return '<b class="d-ok" title="Priemerne presne podľa termínu">v čase</b>';
+  };
   const mins = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + ' %' : '–');
 
@@ -1267,7 +1275,7 @@
     const row = (d, cls = '') => `<tr class="${cls}"><td class="doc">${esc(d.doctor)}${d.rooms && d.rooms.length && !cls ? `<div class="hint">${esc(d.rooms.join(', '))}</div>` : ''}</td>
       <td class="num">${d.days}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}${d.open ? ` <span class="hint">(+${d.open} nevyb.)</span>` : ''}</td>
       <td class="num">${mins(d.avgWait)}</td><td class="num">${mins(d.medianWait)}</td>
-      <td class="num">${d.planned}</td><td class="num ${d.avgDelay > 15 ? 'bad' : ''}">${d.planned ? mins(d.avgDelay) : '–'}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
+      <td class="num">${d.planned}</td><td class="num">${delayHtml(d)}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
       <td class="num">${pct(d.onTime, d.planned)}</td><td class="num ${d.late15 ? 'bad' : ''}">${d.planned ? d.late15 : '–'}</td>
       <td class="num">${mins(d.avgExam)}</td>${grp === 'room' ? `<td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td>` : ''}</tr>`;
     const G = { doctor: { who: 'Lekár', wait: 'Ø čakanie na lekára', exam: 'Ø u lekára' }, nurse: { who: 'Sestra', wait: 'Ø čakanie', exam: 'Ø u sestry' },
@@ -1276,7 +1284,7 @@
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu</span></div>
-        <div class="stats-kpi"><b>${t.planned ? mins(t.avgDelay) : '–'}</b><span>priemerné meškanie oproti plánovanému času</span></div>
+        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti plánovanému času</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov s plánom vyvolaných načas (do 5 min)</span></div>
         <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
       </section>
