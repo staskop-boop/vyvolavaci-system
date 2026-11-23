@@ -801,7 +801,95 @@
     const w = S.staff.counts.waiting;
     const ok = await confirmDialog('Ukončiť deň?', `Tablet prestane vydávať poradové čísla a obrazovka v čakárni oznámi, že dnes už nových pacientov neprijímame.
       ${w ? `Čakajúcich pacientov (${w}) môžete ešte normálne vyvolať.` : 'Nikto nečaká – TV ukáže „Dnes už neordinujeme“.'} Príjem sa dá kedykoľvek obnoviť, zajtra sa začne sám.`, 'Ukončiť deň');
-    if (ok) act(() => api('/api/staff/day-end', { body: { ended: true } }), 'Deň je ukončený – nové čísla sa už nevydávajú.');
+    if (!ok) return;
+    const r = await act(() => api('/api/staff/day-end', { body: { ended: true } }), 'Deň je ukončený – nové čísla sa už nevydávajú.');
+    if (r) celebrate();
+  }
+
+  /**
+   * 2026-11-23 (Pali): po „Ukončiť deň“ poďakovanie s ohňostrojom – pre toho, kto tlačidlo stlačil (len v tejto aplikácii, nie na TV).
+   * Čísla sú len súhrnné (počty a priemer), žiadne údaje o pacientoch.
+   */
+  const FIN_QUOTES = [
+    (n) => `${n} ľudí dnes odišlo s lepším pocitom, než s akým prišli. To je dobrý deň.`,
+    () => 'Čakáreň je prázdna a to je tvoja zásluha. Vypni, vydýchni, zajtra zas.',
+    () => 'Dnes to išlo ako po masle. A ak nie, aj tak je to zvládnuté na jednotku.',
+    (n) => `${n} vyvolaní, nula zabudnutých. Presne takto sa to robí.`,
+    () => 'Žily dnes boli v dobrých rukách. Teraz si daj nohy hore aj ty.',
+    () => 'Poriadok v čakárni nerobí systém, ale ľudia, čo ho používajú. Ďakujeme.',
+    () => 'Káva bola dnes zaslúžená už ráno. Teraz je zaslúžený aj pokoj.',
+  ];
+  async function celebrate() {
+    const ts = (S.staff && S.staff.tickets) || [];
+    const done = ts.filter((t) => t.status === 'done').length, absent = ts.filter((t) => t.status === 'absent').length;
+    let avgWait = null;
+    try { avgWait = (await api('/api/staff/today-stats')).total.avgWait; } catch {}
+    const room = S.staff && S.staff.rooms.find((x) => x.id === S.roomId);
+    const first = ((room && room.nurseName) || '').split(/\s+/).find((w) => w && !w.endsWith('.')) || '';
+    const day = new Date();
+    const quote = FIN_QUOTES[Math.floor(day.getTime() / 86400000) % FIN_QUOTES.length](done);
+    const head = `${day.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long' })}${room ? ' · ' + room.name : ''}`;
+    const el = document.createElement('div');
+    el.id = 'fin'; el.className = 'fin-back';
+    el.innerHTML = `<canvas id="fin-canvas" aria-hidden="true"></canvas>
+      <div class="fin" role="dialog" aria-modal="true" aria-labelledby="fin-title">
+        <div class="fin-top"><small>${esc(head)}</small><h2 id="fin-title">Hotovo, deň je za tebou! 🎉</h2>
+          <svg class="fin-medal" width="112" height="112" viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="54" fill="#fff"/><circle cx="56" cy="56" r="46" fill="#F2B632"/><circle cx="56" cy="56" r="38" fill="#FFD766"/>
+            <path d="M56 78 C30 60 34 40 47 40 c5 0 8 3 9 6 c1-3 4-6 9-6 c13 0 17 20 -9 38z" fill="#c8102e"/><path d="M36 58h10l4-9 6 16 5-10 3 3h12" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="fin-body"><p class="fin-lead">Ďakujeme${first ? ', ' + esc(first) : ''}. Dnes máš za sebou <b>${done} ${done === 1 ? 'pacienta' : 'pacientov'}</b>.</p>
+          <div class="fin-tiles"><div class="fin-tile g"><b>${done}</b><span>ukončených pacientov</span></div>
+            <div class="fin-tile"><b>${avgWait == null ? '–' : fmtMin(avgWait)}</b><span>priemerné čakanie</span></div>
+            <div class="fin-tile ${absent ? 'r' : ''}"><b>${absent}</b><span>neprítomných</span></div></div>
+          <div class="fin-quote">„${esc(quote)}“</div>
+          <button type="button" class="btn btn-primary" id="fin-close">Zaslúžený oddych 👋</button></div></div>`;
+    document.body.appendChild(el);
+    const stop = fireworks(el.querySelector('#fin-canvas'));
+    const close = () => { stop(); document.removeEventListener('keydown', onKey); el.remove(); };
+    const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); close(); } };
+    document.addEventListener('keydown', onKey);
+    el.querySelector('#fin-close').onclick = close;
+    el.onclick = (e) => { if (e.target === el || e.target.id === 'fin-canvas') close(); };
+    el.querySelector('#fin-close').focus();
+  }
+
+  /** Animovaný ohňostroj a konfety na plátne. Pri „obmedziť pohyb“ v systéme sa nakreslia len nehybné konfety. Vráti funkciu na zastavenie. */
+  function fireworks(cv) {
+    const ctx = cv.getContext('2d');
+    const COLORS = ['#c8102e', '#ff5a6e', '#F2B632', '#FFD766', '#ffffff', '#3fae6a', '#5aa2ea'];
+    const rnd = (a, b) => a + Math.random() * (b - a), pick = () => COLORS[Math.floor(Math.random() * COLORS.length)];
+    let W = 0, H = 0, raf = 0, last = 0, nextRocket = 0, t0 = 0, alive = true;
+    const size = () => { W = cv.width = cv.clientWidth; H = cv.height = cv.clientHeight; };
+    size(); window.addEventListener('resize', size);
+    const rockets = [], sparks = [], confetti = [];
+    for (let i = 0; i < 140; i++) confetti.push({ x: rnd(0, W), y: rnd(-H, 0), w: rnd(6, 13), h: rnd(8, 18), c: pick(), vy: rnd(70, 190), vx: rnd(-30, 30), a: rnd(0, 6.3), va: rnd(-4, 4) });
+    const drawConfetti = (dt) => { for (const c of confetti) {
+      c.y += c.vy * dt; c.x += c.vx * dt; c.a += c.va * dt; if (c.y > H + 20) { c.y = -20; c.x = rnd(0, W); }
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a); ctx.fillStyle = c.c; ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h * Math.abs(Math.cos(c.a * 1.3)) + 2); ctx.restore(); } };
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (const c of confetti) c.y = rnd(0, H);
+      drawConfetti(0);
+      return () => window.removeEventListener('resize', size);
+    }
+    const burst = (x, y) => { const c1 = pick(), c2 = pick(), n = 70 + Math.floor(rnd(0, 50)), sp = rnd(150, 300);
+      for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2 + rnd(-0.05, 0.05), v = sp * rnd(0.55, 1); sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rnd(0.9, 1.6), t: 0, c: i % 3 ? c1 : c2 }); } };
+    const frame = (now) => {
+      if (!alive) return;
+      if (!t0) { t0 = last = now; }
+      const dt = Math.min(0.05, (now - last) / 1000); last = now;
+      ctx.clearRect(0, 0, W, H);
+      if (now >= nextRocket) { rockets.push({ x: rnd(W * 0.12, W * 0.88), y: H + 10, vy: -rnd(520, 760), ty: rnd(H * 0.12, H * 0.45), c: pick() }); nextRocket = now + (now - t0 < 6000 ? rnd(220, 520) : rnd(900, 1800)); }
+      for (let i = rockets.length - 1; i >= 0; i--) { const r = rockets[i]; r.y += r.vy * dt; r.vy += 260 * dt;
+        ctx.fillStyle = r.c; ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.arc(r.x, r.y, 3, 0, 6.3); ctx.fill(); ctx.globalAlpha = 0.35; ctx.fillRect(r.x - 1, r.y, 2, 26);
+        if (r.y <= r.ty || r.vy >= -40) { burst(r.x, r.y); rockets.splice(i, 1); } }
+      for (let i = sparks.length - 1; i >= 0; i--) { const p = sparks[i]; p.t += dt; if (p.t >= p.life) { sparks.splice(i, 1); continue; }
+        p.vx *= 1 - 1.6 * dt; p.vy = p.vy * (1 - 1.6 * dt) + 130 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+        ctx.globalAlpha = Math.max(0, 1 - p.t / p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, 6.3); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      drawConfetti(dt);
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => { alive = false; cancelAnimationFrame(raf); window.removeEventListener('resize', size); };
   }
   async function reopenDay() {
     const ok = await confirmDialog('Obnoviť príjem pacientov?', 'Tablet znova začne vydávať poradové čísla a oznam o ukončení dňa z obrazovky zmizne.', 'Obnoviť príjem');
