@@ -489,8 +489,11 @@
       ${st.previousDayOpen.count} neukončených čísel. Do dnešného zoznamu sa neprenášajú.</div>
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
+    // 2026-11-18 (Pali): rýchla zmena ambulancie priamo v riadku radu k lekárovi (2026-11-23 aj v rade k sestre)
+    const roomQuick = (t, dis) => `<select class="room-sel amb-pill ${t.homeRoomId ? 'c' + ((Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1) : 'any'} needs-online" data-room-for="${t.id}" ${dis} aria-label="Ambulancia pacienta ${esc(t.code)}" title="Zmeniť ambulanciu">
+      ${active.map((r) => `<option value="${r.id}" ${r.id === t.homeRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="" ${t.homeRoomId ? '' : 'selected'}>Ktorákoľvek</option></select>`;
     const waitRows = waitingNurse.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="t-room">${t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
       <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${plannedBadge(t, now)}</span><span class="tl t-arr"><i>príchod</i> <b>${esc(fmtTime(t.createdAt))}</b></span><span class="tl t-wait"><i>čaká</i> ${waitBadge(t, t.createdAt, now)}</span></td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="${isDocAcc ? 'Pacienta si vezmete rovno k sebe (bez sestry)' : 'Vyvolať k sestre'}">${isDocAcc ? 'Vyvolať k sebe' : 'Vyvolať'}${i > 0 || isDocAcc ? '…' : ''}</button>
@@ -501,9 +504,6 @@
         ${t.source === 'card' ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="reprint" data-id="${t.id}" ${dis} title="Znovu vytlačiť lístok">🖨 Tlač</button>`}
       </div></td></tr>`).join('');
 
-    // 2026-11-18 (Pali): rýchla zmena ambulancie priamo v riadku radu k lekárovi
-    const roomQuick = (t, dis) => `<select class="room-sel amb-pill ${t.homeRoomId ? 'c' + ((Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1) : 'any'} needs-online" data-room-for="${t.id}" ${dis} aria-label="Ambulancia pacienta ${esc(t.code)}" title="Zmeniť ambulanciu">
-      ${active.map((r) => `<option value="${r.id}" ${r.id === t.homeRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="" ${t.homeRoomId ? '' : 'selected'}>Ktorákoľvek</option></select>`;
     const docRows = waitingDoc.map((t, i) => `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : (t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
       <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${plannedBadge(t, now)}</span><span class="tl"><i>u sestry</i> ${t.nurseCalledAt ? `<b>${esc(fmtTime(t.nurseCalledAt))}</b>` : '<span class="hint" title="Pacient nebol u sestry">—</span>'}</span><span class="tl"><i>k lekárovi</i> <b>${esc(fmtTime(t.toDoctorAt))}</b></span><span class="tl t-wait"><i>čaká</i> ${waitBadge(t, t.toDoctorAt || t.createdAt, now)}</span></td>
@@ -526,6 +526,7 @@
         <button class="btn btn-sm needs-online" data-act="back-to-doctor" data-id="${t.id}" ${dis} title="Omyl – pacient je ešte u lekára">← Späť k lekárovi</button>
         ${nurse ? `<button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
+        ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
       </div></td></tr>`;
     const calledRow = (t) => (t.stage === 'final' ? finalRow(t) : `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
@@ -539,6 +540,7 @@
         <button class="btn btn-sm needs-online" data-act="absent" data-id="${t.id}" ${dis} title="Pacient neprišiel alebo odišiel">⊘ Neprítomný</button>
         <button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>
         ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
+        ${nurse ? `<button class="btn btn-sm btn-ghost needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
       </div></td></tr>`);
 
     // 2026-11-18 (Pali): „Práve v ambulancii“ rozdelené – kto je u sestry (aj na ukončení) a kto u lekára
@@ -557,7 +559,8 @@
       <td class="nw">${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</td>
       <td class="nw">${tm(t.createdAt)}</td><td class="nw">${tm(t.nurseCalledAt)}</td><td class="nw">${tm(t.toDoctorAt)}</td>
       <td class="nw">${tm(t.stage === 'doctor' || t.stage === 'final' ? t.calledAt : null)}</td><td class="nw">${tm(t.finalAt)}</td><td class="nw"><b>${tm(t.finishedAt)}</b></td>
-      <td class="actions"><button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button></td></tr>`).join('');
+      <td class="actions"><div class="acts"><button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>
+        ${nurse && t.status !== 'cancelled' ? `<button class="btn btn-sm btn-ghost needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Opraviť ambulanciu, v ktorej pacient bol (aj v štatistikách)">⇄ Ambulancia</button>` : ''}</div></td></tr>`).join('');
 
     // ďalší na rade – veľká karta s hlavnou akciou
     const next = waiting[0] || null;
@@ -729,6 +732,7 @@
       case 'plan': return planTicket(t);
       case 'edit': return editTicket(t);
       case 'note': return noteTicket(t);
+      case 'move-room': return moveRoomTicket(t);
       case 'cancel': {
         const ok = await confirmDialog(`Zmazať pacienta ${code}?`, `Číslo ${code} sa odstráni zo zoznamu čakajúcich, ako keby nebolo zadané (nezapočíta sa ani do štatistík). Použite pri chybnom zadaní.`, 'Zmazať pacienta', true);
         if (ok) act(() => api(`/api/staff/tickets/${id}/cancel`, { body: {} }), `Pacient ${code} bol zmazaný`);
@@ -913,6 +917,38 @@
     if (res && res.ticket) toast(`Uložené: ${res.ticket.code}${res.ticket.plannedAt ? ' · ' + fmtTime(res.ticket.plannedAt) : ''} · ${res.ticket.homeRoomName || 'ktorákoľvek ambulancia'}`, 'ok');
   }
 
+  /**
+   * 2026-11-23 (Pali): zmena ambulancie vyvolaného pacienta (u sestry, u lekára, na ukončení) – napr. pacient
+   * musí ísť k inému lekárovi. Pacient odíde z ambulancie do čakárne a zaradí sa do radu vybranej ambulancie.
+   */
+  async function moveRoomTicket(t) {
+    if (!t) return;
+    const finishedT = t.status !== 'called';
+    const opts = roomsActive().filter((r) => r.id !== t.roomId && (finishedT || !isClosed(r.id)));
+    if (!opts.length) return toast('⚠ Iná ambulancia nie je – nie je kam pacienta presunúť.', 'error');
+    const cur = finishedT || t.stage === 'final' ? 'here' : t.stage === 'nurse' ? 'nurse' : 'doctor';
+    const where = finishedT ? `bol ${t.status === 'done' ? 'ukončený' : 'označený ako neprítomný'}` : t.stage === 'doctor' ? 'je teraz u lekára' : t.stage === 'final' ? 'je teraz u sestry na ukončení' : 'je teraz u sestry';
+    const docName = (id) => (S.staff.doctors || {})[id];
+    const res = await modal({
+      title: `Zmeniť ambulanciu – ${t.code}`,
+      okText: 'Zmeniť ambulanciu',
+      body: `<p>Pacient ${where} v ambulancii <b>${esc(t.roomName || t.homeRoomName || '–')}</b>.</p>
+        <div class="field" style="margin-top:14px"><label for="m-room">Nová ambulancia</label><select id="m-room">${opts.map((r, i) => `<option value="${r.id}" ${i === 0 ? 'selected' : ''}>${esc(r.name)}${docName(r.id) ? ' – ' + esc(docName(r.id)) : ''}</option>`).join('')}</select></div>
+        <div class="field" style="margin-top:14px"><label for="m-stage">Čo s pacientom</label><select id="m-stage">
+          ${finishedT ? '' : `<option value="doctor" ${cur === 'doctor' ? 'selected' : ''}>ide do čakárne a čaká na lekára novej ambulancie</option>
+          <option value="nurse" ${cur === 'nurse' ? 'selected' : ''}>ide do čakárne a čaká na sestru novej ambulancie</option>`}
+          <option value="here" ${cur === 'here' ? 'selected' : ''}>${finishedT ? 'bol v novej ambulancii – opraviť záznam' : 'už je v novej ambulancii – len opraviť'}</option></select></div>
+        <p class="hint">${finishedT ? 'Ambulancia sa opraví v histórii aj v štatistikách (lekár a sestra podľa dnešného obsadenia novej ambulancie).'
+          : 'Pri čakaní pacienta vyvolá nová ambulancia – na obrazovke sa ukáže jej číslo. Na lekára čaká podľa času, kedy ho sestra poslala k lekárovi. Pri oprave sa ambulancia zmení na kartičke, na obrazovke, v histórii aj v štatistikách.'}</p>`,
+      onOk: async (root) => {
+        if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
+        return api(`/api/staff/tickets/${t.id}/room`, { body: { roomId: Number(root.querySelector('#m-room').value), stage: root.querySelector('#m-stage').value } });
+      },
+    });
+    if (res && res.ticket) toast(res.ticket.status === 'waiting' ? `${res.ticket.code}: ${res.ticket.homeRoomName} – čaká na ${res.ticket.stage === 'doctor' ? 'lekára' : 'sestru'}`
+      : `${res.ticket.code}: ambulancia opravená na ${res.ticket.roomName}`, 'ok');
+  }
+
   /** 2026-11-17: identifikátor aj pre vyvolaného pacienta (úprava čakajúceho je v ✎ Upraviť). */
   async function noteTicket(t) {
     if (!t) return;
@@ -947,15 +983,18 @@
     const st2 = t.stage === 'doctor' ? 'doctor' : 'nurse';
     const waiting = S.staff.tickets.filter((x) => x.status === 'waiting' && (x.stage || 'nurse') === st2 && (showAll() || mineFilter(x))).sort(st2 === 'doctor' ? byDocOrder : byOrder);
     const outOfOrder = waiting.length && waiting[0].id !== t.id;
-    if (!outOfOrder) {
+    // 2026-11-23 (Pali): pacient patrí inej ambulancii – vyvolanie ponúkne jeho ambulanciu, aby sa nezapísal do cudzej
+    const rooms = roomsOpen(S.roomId);
+    const other = t.homeRoomId && t.homeRoomId !== S.roomId && rooms.some((r) => r.id === t.homeRoomId) ? t.homeRoomId : null;
+    if (!outOfOrder && !other) {
       return act(() => api(`/api/staff/tickets/${t.id}/call`, { body: { roomId: S.roomId } }), (r) => `Vyvolané ${r.ticket.code} – ${r.ticket.roomName}`);
     }
-    const rooms = roomsOpen(S.roomId);
     const res = await modal({
       title: `Vyvolať ${t.code}`,
       okText: 'Vyvolať',
       body: `${outOfOrder ? `<p class="alert alert-info">Číslo nie je na rade (na rade je ${esc(waiting[0].code)}). Vyvolanie mimo poradia je v poriadku, napr. pre objednaného pacienta.</p>` : ''}
-        <div class="field"><label for="m-room">Ambulancia</label><select id="m-room">${rooms.map((r) => `<option value="${r.id}" ${r.id === S.roomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
+        ${other ? `<p class="alert alert-info">Pacient patrí do ambulancie <b>${esc(t.homeRoomName || '')}</b> – vyvolá sa tam. Ak ho naozaj prevezmete vy, vyberte svoju ambulanciu.</p>` : ''}
+        <div class="field"><label for="m-room">Ambulancia</label><select id="m-room">${rooms.map((r) => `<option value="${r.id}" ${r.id === (other || S.roomId) ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div>
         ${outOfOrder ? `<div class="field" style="margin-top:14px"><label for="m-note">Dôvod (nepovinné, vidí len personál)</label><textarea id="m-note" maxlength="200" placeholder="napr. objednaný na 9:30"></textarea></div>` : ''}`,
       onOk: async (root) => {
         if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');

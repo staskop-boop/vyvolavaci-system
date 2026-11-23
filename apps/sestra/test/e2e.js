@@ -445,6 +445,34 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await A.click('.tab[data-view=queue]');
     ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi, „K sestre na ukončenie“ a „Ukončený“ u sestry');
 
+    // 11d. 2026-11-23 (Pali): zmena ambulancie aj pacientovi u lekára – napr. musí ísť k inému lekárovi
+    const tm = (await kiosk()).ticket.code;
+    await row(A, 'tbl-waiting', tm).getByRole('button', { name: /^Vyvolať/ }).click();
+    if (await A.locator('#m-ok').count()) await A.click('#m-ok');
+    await row(A, 'tbl-called', tm).getByRole('button', { name: '→ Priamo k lekárovi' }).click();
+    await row(A, 'tbl-called', tm).locator('.stage-pill', { hasText: 'u lekára' }).waitFor();
+    await shot(A, '23-u-lekara-zmenit-ambulanciu');
+    await row(A, 'tbl-called', tm).getByRole('button', { name: /Zmeniť ambulanciu/ }).click();
+    await A.locator('.modal', { hasText: `Zmeniť ambulanciu – ${tm}` }).waitFor();
+    const opt2 = await A.locator('#m-room option', { hasText: 'Ambulancia č. 2' }).getAttribute('value');
+    await A.selectOption('#m-room', opt2);
+    assert.equal(await A.inputValue('#m-stage'), 'doctor', 'predvolene čaká na lekára novej ambulancie');
+    await shot(A, '24-zmenit-ambulanciu-okno');
+    await A.click('#m-ok');
+    await toastWith(A, /Ambulancia č. 2 – čaká na lekára/);
+    await row(A, 'tbl-called', tm).waitFor({ state: 'detached' });   // pacient odišiel z ambulancie 1
+    d = await display();
+    assert.deepEqual(d.rooms.find((r) => r.name === 'Ambulancia č. 2').doctorQueue, [tm]);
+    // oprava ukončeného pacienta: bol v inej ambulancii → zmení sa aj v zozname (a štatistikách)
+    await row(A, 'tbl-finished', tn).getByRole('button', { name: /Ambulancia/ }).click();
+    await A.selectOption('#m-room', opt2);
+    assert.equal(await A.inputValue('#m-stage'), 'here');
+    await A.click('#m-ok');
+    await toastWith(A, /ambulancia opravená na Ambulancia č. 2/);
+    const fixed = await A.evaluate(async (c) => (await (await fetch('/api/staff/state')).json()).tickets.find((x) => x.code === c), tn);
+    assert.equal(fixed.roomName, 'Ambulancia č. 2'); assert.equal(fixed.status, 'done');
+    ok('zmena ambulancie pacienta u lekára (do radu lekára inej ambulancie) aj oprava ukončeného');
+
     // 11c. hromadné kontá nastavia heslo aj kontám lekárov, ktoré vznikli bez hesla
     await A.click('.tab[data-view=admin]');
     await A.click('#btn-bulk-users');

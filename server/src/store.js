@@ -608,15 +608,63 @@ class Store extends EventEmitter {
    * 2026-11-16 (Pali): zmena ambulancie pacienta – napr. keď ho prevezme druhá ambulancia.
    * roomId = null → spoločný pacient (vidia ho všetky ambulancie).
    */
-  setHomeRoom(ticketId, roomId, userId) {
+  setHomeRoom(ticketId, roomId, userId, stage) {
     const home = roomId != null && roomId !== '' ? this.requireRoom(roomId) : null;
+    if (stage === 'here') return this.fixRoom(ticketId, home, userId);
+    const want = stage != null && stage !== '' ? this.normStage(stage) : null;
     tx(this.db, () => {
       const row = this.getTicketRow(ticketId);
       this.requireToday(row);
       if (!['waiting', 'called', 'absent'].includes(row.status)) throw conflict(`Číslo ${row.code} je už ukončené – ambulanciu nemožno zmeniť.`);
+      const now = clock.nowIso();
       this.db.prepare('UPDATE tickets SET home_room_id = ?, version = version + 1 WHERE id = ?').run(home ? home.id : null, row.id);
       this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note) VALUES (?, 'moved', ?, ?, ?, ?)")
-        .run(row.id, clock.nowIso(), home ? home.id : null, userId ?? null, home ? home.name : 'všetky ambulancie');
+        .run(row.id, now, home ? home.id : null, userId ?? null, home ? home.name : 'všetky ambulancie');
+      // 2026-11-23 (Pali): zmena ambulancie aj pri vyvolanom pacientovi (u sestry, u lekára, na ukončení) –
+      // napr. pacient musí ísť k inému lekárovi. Pacient odíde z ambulancie do čakárne a zaradí sa do radu
+      // novej ambulancie (k lekárovi alebo k sestre); poradie k lekárovi si ponechá podľa pôvodného času.
+      if (row.status === 'called') {
+        const cur = row.stage || 'nurse';
+        const stg = want || (cur === 'nurse' ? 'nurse' : 'doctor');
+        this.db.prepare(`UPDATE tickets SET status = 'waiting', room_id = NULL, called_at = NULL, final_at = NULL, stage = ?,
+          to_doctor_at = CASE WHEN ? = 'doctor' THEN COALESCE(to_doctor_at, ?) ELSE NULL END WHERE id = ?`).run(stg, stg, now, row.id);
+        if (stg === 'doctor' && cur === 'nurse') this.insertCallEvent('to_doctor', row.id, now, row.room_id, userId, null, 'nurse');
+        if (stg === 'nurse' && cur !== 'nurse') this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id) VALUES (?, 'to_nurse', ?, ?, ?)")
+          .run(row.id, now, home ? home.id : null, userId ?? null);
+      }
+    });
+    this.changed('tickets');
+    return { ticket: this.getTicket(Number(ticketId)) };
+  }
+
+  /**
+   * 2026-11-23 (Pali): oprava ambulancie – pacient už je (alebo bol) v inej ambulancii, než ukazuje systém.
+   * Bez nového zaradenia do radu: zmení sa ambulancia na kartičke, v histórii aj v štatistikách (udalosti
+   * aktuálneho kroku – u sestry, alebo u lekára a ukončenie – sa prepíšu na novú ambulanciu a jej dnešného
+   * lekára/sestru). Ide aj pri ukončenom a neprítomnom pacientovi z dnešného dňa. Nič sa nemaže.
+   */
+  fixRoom(ticketId, home, userId) {
+    if (!home) throw bad('Vyberte ambulanciu, v ktorej pacient je.');
+    tx(this.db, () => {
+      const row = this.getTicketRow(ticketId);
+      this.requireToday(row);
+      if (row.status === 'waiting') throw conflict(`Číslo ${row.code} čaká – ambulanciu zmeňte bez opravy (pacient sa zaradí do jej radu).`);
+      const old = row.room_id != null ? this.getRoom(row.room_id) : null;
+      const now = clock.nowIso();
+      this.db.prepare('UPDATE tickets SET home_room_id = ?, room_id = ?, version = version + 1 WHERE id = ?').run(home.id, home.id, row.id);
+      const docStep = (row.stage || 'nurse') !== 'nurse';
+      const doc = this.doctorsToday()[home.id] || null, nur = this.nursesToday()[home.id] || null;
+      if (docStep) {
+        this.db.prepare(`UPDATE ticket_events SET room_id = ?, doctor = COALESCE(?, doctor) WHERE ticket_id = ? AND stage = 'doctor'
+          AND type IN ('call','recall','to_doctor')`).run(home.id, doc, row.id);
+        this.db.prepare(`UPDATE ticket_events SET room_id = ? WHERE ticket_id = ? AND (stage = 'final' OR type IN ('to_final','final_back'))
+          AND type IN ('call','recall','to_final','final_back')`).run(home.id, row.id);
+      } else {
+        this.db.prepare(`UPDATE ticket_events SET room_id = ?, nurse = COALESCE(?, nurse), doctor = COALESCE(?, doctor) WHERE ticket_id = ?
+          AND COALESCE(stage, 'nurse') = 'nurse' AND type IN ('call','recall')`).run(home.id, nur, doc, row.id);
+      }
+      this.db.prepare("INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note) VALUES (?, 'moved', ?, ?, ?, ?)")
+        .run(row.id, now, home.id, userId ?? null, `oprava: ${old ? old.name + ' → ' : ''}${home.name}`);
     });
     this.changed('tickets');
     return { ticket: this.getTicket(Number(ticketId)) };
@@ -1164,6 +1212,7 @@ class Store extends EventEmitter {
         if (e.type === 'call') x.lastCall = e.at;
         if (e.stage === 'nurse') { if (!x.nurseCall) x.nurseCall = e.at; if (e.nurse) x.nurse = e.nurse; }
         if (e.stage === 'doctor' && e.type === 'call' && !x.doctorStart) x.doctorStart = e.at;
+        if (e.stage === 'doctor' && e.type === 'call') x.final = null;   // nové vyvolanie lekárom (napr. po zmene ambulancie)
         // lekár: pri dvoch krokoch len z vyvolania lekárom, inak z posledného vyvolania (ako doteraz)
         if (e.doctor && (!e.stage || e.stage === 'doctor')) x.doctor = e.doctor;
       }
