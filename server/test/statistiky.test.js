@@ -49,7 +49,7 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   const prvy = r.data.doctors.find((x) => x.doctor === 'MUDr. Test Prvý');
   assert.equal(prvy.patients, 2, 'pacient ukončený len u sestry sa lekárovi nepočíta'); assert.equal(prvy.done, 1); assert.equal(prvy.absent, 1);
   assert.equal(prvy.avgWait, 8, 'čakanie na lekára (15 + 0) / 2');
-  assert.equal(prvy.planned, 0, 'meškanie oproti termínu sa lekárovi pri dvoch krokoch nepripisuje');
+  assert.equal(prvy.planned, 1, 'meškanie oproti termínu sa ukazuje aj pri lekárovi'); assert.equal(prvy.avgDelay, 20, 'vstup k sestre 30 − termín 10');
   assert.equal(prvy.avgExam, 20, 'u lekára od vyvolania lekárom po ukončenie');
   assert.equal(prvy.avgNurse, 10); assert.equal(prvy.direct, 1); assert.equal(prvy.toDoctor, 2);
   const druhy = r.data.doctors.find((x) => x.doctor === 'MUDr. Test Druhý');

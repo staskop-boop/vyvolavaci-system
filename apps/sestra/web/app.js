@@ -1289,7 +1289,7 @@
           <td class="num">${mins(d.avgWait)}</td><td class="num">${delayHtml(d)}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
           <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
         <p class="hint">Od 17. 11. 2026 ide pacient najprv k sestre a potom k vám. Čakanie = od chvíle, keď ho sestra poslala k lekárovi, po vaše vyvolanie (priamo k lekárovi = 0).
-          Vyšetrenie = od vášho vyvolania po „Ukončený“. Meškanie oproti termínu patrí k vstupu k sestre, preto sa vám pri dvoch krokoch nepripisuje.
+          Vyšetrenie = od vášho vyvolania po „Ukončený“. Meškanie = vstup vášho pacienta k sestre oproti termínu (ak prišiel neskôr, počíta sa od príchodu).
           Staršie dni: čakanie od príchodu po prvé vyvolanie, meškanie oproti plánovanému času.</p>
       </section>
       ${r.comparison && r.comparison.length > 1 ? `<section class="card"><div class="section-title"><h2>Porovnanie s ostatnými lekármi</h2><span class="hint">Anonymne – mená ostatných lekárov nevidíte</span></div>
@@ -1383,7 +1383,7 @@
         <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}</tr></thead>
         <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
         <p class="hint">${r.twoStepSince ? `Od ${esc(fmtDay(r.twoStepSince))} má návšteva dva kroky – najprv sestra (čas objednania = vstup k sestre), potom lekár.
-          Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho; meškanie oproti termínu a čakanie od príchodu patria sestre a ambulancii.
+          Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho; meškanie = vstup jeho pacienta k sestre oproti termínu (ak pacient prišiel neskôr, od príchodu).
           Pacient ukončený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
           Vyšetrenie = od vyvolania po „Ukončený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
           ${r.doctorDataSince ? `Lekári sa ukladajú od ${esc(fmtDay(r.doctorDataSince))}; staršie vyvolania sú v riadku „Lekár nebol zadaný“.` : 'Pri vyvolaniach zatiaľ nebol zadaný lekár – nastavte ho v Zozname tlačidlom Lekár.'}</p>

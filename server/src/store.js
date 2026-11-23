@@ -1180,7 +1180,7 @@ class Store extends EventEmitter {
    * – sestra / ambulancia: čakanie = vyvolanie k sestre − príchod, meškanie = vyvolanie k sestre − termín (nie skôr ako príchod),
    *   čas u sestry = poslanie k lekárovi (alebo ukončenie) − vyvolanie k sestre;
    * – lekár: čakanie = vyvolanie lekárom − poslanie od sestry (priamo k lekárovi = 0), vyšetrenie = ukončenie − začiatok u lekára.
-   *   Meškanie oproti termínu sa lekárovi pri dvoch krokoch nepripisuje (termín je čas vstupu k sestre).
+   *   Meškanie oproti termínu (vstup k sestre − termín) sa od 23. 11. 2026 ukazuje aj pri lekárovi – za jeho pacientov (Pali).
    * Staršie záznamy (jeden krok, bez kroku v udalosti) sa počítajú ako doteraz: všetko lekárovi z posledného vyvolania.
    */
   doctorStats(from, to, groupBy = 'doctor') {
@@ -1254,7 +1254,7 @@ class Store extends EventEmitter {
         // čakanie: lekár = na lekára, ostatní = od príchodu po vstup k sestre
         if (doctorView) { const dw = x.direct ? 0 : x.sent ? min(x.doctorStart, x.sent) : null; if (dw != null && dw >= 0) s.waits.push(dw); }
         else { const w = min(visitStart, t.created_at); if (w >= 0) s.waits.push(w); }
-        if (t.planned_at && !doctorView) {
+        if (t.planned_at) {
           const d = (Date.parse(visitStart) - Math.max(Date.parse(t.planned_at), Date.parse(t.created_at) || 0)) / 60000;
           s.delays.push(d);
           if (d <= 5) s.onTime++;
