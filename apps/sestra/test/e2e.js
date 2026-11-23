@@ -356,6 +356,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     // 2026-11-23 (Pali): poďakovanie s ohňostrojom pre toho, kto deň ukončil
     await A.locator('#fin #fin-title', { hasText: 'deň je za tebou' }).waitFor();
     assert.equal(await A.locator('#fin .fin-tile').count(), 3);
+    assert.match(await A.locator('#fin .fin-lead').innerText(), /^Ďakujeme(, \S+)?\. Dnes máš za sebou \d+ pacient/);
     await A.waitForTimeout(1800);
     assert.ok(await A.evaluate(() => { const c = document.getElementById('fin-canvas'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; }), 'ohňostroj sa kreslí');
     await shot(A, '26-ukoncenie-dna-ohnostroj');

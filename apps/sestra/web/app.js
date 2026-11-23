@@ -825,7 +825,7 @@
     let avgWait = null;
     try { avgWait = (await api('/api/staff/today-stats')).total.avgWait; } catch {}
     const room = S.staff && S.staff.rooms.find((x) => x.id === S.roomId);
-    const first = ((room && room.nurseName) || '').split(/\s+/).find((w) => w && !w.endsWith('.')) || '';
+    const first = ((S.staff && (S.staff.nurses || {})[S.roomId]) || '').split(/\s+/).find((w) => w && !w.endsWith('.')) || '';
     const day = new Date();
     const quote = FIN_QUOTES[Math.floor(day.getTime() / 86400000) % FIN_QUOTES.length](done);
     const head = `${day.toLocaleDateString('sk-SK', { weekday: 'long', day: 'numeric', month: 'long' })}${room ? ' · ' + room.name : ''}`;
