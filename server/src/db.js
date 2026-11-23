@@ -79,8 +79,47 @@ function open(file = config.dbFile) {
   db.exec('PRAGMA busy_timeout = 5000;');
   db.exec(SCHEMA);
   migrate(db);
+  try { ostryStart(db, file); } catch (e) { console.error('⚠ Vymazanie údajov spred ostrej prevádzky zlyhalo – nič sa nezmazalo:', e.message); }
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return db;
+}
+
+/**
+ * 2026-11-23 (Pali): „od dnes ideme naostro“ – staré štatistiky skresľujú výsledok, preto sa pri prvom spustení tejto verzie
+ * jednorazovo zmažú pacienti, história a počítadlá spred 23. 11. 2026. Dnešok a všetko novšie ostáva, kontá a nastavenia tiež.
+ * Pred zmazaním sa urobí záloha do <dáta>/zalohy/adna-pred-ostrym-startom-<čas>.db; ak sa záloha nepodarí, nič sa nezmaže.
+ */
+const OSTRY_START = '2026-11-23';
+function ostryStart(db, file, cutoff = OSTRY_START) {
+  const key = `ostryStart:${cutoff}`;
+  if (db.prepare('SELECT 1 FROM settings WHERE key = ?').get(key)) return null;
+  const n = db.prepare('SELECT COUNT(*) AS n FROM tickets WHERE day < ?').get(cutoff).n;
+  let zaloha = null;
+  if (n > 0) {
+    if (file !== ':memory:') {
+      const path = require('node:path');
+      const dir = path.join(path.dirname(file), 'zalohy');
+      fs.mkdirSync(dir, { recursive: true });
+      zaloha = path.join(dir, `adna-pred-ostrym-startom-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
+      db.exec(`VACUUM INTO '${zaloha.replace(/'/g, "''")}'`);
+      const z = new DatabaseSync(zaloha, { readOnly: true });
+      const vZalohe = z.prepare('SELECT COUNT(*) AS n FROM tickets').get().n;
+      z.close();
+      if (vZalohe !== db.prepare('SELECT COUNT(*) AS n FROM tickets').get().n) throw new Error('záloha nesedí s databázou');
+    }
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('DELETE FROM ticket_events WHERE ticket_id IN (SELECT id FROM tickets WHERE day < ?)').run(cutoff);
+      db.prepare('DELETE FROM tickets WHERE day < ?').run(cutoff);
+      db.prepare('DELETE FROM day_counters WHERE day < ?').run(cutoff);
+      db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(key, JSON.stringify({ at: new Date().toISOString(), deleted: n, backup: zaloha }));
+      db.exec('COMMIT');
+    } catch (e) { try { db.exec('ROLLBACK'); } catch {} throw e; }
+    console.log(`Ostrá prevádzka od ${cutoff}: zmazaných ${n} starších pacientov (záloha: ${zaloha || '—'}).`);
+  } else {
+    db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run(key, JSON.stringify({ at: new Date().toISOString(), deleted: 0 }));
+  }
+  return { deleted: n, backup: zaloha };
 }
 
 /** v2: plánovaný čas vyšetrenia a zdroj čísla (tablet / kartička od sestry). Bezpečné aj pri opakovanom spustení. */
