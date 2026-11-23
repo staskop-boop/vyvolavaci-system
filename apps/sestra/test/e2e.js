@@ -473,6 +473,21 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     assert.equal(fixed.roomName, 'Ambulancia č. 2'); assert.equal(fixed.status, 'done');
     ok('zmena ambulancie pacienta u lekára (do radu lekára inej ambulancie) aj oprava ukončeného');
 
+    // 11e. 2026-11-23 (Pali): priebežné štatistiky – dnešok sa obnovuje sám, bez klikania
+    await A.click('.tab[data-view=stats]');
+    await A.click('#stats-form [data-range="0"]');
+    await A.locator('#live-now').waitFor();
+    await A.locator('#live-stamp', { hasText: 'obnovuje sa automaticky' }).waitFor();
+    const nurseWait = () => A.locator('#live-now .stats-kpi', { hasText: 'čaká na sestru' }).locator('b').innerText();
+    const before = Number(await nurseWait());
+    await kiosk();
+    await A.waitForFunction((n) => { const k = [...document.querySelectorAll('#live-now .stats-kpi')].find((x) => x.textContent.includes('čaká na sestru')); return k && Number(k.querySelector('b').textContent) === n; }, before + 1, { timeout: 8000 });
+    await shot(A, '25-statistiky-priebezne');
+    await A.click('#stats-form [data-range="29"]');
+    await A.locator('#live-now').waitFor();   // obdobie po dnešok je tiež priebežné
+    await A.click('.tab[data-view=queue]');
+    ok('štatistiky za dnešok sa obnovujú samy a ukazujú stav „Práve teraz“');
+
     // 11c. hromadné kontá nastavia heslo aj kontám lekárov, ktoré vznikli bez hesla
     await A.click('.tab[data-view=admin]');
     await A.click('#btn-bulk-users');

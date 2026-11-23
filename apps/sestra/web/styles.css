@@ -440,6 +440,11 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 /* dlhý typ pacienta v rade nesmie rozšíriť tabuľku za okraj okna */
 .a-queues td.t-room .ident-pill { max-width: 100%; }
 .a-queues td.t-room { max-width: 16ch; }
+
+/* 2026-11-23 (Pali): priebežné štatistiky počas dňa */
+.live-stamp { color: #14602F; font-weight: 600; }
+.live-now h2 { margin-bottom: 10px; }
+.stats-kpi.live { background: #F4F8FD; border-color: #C9DDF3; }
 /* 2026-11-23: bez Identifikátora a zmeny ambulancie (konto lekára) – dve vedľajšie akcie na celý riadok; na mobile po dvoch */
 #tbl-called td.actions .acts:not(:has([data-act=note])) .btn[data-act=absent], #tbl-called td.actions .acts:not(:has([data-act=note])) .btn[data-act=requeue] { grid-column: span 6; }
 @media (max-width: 520px) { #tbl-called td.actions .btn[data-act=absent], #tbl-called td.actions .btn[data-act=requeue], #tbl-called td.actions .btn[data-act=note], #tbl-called td.actions .btn[data-act=move-room] { grid-column: span 6; } }
