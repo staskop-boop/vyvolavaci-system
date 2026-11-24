@@ -813,11 +813,23 @@ class Store extends EventEmitter {
       nurseName: stage === 'nurse' ? (ev && ev.nurse) || d.nurseName : null };
   }
 
-  /** Zápis vyvolania – s krokom a menami sestry a lekára, ktorí sú dnes v ambulancii. */
+  /** Osobné konto, ktoré úkon robí: lekár (doctor_name) alebo sestra (nurse_name); spoločné konto ambulancie = obe null. */
+  actorNames(userId) {
+    if (userId == null) return { doctor: null, nurse: null };
+    const u = this.db.prepare('SELECT doctor_name, nurse_name FROM users WHERE id = ?').get(Number(userId));
+    return { doctor: (u && u.doctor_name) || null, nurse: (u && !u.doctor_name && u.nurse_name) || null };
+  }
+
+  /**
+   * Zápis vyvolania – s krokom a menami sestry a lekára. 2026-11-24 (Pali): štatistiky sa viažu na osobu – keď úkon robí
+   * osobné konto lekára či sestry, zapíše sa jeho meno (aj keď sa počas dňa v tej istej ambulancii vystriedali);
+   * inak meno, ktoré je dnes pri ambulancii zadané.
+   */
   insertCallEvent(type, ticketId, at, roomId, userId, note, stage) {
+    const a = this.actorNames(userId);
     return Number(this.db.prepare('INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note, doctor, nurse, stage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(ticketId, type, at, roomId, userId ?? null, note || null, (roomId != null && this.doctorsToday()[roomId]) || null,
-        (roomId != null && this.nursesToday()[roomId]) || null, stage).lastInsertRowid);
+      .run(ticketId, type, at, roomId, userId ?? null, note || null, a.doctor || (roomId != null && this.doctorsToday()[roomId]) || null,
+        a.nurse || (roomId != null && this.nursesToday()[roomId]) || null, stage).lastInsertRowid);
   }
 
   /**
@@ -1183,7 +1195,7 @@ class Store extends EventEmitter {
    *   Meškanie oproti termínu (vstup k sestre − termín) sa od 23. 11. 2026 ukazuje aj pri lekárovi – za jeho pacientov (Pali).
    * Staršie záznamy (jeden krok, bez kroku v udalosti) sa počítajú ako doteraz: všetko lekárovi z posledného vyvolania.
    */
-  doctorStats(from, to, groupBy = 'doctor') {
+  doctorStats(from, to, groupBy = 'doctor', keyMap = null) {
     const D = /^\d{4}-\d{2}-\d{2}$/;
     if (!D.test(String(from || '')) || !D.test(String(to || '')) || from > to) throw bad('Neplatné obdobie.');
     const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at, to_doctor_at FROM tickets
@@ -1236,7 +1248,8 @@ class Store extends EventEmitter {
       // v štatistike lekára sú len pacienti, ktorí k nemu prišli (pri dvoch krokoch); v štatistike sestier len dvojkrokové návštevy
       if (groupBy === 'doctor' && two && !x.doctorStart) continue;
       if (groupBy === 'nurse' && !(two && x.nurseCall)) continue;
-      const key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
+      let key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
+      if (keyMap) { key = keyMap(key, UNKNOWN); if (key == null) continue; }   // napr. „ja“ / „ostatní spolu“
       const visitStart = two ? x.nurseCall || x.first : x.first;   // vstup do ambulancie (k sestre)
       for (const s of [g(key), all]) {
         s.patients++;
@@ -1301,27 +1314,44 @@ class Store extends EventEmitter {
     return { day, total: strip(r.total), rooms: r.doctors.map(strip).sort((a, b) => a.name.localeCompare(b.name, 'sk')), waiting };
   }
 
-  /** Prehľad jedného lekára: súhrn za obdobie a po dňoch (pre lekárske konto). */
-  doctorOwnStats(name, from, to) {
-    const all = this.doctorStats(from, to);
+  /**
+   * Prehľad jednej osoby: súhrn za obdobie a po dňoch (osobné konto lekára, od 2026-11-24 aj sestry).
+   * Počítajú sa len pacienti, ktorých táto osoba sama vybavila – keď sa počas dňa v ambulancii vystriedajú lekári
+   * (sestry), každý má svoje čísla. Celý deň (všetci spolu) je v `clinic`.
+   * Lekár navyše dostane anonymné porovnanie s ostatnými lekármi (2026-11-24, Pali): vždy „priemer ostatných lekárov“
+   * spolu; jednotlivých lekárov (Lekár A, B…) len vtedy, keď sú aspoň traja ďalší – pri menšom počte by sa dali ľahko uhádnuť.
+   */
+  doctorOwnStats(name, from, to, group = 'doctor') {
+    const all = this.doctorStats(from, to, group);
     const span = (Date.parse(to + 'T12:00:00Z') - Date.parse(from + 'T12:00:00Z')) / 86400000;
     if (span > 92) throw bad('Obdobie môže mať najviac 3 mesiace.');
     const pick = (r) => r.doctors.find((d) => d.doctor === name) || null;
     const days = [];
     for (let i = 0; i <= span; i++) {
       const day = new Date(Date.parse(from + 'T12:00:00Z') + i * 86400000).toISOString().slice(0, 10);
-      const d = pick(this.doctorStats(day, day));
+      const d = pick(this.doctorStats(day, day, group));
       if (d) days.push({ day, ...d });
     }
-    // Porovnanie s ostatnými lekármi BEZ mien a ambulancií – poradie podľa meškania, aby sa z neho nedalo uhádnuť, o koho ide.
+    const strip = (d) => { const { doctor, rooms, ...rest } = d; return rest; };   // bez mien a ambulancií
+    const me = pick(all);
+    const base = { from, to, group, summary: me && strip(me), days: days.reverse().map(strip), clinic: strip(all.total) };
+    if (group === 'nurse') return { ...base, nurse: name };
     const anon = (d) => ({ patients: d.patients, done: d.done, avgWait: d.avgWait, planned: d.planned, avgDiff: d.avgDiff, avgDelay: d.avgDelay, onTime: d.onTime, avgExam: d.avgExam,
       avgDoctorWait: d.avgDoctorWait, avgDoctor: d.avgDoctor });
-    const me = pick(all);
-    const rows = all.doctors.filter((d) => d.doctor !== 'Lekár nebol zadaný').map((d) => ({ ...anon(d), me: d.doctor === name }))
-      .sort((a, b) => (a.avgDelay ?? 1e9) - (b.avgDelay ?? 1e9) || (a.avgWait ?? 1e9) - (b.avgWait ?? 1e9) || b.patients - a.patients);
-    let k = 0;
-    const comparison = rows.map((r, i) => ({ ...r, rank: i + 1, label: r.me ? 'Vy' : `Lekár ${String.fromCharCode(65 + k++)}` }));
-    return { from, to, doctor: name, summary: me, days: days.reverse(), clinic: all.total, comparison };
+    const others = all.doctors.filter((d) => d.doctor !== name && d.doctor !== 'Lekár nebol zadaný');
+    // ostatní lekári spolu (priemer za všetkých ich pacientov, nie priemer priemerov)
+    const OTHERS = '__ostatni__';
+    const sum = others.length ? this.doctorStats(from, to, 'doctor', (k, U) => (k === name ? null : k === U ? null : OTHERS)).doctors.find((d) => d.doctor === OTHERS) : null;
+    const othersAvg = sum ? { ...anon(sum), count: others.length } : null;
+    // jednotlivo len pri aspoň 3 ďalších lekároch; poradie podľa meškania, aby sa z neho nedalo uhádnuť, o koho ide
+    let comparison = [];
+    if (others.length >= 3) {
+      const rows = [...(me ? [{ ...anon(me), me: true }] : []), ...others.map((d) => ({ ...anon(d), me: false }))]
+        .sort((a, b) => (a.avgDelay ?? 1e9) - (b.avgDelay ?? 1e9) || (a.avgWait ?? 1e9) - (b.avgWait ?? 1e9) || b.patients - a.patients);
+      let k = 0;
+      comparison = rows.map((r, i) => ({ ...r, rank: i + 1, label: r.me ? 'Vy' : `Lekár ${String.fromCharCode(65 + k++)}` }));
+    }
+    return { ...base, doctor: name, me: me ? anon(me) : null, othersAvg, comparison };
   }
 
   /** Kontrola zmeny dňa (volá sa periodicky). */

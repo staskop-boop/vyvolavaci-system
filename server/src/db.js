@@ -159,6 +159,8 @@ function migrate(db) {
   if (!ucols.includes('room_id')) db.exec('ALTER TABLE users ADD COLUMN room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL');
   // v3.3: konto lekára – vyvoláva pacientov, nepridáva ich; meno sa zhoduje s menom na TV a v štatistikách
   if (!ucols.includes('doctor_name')) db.exec('ALTER TABLE users ADD COLUMN doctor_name TEXT');
+  // 2026-11-24 (Pali): osobné konto sestry – štatistiky sa viažu na sestru, ktorá je prihlásená, nie na ambulanciu
+  if (!ucols.includes('nurse_name')) db.exec('ALTER TABLE users ADD COLUMN nurse_name TEXT');
 }
 
 /** Vykoná funkciu v transakcii BEGIN IMMEDIATE (zápisový zámok hneď na začiatku). */

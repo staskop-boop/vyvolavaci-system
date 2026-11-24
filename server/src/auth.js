@@ -123,13 +123,13 @@ class Auth {
     const exp = new Date(now.getTime() + config.sessionHours * 3600_000);
     this.db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at, last_seen_at, label) VALUES (?,?,?,?,?,?)')
       .run(sha(token), u.id, now.toISOString(), exp.toISOString(), now.toISOString(), String(label || '').slice(0, 100));
-    return { token, user: { id: u.id, username: u.username, role: u.role, roomId: u.room_id ?? null, doctorName: u.doctor_name || null } };
+    return { token, user: { id: u.id, username: u.username, role: u.role, roomId: u.room_id ?? null, doctorName: u.doctor_name || null, nurseName: u.nurse_name || null } };
   }
 
   /** Overí token; posúva platnosť (kĺzavá expirácia). */
   check(token) {
     if (!token) return null;
-    const row = this.db.prepare(`SELECT s.token_hash, s.expires_at, s.last_seen_at, u.id, u.username, u.role, u.room_id, u.doctor_name FROM sessions s
+    const row = this.db.prepare(`SELECT s.token_hash, s.expires_at, s.last_seen_at, u.id, u.username, u.role, u.room_id, u.doctor_name, u.nurse_name FROM sessions s
       JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND u.active = 1`).get(sha(token));
     if (!row) return null;
     const now = clock.now();
@@ -138,15 +138,15 @@ class Auth {
       const exp = new Date(now.getTime() + config.sessionHours * 3600_000);
       this.db.prepare('UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE token_hash = ?').run(now.toISOString(), exp.toISOString(), row.token_hash);
     }
-    return { id: row.id, username: row.username, role: row.role, roomId: row.room_id ?? null, doctorName: row.doctor_name || null };
+    return { id: row.id, username: row.username, role: row.role, roomId: row.room_id ?? null, doctorName: row.doctor_name || null, nurseName: (!row.doctor_name && row.nurse_name) || null };
   }
 
   // ---------- kontá personálu (v2.1: každá ambulancia má vlastné konto) ----------
   listUsers() {
-    return this.db.prepare(`SELECT u.id, u.username, u.role, u.active, u.room_id, u.doctor_name, u.created_at, u.password_hash = '!' AS no_pw, r.name AS room_name FROM users u
+    return this.db.prepare(`SELECT u.id, u.username, u.role, u.active, u.room_id, u.doctor_name, u.nurse_name, u.created_at, u.password_hash = '!' AS no_pw, r.name AS room_name FROM users u
       LEFT JOIN rooms r ON r.id = u.room_id ORDER BY u.id`).all()
       .map((u) => ({ id: u.id, username: u.username, role: u.role, active: !!u.active, roomId: u.room_id ?? null, roomName: u.room_name ?? null,
-        doctorName: u.doctor_name || null, noPassword: !!u.no_pw, createdAt: u.created_at }));
+        doctorName: u.doctor_name || null, nurseName: (!u.doctor_name && u.nurse_name) || null, noPassword: !!u.no_pw, createdAt: u.created_at }));
   }
   /** Meno lekára pre lekárske konto (null = konto sestry/správcu). */
   doctorOk(v) {
@@ -154,6 +154,13 @@ class Auth {
     const n = String(v).trim().replace(/\s+/g, ' ');
     if (n.length < 2 || n.length > 60) return { error: 'Meno lekára: 2 – 60 znakov.' };
     return { doctorName: n };
+  }
+  /** Meno sestry pre osobné konto sestry (null = spoločné konto ambulancie, sestra sa vyberá tlačidlom „Zadať sestru“). */
+  nurseOk(v) {
+    if (v == null || String(v).trim() === '') return { nurseName: null };
+    const n = String(v).trim().replace(/\s+/g, ' ');
+    if (n.length < 2 || n.length > 60) return { error: 'Meno sestry: 2 – 60 znakov.' };
+    return { nurseName: n };
   }
   validUsername(v) {
     const n = String(v == null ? '' : v).trim().toLowerCase();
@@ -170,10 +177,11 @@ class Auth {
     if (this.db.prepare('SELECT 1 FROM users WHERE username = ?').get(un.name)) return { error: `Konto „${un.name}“ už existuje.` };
     const pe = validatePassword(b.password); if (pe) return { error: pe };
     const dn = this.doctorOk(b.doctorName); if (dn.error) return dn;
+    const nn = dn.doctorName ? { nurseName: null } : this.nurseOk(b.nurseName); if (nn.error) return nn;
     const role = b.role === 'admin' && !dn.doctorName ? 'admin' : 'staff';
     const rm = this.roomOk(b.roomId); if (rm.error) return rm;
-    const id = Number(this.db.prepare('INSERT INTO users (username, password_hash, role, created_at, room_id, doctor_name) VALUES (?,?,?,?,?,?)')
-      .run(un.name, hashPassword(b.password), role, clock.nowIso(), rm.roomId, dn.doctorName).lastInsertRowid);
+    const id = Number(this.db.prepare('INSERT INTO users (username, password_hash, role, created_at, room_id, doctor_name, nurse_name) VALUES (?,?,?,?,?,?,?)')
+      .run(un.name, hashPassword(b.password), role, clock.nowIso(), rm.roomId, dn.doctorName, nn.nurseName).lastInsertRowid);
     log.info('Vytvorené konto', { username: un.name, role });
     return { user: this.listUsers().find((u) => u.id === id) };
   }
@@ -184,6 +192,9 @@ class Auth {
     if (b.password) { const pe = validatePassword(b.password); if (pe) return { error: pe }; }
     let doctorName = u.doctor_name || null;
     if ('doctorName' in b) { const dn = this.doctorOk(b.doctorName); if (dn.error) return dn; doctorName = dn.doctorName; }
+    let nurseName = u.nurse_name || null;
+    if ('nurseName' in b) { const nn = this.nurseOk(b.nurseName); if (nn.error) return nn; nurseName = nn.nurseName; }
+    if (doctorName) nurseName = null;   // konto je buď lekárske, alebo sestry
     let role = b.role != null ? (b.role === 'admin' ? 'admin' : 'staff') : u.role;
     if (doctorName) role = 'staff';   // lekárske konto nemá nastavenia
     const active = b.active != null ? (b.active ? 1 : 0) : u.active;
@@ -192,11 +203,11 @@ class Auth {
     const otherAdmins = this.db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND active = 1 AND id <> ?").get(u.id).n;
     if ((role !== 'admin' || !active) && u.role === 'admin' && otherAdmins === 0) return { error: 'Musí zostať aspoň jedno aktívne konto s oprávnením na nastavenia.' };
     if (!active && u.id === actingUserId) return { error: 'Vlastné konto nemôžete vypnúť.' };
-    this.db.prepare('UPDATE users SET role = ?, active = ?, room_id = ?, doctor_name = ? WHERE id = ?').run(role, active, roomId, doctorName, u.id);
+    this.db.prepare('UPDATE users SET role = ?, active = ?, room_id = ?, doctor_name = ?, nurse_name = ? WHERE id = ?').run(role, active, roomId, doctorName, nurseName, u.id);
     if (b.password) {
       this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(b.password), u.id);
     }
-    if (b.password || !active || role !== u.role || doctorName !== (u.doctor_name || null)) this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
+    if (b.password || !active || role !== u.role || doctorName !== (u.doctor_name || null) || nurseName !== (u.nurse_name || null)) this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(u.id);
     return { user: this.listUsers().find((x) => x.id === u.id) };
   }
 

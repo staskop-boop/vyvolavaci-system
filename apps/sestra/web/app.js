@@ -173,7 +173,7 @@
     const parts = String(full).split(',')[0].replace(/\b(MUDr|MVDr|Mgr|Bc|Ing|doc|prof|PhD|MHA|MPH)\.?/gi, ' ').trim().split(/\s+/);
     return cleanUsername(parts[parts.length - 1] || '');
   };
-  async function bulkUsers(users, rooms, doctors) {
+  async function bulkUsers(users, rooms, doctors, nurses = []) {
     const taken = new Set(users.map((u) => u.username));
     const plan = [];
     const add = (p) => { if (p.username.length >= 3 && !taken.has(p.username)) { taken.add(p.username); plan.push(p); } };
@@ -182,14 +182,17 @@
       add({ username: 'ambulancia' + n, kind: 'Sestra', roomId: r.id, where: r.name, doctorName: null }); });
     const hasDoc = new Set(users.map((u) => u.doctorName).filter(Boolean));
     doctors.filter((d) => !hasDoc.has(d)).forEach((d) => add({ username: surnameLogin(d), kind: 'Lekár', roomId: null, where: 'všetky', doctorName: d }));
+    // 2026-11-24 (Pali): osobné kontá sestier podľa priezviska – štatistiky sa viažu na sestru, nie na ambulanciu
+    const hasNurse = new Set(users.map((u) => u.nurseName).filter(Boolean));
+    nurses.filter((n) => !hasNurse.has(n)).forEach((n) => add({ username: surnameLogin(n), kind: 'Sestra (osobné)', roomId: null, where: 'všetky', nurseName: n }));
     // 2026-11-17: kontá lekárov bez hesla (založila ich aktualizácia 16. 11.) dostanú heslo tiež – predtým sa preskočili
-    users.filter((u) => u.noPassword && u.active).forEach((u) => plan.push({ username: u.username, kind: u.doctorName ? 'Lekár' : 'Sestra', roomId: u.roomId,
-      where: u.roomName || 'všetky', doctorName: u.doctorName, existingId: u.id }));
+    users.filter((u) => u.noPassword && u.active).forEach((u) => plan.push({ username: u.username, kind: u.doctorName ? 'Lekár' : u.nurseName ? 'Sestra (osobné)' : 'Sestra', roomId: u.roomId,
+      where: u.roomName || 'všetky', doctorName: u.doctorName, nurseName: u.nurseName, existingId: u.id }));
     if (!plan.length) { toast('Všetky kontá už existujú a majú heslo.', 'ok'); return; }
     const ok = await modal({
       title: `Založiť ${plan.length} kont?`, okText: 'Založiť kontá',
-      body: `<table><thead><tr><th>Konto</th><th>Typ</th><th>Lekár / pracovisko</th></tr></thead><tbody>
-        ${plan.map((p) => `<tr><td><b>${esc(p.username)}</b>${p.existingId ? ' <span class="hint">(už existuje, dostane heslo)</span>' : ''}</td><td>${p.kind}</td><td>${esc(p.doctorName || p.where)}</td></tr>`).join('')}</tbody></table>
+      body: `<table><thead><tr><th>Konto</th><th>Typ</th><th>Meno / pracovisko</th></tr></thead><tbody>
+        ${plan.map((p) => `<tr><td><b>${esc(p.username)}</b>${p.existingId ? ' <span class="hint">(už existuje, dostane heslo)</span>' : ''}</td><td>${p.kind}</td><td>${esc(p.doctorName || p.nurseName || p.where)}</td></tr>`).join('')}</tbody></table>
         <p class="hint">Heslá sa vygenerujú náhodne a zobrazia sa <b>len raz</b> hneď po založení – vytlačte si ich alebo odpíšte. Neskôr sa dajú len zmeniť (Nové heslo).</p>`,
     });
     if (!ok) return;
@@ -198,13 +201,13 @@
       const password = randomPassword();
       try {
         if (p.existingId) await api('/api/admin/users/' + p.existingId, { method: 'PUT', body: { password } });
-        else await api('/api/admin/users', { body: { username: p.username, password, roomId: p.roomId, role: 'staff', doctorName: p.doctorName } });
+        else await api('/api/admin/users', { body: { username: p.username, password, roomId: p.roomId, role: 'staff', doctorName: p.doctorName || null, nurseName: p.nurseName || null } });
         done.push({ ...p, password });
       } catch (e) { done.push({ ...p, error: e.message }); }
     }
-    const tableHtml = `<table><thead><tr><th>Konto</th><th>Heslo</th><th>Typ</th><th>Lekár / pracovisko</th></tr></thead><tbody>
+    const tableHtml = `<table><thead><tr><th>Konto</th><th>Heslo</th><th>Typ</th><th>Meno / pracovisko</th></tr></thead><tbody>
         ${done.map((p) => `<tr><td><b>${esc(p.username)}</b></td><td>${p.error ? `<span class="bad">⚠ ${esc(p.error)}</span>` : `<code style="font-size:18px">${esc(p.password)}</code>`}</td>
-          <td>${p.kind}</td><td>${esc(p.doctorName || p.where)}</td></tr>`).join('')}</tbody></table>`;
+          <td>${p.kind}</td><td>${esc(p.doctorName || p.nurseName || p.where)}</td></tr>`).join('')}</tbody></table>`;
     const printIt = () => {
       // vytlačí sa len tabuľka s heslami (v novom okne), nie celá aplikácia
       const w = window.open('', '_blank', 'width=800,height=900');
@@ -324,7 +327,7 @@
     const isDoc = !!S.user.doctorName;
     document.body.classList.toggle('is-doctor', isDoc);
     document.querySelector('.brand-title').textContent = isDoc ? 'Lekár' : 'Sestra';
-    document.getElementById('tab-me').hidden = !isDoc;
+    document.getElementById('tab-me').hidden = !isDoc && !S.user.nurseName;   // osobné konto lekára alebo sestry
     document.getElementById('tab-today').hidden = isDoc || S.user.role === 'admin';
     document.querySelector('.tab[data-view=history]').hidden = isDoc;
     stopSocket();
@@ -460,7 +463,7 @@
     const off = S.conn !== 'online';
     const dis = off ? 'disabled' : '';
     const active = roomsActive();
-    document.getElementById('who').innerHTML = `<b>${esc(S.user.doctorName || S.user.username)}</b>${S.user.roomId ? ' · ' + esc(roomName(S.user.roomId)) : ''}`;
+    document.getElementById('who').innerHTML = `<b>${esc(S.user.doctorName || S.user.nurseName || S.user.username)}</b>${S.user.roomId ? ' · ' + esc(roomName(S.user.roomId)) : ''}`;
     const all = showAll();
     const mine = (t) => all || mineFilter(t);
     const isDocAcc = !!S.user.doctorName;
@@ -627,7 +630,7 @@
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
         <div class="rb-btns">
           <button class="btn needs-online ${doctor || S.user.doctorName || closedHere ? '' : 'need'}" id="btn-doctor" ${dis} title="Lekár, ktorého meno sa ukáže na TV pri vyvolaní">${doctor ? '👩‍⚕️ ' + esc(doctor) : S.user.doctorName ? '👩‍⚕️ ' + esc(S.user.doctorName) : closedHere ? 'Dnes neordinuje nikto' : '⚠ Zadať lekára'}</button>
-          ${S.user.doctorName ? '' : `<button class="btn needs-online ${nurseNow || closedHere ? '' : 'need'}" id="btn-nurse" ${dis} title="Sestra, ktorej meno a fotka sa ukáže na TV pri prvom vyvolaní pacienta">${nurseNow ? '🩺 ' + esc(nurseNow) : closedHere ? 'Sestra –' : '⚠ Zadať sestru'}</button>`}
+          ${S.user.doctorName ? '' : `<button class="btn needs-online ${nurseNow || S.user.nurseName || closedHere ? '' : 'need'}" id="btn-nurse" ${dis} title="Sestra, ktorej meno a fotka sa ukáže na TV pri prvom vyvolaní pacienta">${S.user.nurseName || nurseNow ? '🩺 ' + esc(S.user.nurseName || nurseNow) : closedHere ? 'Sestra –' : '⚠ Zadať sestru'}</button>`}
           <button class="btn needs-online ${delay ? 'on' : ''}" id="btn-delay" ${dis} title="Oznam do čakárne, že pracovisko mešká (napr. predĺžený výkon)">${delay ? `Meškanie ${fmtMin(delay.minutes)}` : 'Hlásiť meškanie'}</button>
           <button class="btn needs-online ${st.announcement ? 'on' : ''}" id="btn-announce" ${dis} title="Mimoriadny oznam na obrazovke v čakárni">📢 ${st.announcement ? 'Oznam je zapnutý' : 'Mimoriadny oznam'}</button>
           ${nurse ? `<button class="btn needs-online ${st.dayEnd ? 'on' : ''}" id="btn-day-end" ${dis} title="Dnes už nových pacientov neprijímame – tablet prestane vydávať čísla, TV ukáže oznam">🏁 ${st.dayEnd ? 'Deň je ukončený' : 'Ukončiť deň'}</button>` : ''}
@@ -1212,12 +1215,13 @@
     } catch (e) { handleError(e); }
   }
 
-  const KIND_TEXT = { staff: 'Sestra', doctor: 'Lekár', admin: 'Správca' };
+  const KIND_TEXT = { staff: 'Sestra – konto ambulancie', nurse: 'Sestra – osobné konto', doctor: 'Lekár', admin: 'Správca' };
+  const kindOf = (u) => (u.doctorName ? 'doctor' : u.nurseName ? 'nurse' : u.role === 'admin' ? 'admin' : 'staff');
   const kindSelect = (cls, cur, id) => `<select ${cls ? `class="${cls}"` : ''} ${id ? `id="${id}"` : ''} aria-label="Typ konta">${Object.entries(KIND_TEXT)
     .map(([k, t]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
-  const docSelect = (cls, cur, list, id) => {
+  const docSelect = (cls, cur, list, id, what = 'doc') => {
     const names = [...new Set([...(list || []), ...(cur ? [cur] : [])])];
-    return `<select ${cls ? `class="${cls} u-doc"` : 'class="u-doc"'} ${id ? `id="${id}"` : ''} aria-label="Lekár">${names
+    return `<select ${cls ? `class="${cls} u-${what}"` : `class="u-${what}"`} ${id ? `id="${id}"` : ''} aria-label="${what === 'nurse' ? 'Sestra' : 'Lekár'}">${names
       .map((n) => `<option value="${esc(n)}" ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`;
   };
 
@@ -1304,14 +1308,16 @@
     document.getElementById('btn-today-refresh').onclick = () => renderToday();
   }
 
-  // ---------- môj prehľad (konto lekára) ----------
+  // ---------- môj prehľad (osobné konto lekára, od 2026-11-24 aj sestry) ----------
   async function renderMe() {
-    if (!S.user.doctorName) { $view.innerHTML = '<div class="center-msg">Prehľad je pre lekárske konto.</div>'; return; }
+    const isDoc = !!S.user.doctorName;
+    const myName = S.user.doctorName || S.user.nurseName;
+    if (!myName) { $view.innerHTML = '<div class="center-msg">Prehľad je pre osobné konto lekára alebo sestry.</div>'; return; }
     const today = (S.staff && S.staff.day) || isoDay(new Date());
     if (!S.meTo) S.meTo = today;
     if (!S.meFrom) { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - 29); S.meFrom = isoDay(d); }
     $view.innerHTML = `<div class="stack">
-      <section class="card stack"><div class="section-title"><h2>Môj prehľad – ${esc(S.user.doctorName)}</h2><span class="hint">Vidíte len svoje údaje</span></div>
+      <section class="card stack"><div class="section-title"><h2>Môj prehľad – ${esc(myName)}</h2><span class="hint">Len pacienti, ktorých ste vybavili vy – aj keď sa v ambulancii počas dňa vystriedate s kolegom</span></div>
         <form class="stats-filter" id="me-form">
           <div class="field"><label for="me-from">Od</label><input type="date" id="me-from" value="${esc(S.meFrom)}" max="${esc(today)}"></div>
           <div class="field"><label for="me-to">Do</label><input type="date" id="me-to" value="${esc(S.meTo)}" max="${esc(today)}"></div>
@@ -1329,37 +1335,49 @@
     }; });
     let r;
     try { r = await api(`/api/staff/my-stats?from=${encodeURIComponent(S.meFrom)}&to=${encodeURIComponent(S.meTo)}`); }
-    catch (e) { handleError(e); document.getElementById('me-out').innerHTML = `<div class="alert alert-danger"><div class="grow">${esc(e.message)}</div></div>`; return; }
+    catch (e) { handleError(e); document.getElementById('me-out').innerHTML = `<div class="alert alert-danger"><div class="grow">⚠ ${esc(e.message)}</div></div>`; return; }
     const out = document.getElementById('me-out');
     const t = r.summary;
-    if (!t) { out.innerHTML = '<section class="card"><div class="empty">V tomto období ste zatiaľ nevyvolali žiadneho pacienta.</div></section>'; return; }
+    if (!t) { out.innerHTML = `<section class="card"><div class="empty">V tomto období ste zatiaľ ${isDoc ? 'nevyvolali' : 'neprijali'} žiadneho pacienta.</div></section>`; return; }
     const c = r.clinic;
-    out.innerHTML = `<div class="stack">
-      <section class="stats-kpis">
-        <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov (ukončení ${t.done})</span></div>
-        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta na vás<br>(celá ambulancia ${mins(c.avgWait)})</span></div>
-        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti plánu<br>(celá ambulancia ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
+    const kpis = isDoc ? `
+        <div class="stats-kpi"><b>${t.patients}</b><span>vašich pacientov (ukončení ${t.done})<br>(všetci lekári spolu ${c.patients})</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta na vás<br>(všetci spolu ${mins(c.avgWait)})</span></div>
+        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti termínu<br>(všetci spolu ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov vyvolaných načas (do 5 min)</span></div>
-        <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia u vás</span></div>
-      </section>
+        <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia u vás</span></div>` : `
+        <div class="stats-kpi"><b>${t.patients}</b><span>vašich pacientov (ukončení ${t.done})<br>(všetky sestry spolu ${c.patients})</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie pacienta na vás<br>(všetci spolu ${mins(c.avgWait)})</span></div>
+        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti termínu<br>(všetci spolu ${c.planned ? mins(c.avgDelay) : '–'})</span></div>
+        <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov prijatých načas (do 5 min)</span></div>
+        <div class="stats-kpi"><b>${mins(t.avgNurse)}</b><span>priemerný čas pacienta u vás</span></div>`;
+    const cmpRow = (d, label, cls) => `<tr class="${cls || ''}"><td class="doc">${label}</td><td class="num">${d.patients}</td><td class="num">${mins(d.avgWait)}</td>
+      <td class="num">${delayHtml(d)}</td><td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`;
+    const cmp = isDoc && r.othersAvg ? `<section class="card"><div class="section-title"><h2>Porovnanie s ostatnými lekármi</h2><span class="hint">Anonymne – mená ostatných lekárov nevidíte</span></div>
+        <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Lekár</th><th class="num">Pacienti</th><th class="num">Ø čakanie</th>
+          <th class="num">Ø meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
+          ${r.me ? cmpRow(r.me, 'Vy', 'me-row') : ''}
+          ${cmpRow(r.othersAvg, `Ostatní lekári spolu <span class="hint">(${r.othersAvg.count})</span>`)}
+          ${(r.comparison || []).length ? `<tr><td colspan="6" class="hint" style="padding-top:14px"><b>Jednotlivo</b> (poradie podľa meškania, najmenšie prvé)</td></tr>` + r.comparison.map((d) => cmpRow(d, `${d.rank}. ${esc(d.label)}`, d.me ? 'me-row' : '')).join('') : ''}
+        </tbody></table></div>
+        <p class="hint">„Ostatní lekári spolu“ = priemer za všetkých ich pacientov v tomto období. Jednotliví lekári (Lekár A, B…) sa ukazujú len vtedy, keď sú aspoň traja ďalší –
+          pri menšom počte by sa dalo ľahko uhádnuť, o koho ide. Ambulancie sa neuvádzajú.</p>
+      </section>` : '';
+    out.innerHTML = `<div class="stack">
+      <section class="stats-kpis">${kpis}</section>
       <section class="card"><h2>Po dňoch</h2><div class="stats-scroll"><table class="stats-table"><thead><tr>
         <th>Deň</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th><th class="num">Ø čakanie</th>
-        <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
+        <th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">${isDoc ? 'Ø vyšetrenie' : 'Ø u vás'}</th></tr></thead><tbody>
         ${r.days.map((d) => `<tr><td class="doc">${esc(fmtDay(d.day))}</td><td class="num">${d.patients}</td><td class="num">${d.done}</td><td class="num">${d.absent}</td>
           <td class="num">${mins(d.avgWait)}</td><td class="num">${delayHtml(d)}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
-          <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
-        <p class="hint">Od 17. 11. 2026 ide pacient najprv k sestre a potom k vám. Čakanie = od chvíle, keď ho sestra poslala k lekárovi, po vaše vyvolanie (priamo k lekárovi = 0).
-          Vyšetrenie = od vášho vyvolania po „Ukončený“. Meškanie = vstup vášho pacienta k sestre oproti termínu (ak prišiel neskôr, počíta sa od príchodu).
-          Staršie dni: čakanie od príchodu po prvé vyvolanie, meškanie oproti plánovanému času.</p>
+          <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(isDoc ? d.avgExam : d.avgNurse)}</td></tr>`).join('')}</tbody></table></div>
+        <p class="hint">${isDoc ? `Čakanie = od chvíle, keď pacienta sestra poslala k lekárovi, po vaše vyvolanie (priamo k lekárovi = 0).
+          Vyšetrenie = od vášho vyvolania po „Ukončený“. Meškanie = vstup vášho pacienta k sestre oproti termínu (ak prišiel neskôr, počíta sa od príchodu).`
+          : `Čakanie = od príchodu pacienta po vaše vyvolanie. Meškanie = vaše vyvolanie oproti termínu (ak prišiel neskôr, počíta sa od príchodu).
+          Čas u vás = od vyvolania po „K lekárovi“ (alebo „Ukončený“).`}
+          Pacient sa počíta tomu, kto bol prihlásený, keď ho vyvolal – pri striedaní v tej istej ambulancii má každý svoje čísla.</p>
       </section>
-      ${r.comparison && r.comparison.length > 1 ? `<section class="card"><div class="section-title"><h2>Porovnanie s ostatnými lekármi</h2><span class="hint">Anonymne – mená ostatných lekárov nevidíte</span></div>
-        <div class="stats-scroll"><table class="stats-table"><thead><tr><th>Poradie</th><th>Lekár</th><th class="num">Pacienti</th><th class="num">Ø čakanie</th>
-          <th class="num">Ø meškanie</th><th class="num">Načas</th><th class="num">Ø vyšetrenie</th></tr></thead><tbody>
-          ${r.comparison.map((d) => `<tr class="${d.me ? 'me-row' : ''}"><td class="num">${d.rank}.</td><td class="doc">${esc(d.label)}</td><td class="num">${d.patients}</td>
-            <td class="num">${mins(d.avgWait)}</td><td class="num">${delayHtml(d)}</td>
-            <td class="num">${pct(d.onTime, d.planned)}</td><td class="num">${mins(d.avgExam)}</td></tr>`).join('')}</tbody></table></div>
-        <p class="hint">Poradie je podľa priemerného meškania (najmenšie prvé). Ostatní lekári sú označení písmenami a neuvádza sa ich ambulancia.</p>
-      </section>` : ''}</div>`;
+      ${cmp}</div>`;
   }
 
   // ---------- štatistiky lekárov (len správca) ----------
@@ -1484,12 +1502,15 @@
       <section class="card stack" id="sec-users"><h2>Kontá personálu</h2>
         <p class="hint">Každá ambulancia má vlastné konto. Sestra po prihlásení vidí svojich pacientov a „Vyvolať ďalšieho“ volá len z nich.
           Obrazovka v čakárni je spoločná – zobrazí toho, koho ktorá sestra vyvolá ako prvá.</p>
-        <p class="hint"><b>Typ konta:</b> Sestra – pridáva a vyvoláva pacientov. Lekár – vyvoláva a vybavuje pacientov, nepridáva ich, vidí „Môj prehľad“ (svoje čakanie a meškanie).
+        <p class="hint"><b>Typ konta:</b> Sestra – konto ambulancie – pridáva a vyvoláva pacientov, sestru treba vybrať tlačidlom „Zadať sestru“.
+          Sestra – osobné konto – to isté, ale pacienti a štatistiky sa viažu na túto sestru a vidí „Môj prehľad“.
+          Lekár – vyvoláva a vybavuje pacientov, nepridáva ich, vidí „Môj prehľad“ (svoje čísla a anonymné porovnanie s ostatnými lekármi).
+          Keď sa lekári (sestry) počas dňa v ambulancii vystriedajú, každý má vlastné štatistiky – podľa toho, kto je prihlásený.
           Správca – navyše Nastavenia a Štatistiky všetkých lekárov.</p>
-        <table id="tbl-users"><thead><tr><th>Konto</th><th>Typ</th><th>Lekár</th><th>Pracovisko</th><th>Aktívne</th><th>Nové heslo</th><th></th></tr></thead><tbody>
+        <table id="tbl-users"><thead><tr><th>Konto</th><th>Typ</th><th>Meno (lekár / sestra)</th><th>Pracovisko</th><th>Aktívne</th><th>Nové heslo</th><th></th></tr></thead><tbody>
         ${users.map((u) => `<tr data-user="${u.id}"><td><b>${esc(u.username)}</b></td>
-          <td>${kindSelect('u-kind', u.doctorName ? 'doctor' : u.role === 'admin' ? 'admin' : 'staff')}</td>
-          <td>${docSelect('u-doc', u.doctorName, s.doctorList)}</td>
+          <td>${kindSelect('u-kind', kindOf(u))}</td>
+          <td>${docSelect('u-doc', u.doctorName, s.doctorList)}${docSelect('u-nurse', u.nurseName, s.nurseList, null, 'nurse')}</td>
           <td><select class="u-room"><option value="">všetky</option>${rooms.filter((r) => r.active).map((r) => `<option value="${r.id}" ${r.id === u.roomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></td>
           <td><input type="checkbox" class="u-active" ${u.active ? 'checked' : ''} style="width:20px;height:20px"></td>
           <td><input type="password" class="u-pw" placeholder="${u.noPassword ? 'nastaviť heslo' : 'ponechať'}" autocomplete="new-password" style="width:150px">${u.noPassword ? '<div class="hint" style="margin:4px 0 0"><b>⚠ Bez hesla</b> – prihlásenie nejde, kým ho nenastavíte.</div>' : ''}</td>
@@ -1501,9 +1522,10 @@
           <input type="password" id="nu-pw" placeholder="heslo (aspoň 10 znakov)" autocomplete="new-password">
           ${kindSelect('', 'staff', 'nu-kind')}
           ${docSelect('', null, s.doctorList, 'nu-doc')}
+          ${docSelect('', null, s.nurseList, 'nu-nurse', 'nurse')}
           <button class="btn btn-primary" type="submit">Pridať konto</button></form>
-        <div class="row"><button class="btn" type="button" id="btn-bulk-users">Založiť kontá pre ambulancie a všetkých lekárov…</button>
-          <span class="hint">Vytvorí chýbajúce kontá (ambulancia1, ambulancia2 … a lekárov podľa priezviska) s náhodnými heslami, ktoré uvidíte len vy.</span></div>
+        <div class="row"><button class="btn" type="button" id="btn-bulk-users">Založiť kontá pre ambulancie, lekárov a sestry…</button>
+          <span class="hint">Vytvorí chýbajúce kontá (ambulancia1, ambulancia2 … a lekárov aj sestry podľa priezviska) s náhodnými heslami, ktoré uvidíte len vy.</span></div>
       </section>
 
       <form class="card stack" id="f-general"><h2>Všeobecné</h2>
@@ -1674,23 +1696,24 @@
       if (document.getElementById('nu-pw').value.length < 10) { toast('Heslo musí mať aspoň 10 znakov.', 'error'); document.getElementById('nu-pw').focus(); return; }
       try {
         await api('/api/admin/users', { body: { username: val('nu-name'), password: val('nu-pw'), roomId: val('nu-room') ? Number(val('nu-room')) : null, role: val('nu-kind') === 'admin' ? 'admin' : 'staff',
-          doctorName: val('nu-kind') === 'doctor' ? val('nu-doc') : null } });
+          doctorName: val('nu-kind') === 'doctor' ? val('nu-doc') : null, nurseName: val('nu-kind') === 'nurse' ? val('nu-nurse') : null } });
         toast('Konto bolo vytvorené.', 'ok'); renderAdmin();
       } catch (e2) { handleError(e2); }
     };
-    document.getElementById('btn-bulk-users').onclick = () => bulkUsers(users, rooms.filter((r) => r.active), s.doctorList || []);
+    document.getElementById('btn-bulk-users').onclick = () => bulkUsers(users, rooms.filter((r) => r.active), s.doctorList || [], s.nurseList || []);
     $view.querySelectorAll('[data-user-save]').forEach((b) => { b.onclick = async () => {
       const tr = b.closest('tr');
       const body = { roomId: tr.querySelector('.u-room').value ? Number(tr.querySelector('.u-room').value) : null,
         role: tr.querySelector('.u-kind').value === 'admin' ? 'admin' : 'staff', active: tr.querySelector('.u-active').checked,
-        doctorName: tr.querySelector('.u-kind').value === 'doctor' ? tr.querySelector('.u-doc').value : null };
+        doctorName: tr.querySelector('.u-kind').value === 'doctor' ? tr.querySelector('.u-doc').value : null,
+        nurseName: tr.querySelector('.u-kind').value === 'nurse' ? tr.querySelector('.u-nurse').value : null };
       const pw = tr.querySelector('.u-pw').value; if (pw) body.password = pw;
       try { await api('/api/admin/users/' + b.dataset.userSave, { method: 'PUT', body }); toast('Konto bolo uložené.', 'ok'); renderAdmin(); } catch (e2) { handleError(e2); }
     }; });
     // výber lekára má zmysel len pri type „Lekár“
-    const syncDoc = (kindEl, docEl) => { const f = () => { docEl.hidden = kindEl.value !== 'doctor'; }; kindEl.onchange = f; f(); };
-    $view.querySelectorAll('#tbl-users tr[data-user]').forEach((tr) => syncDoc(tr.querySelector('.u-kind'), tr.querySelector('.u-doc')));
-    syncDoc(document.getElementById('nu-kind'), document.getElementById('nu-doc'));
+    const syncDoc = (kindEl, docEl, nurseEl) => { const f = () => { docEl.hidden = kindEl.value !== 'doctor'; nurseEl.hidden = kindEl.value !== 'nurse'; }; kindEl.onchange = f; f(); };
+    $view.querySelectorAll('#tbl-users tr[data-user]').forEach((tr) => syncDoc(tr.querySelector('.u-kind'), tr.querySelector('.u-doc'), tr.querySelector('.u-nurse')));
+    syncDoc(document.getElementById('nu-kind'), document.getElementById('nu-doc'), document.getElementById('nu-nurse'));
     document.getElementById('f-room').onsubmit = async (e) => {
       e.preventDefault();
       const name = val('new-room');

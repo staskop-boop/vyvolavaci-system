@@ -92,6 +92,15 @@ function createServer(opts = {}) {
     if (rid == null) return;
     if (store.doctorsToday()[rid] !== n) store.setDoctor(rid, n, req.user.id);
   };
+  // 2026-11-24 (Pali): osobné konto sestry – keď vyvoláva, jej meno sa nastaví ako dnešná sestra ambulancie (TV, štatistiky).
+  const asNurse = (req, roomId) => {
+    const n = req.user.nurseName;
+    if (!n) return;
+    const rid = roomId ?? req.user.roomId;
+    if (rid == null || !store.getRoom(rid)) return;
+    if (store.nursesToday()[rid] !== n) store.setNurse(rid, n, req.user.id);
+  };
+  const asPerson = (req, roomId) => { asDoctor(req, roomId); asNurse(req, roomId); };
   const id = (req) => {
     const n = Number(req.params.id);
     if (!Number.isInteger(n) || n <= 0) throw new AppError(400, 'BAD_REQUEST', 'Neplatné číslo záznamu.');
@@ -146,9 +155,9 @@ function createServer(opts = {}) {
   const seesNote = (u) => !!u;
   app.get('/api/staff/state', requireStaff, (req, res) => res.json(store.staffState({ withNote: seesNote(req.user) })));
   // lekárske konto si pacienta volá vždy k sebe (krok „lekár“); sestra volá podľa kroku čísla, „ďalšieho“ z radu k sestre alebo k lekárovi
-  app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId),
+  app.post('/api/staff/tickets/:id/call', requireStaff, (req, res) => (asPerson(req, req.body?.roomId),
     res.json(store.call(id(req), req.body?.roomId, req.user.id, req.body?.note, { byDoctor: !!req.user.doctorName }))));
-  app.post('/api/staff/call-next', requireStaff, (req, res) => (asDoctor(req, req.body?.roomId),
+  app.post('/api/staff/call-next', requireStaff, (req, res) => (asPerson(req, req.body?.roomId),
     res.json(store.callNext(req.body?.roomId, req.user.id, req.user.doctorName ? 'doctor' : req.body?.stage === 'doctor' ? 'doctor' : 'nurse'))));
   // 2026-11-17: sestra pošle pacienta k lekárovi – von do čakárne (rad lekára) alebo priamo, bez čakania
   // 2026-11-18: lekár (alebo sestra) pošle pacienta od lekára k sestre na ukončenie; späť k lekárovi pri omyle
@@ -180,10 +189,12 @@ function createServer(opts = {}) {
   // ---------- administrácia ----------
   // dnešné štatistiky pre sestry (lekár má Môj prehľad, správca Štatistiky)
   app.get('/api/staff/today-stats', requireNurse, (req, res) => res.json(store.todayStats()));
-  // prehľad lekára o sebe (len lekárske konto, len vlastné čísla)
+  // prehľad lekára / sestry o sebe (len osobné konto, len vlastní pacienti; lekár navyše anonymné porovnanie s ostatnými lekármi)
   app.get('/api/staff/my-stats', requireStaff, (req, res) => {
-    if (!req.user.doctorName) throw new AppError(403, 'FORBIDDEN', 'Prehľad je pre lekárske konto.');
-    res.json(store.doctorOwnStats(req.user.doctorName, String(req.query.from || ''), String(req.query.to || '')));
+    const from = String(req.query.from || ''), to = String(req.query.to || '');
+    if (req.user.doctorName) return res.json(store.doctorOwnStats(req.user.doctorName, from, to));
+    if (req.user.nurseName) return res.json(store.doctorOwnStats(req.user.nurseName, from, to, 'nurse'));
+    throw new AppError(403, 'FORBIDDEN', 'Prehľad je pre osobné konto lekára alebo sestry.');
   });
   app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''),
     ['doctor', 'nurse', 'room'].includes(req.query.groupBy) ? req.query.groupBy : 'doctor')));

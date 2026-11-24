@@ -58,9 +58,11 @@ test('môj prehľad: lekár vidí len svoje údaje, sestra/správca nie', async 
   assert.equal(r.data.days.length, 1);
   assert.equal(r.data.clinic.patients, 2, 'porovnanie s celou ambulanciou bez mien iných lekárov');
   assert.equal(JSON.stringify(r.data).includes('Iný Lekár'), false);
-  assert.equal(r.data.comparison.length, 2);
-  assert.deepEqual(r.data.comparison.map((c) => c.label).sort(), ['Lekár A', 'Vy']);
-  assert.ok(r.data.comparison.every((c) => !('doctor' in c) && !('rooms' in c)), 'bez mien a ambulancií');
+  // 2026-11-24: pri jednom ďalšom lekárovi len „ostatní lekári spolu“, jednotlivo až od troch ďalších
+  assert.equal(r.data.othersAvg.count, 1);
+  assert.equal(r.data.othersAvg.patients, 1);
+  assert.deepEqual(r.data.comparison, []);
+  assert.ok(!('doctor' in r.data.othersAvg) && !('rooms' in r.data.othersAvg) && !('rooms' in r.data.summary), 'bez mien a ambulancií');
   assert.equal((await admin.get(`/api/staff/my-stats?from=${st.day}&to=${st.day}`)).status, 403);
 });
 
