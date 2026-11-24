@@ -108,6 +108,23 @@
   const isClosed = (id) => !!(S.staff && (S.staff.roomsClosed || []).includes(id));
   const roomsOpen = (keepId) => roomsActive().filter((r) => !isClosed(r.id) || r.id === keepId);
   const roomName = (id) => { const r = S.staff && S.staff.rooms.find((x) => x.id === id); return r ? r.name : ''; };
+  // 2026-11-24 (Pali): každá ambulancia má vlastnú stálu farbu – podľa čísla v názve (Ambulancia č. 2 → 2), inak podľa poradia
+  const roomColor = (id) => {
+    if (id == null || !S.staff) return 'any';
+    const rooms = S.staff.rooms || [], i = rooms.findIndex((x) => x.id === id);
+    if (i < 0) return 'any';
+    const n = Number((String(rooms[i].name).match(/(\d+)/) || [])[1]) || i + 1;
+    return 'rc' + (((n - 1) % 4) + 1);
+  };
+  // názvy ambulancií v texte (História → Priebeh) farebne; text je už ošetrený cez esc()
+  const ambColorText = (html) => {
+    const rooms = ((S.staff && S.staff.rooms) || []).slice().sort((x, y) => String(y.name).length - String(x.name).length);
+    if (!rooms.length) return html;
+    const map = new Map(rooms.map((r) => [esc(r.name), roomColor(r.id)]));
+    const re = new RegExp('(' + [...map.keys()].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?!\\d)', 'g');
+    return html.replace(re, (m) => `<b class="amb-txt ${map.get(m)}">${m}</b>`);
+  };
+  const ambPill = (id, name) => (name ? `<span class="amb-pill ${roomColor(id)}">${esc(name)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>');
 
   function pickRoom() {
     const active = roomsActive();
@@ -491,10 +508,10 @@
       <button class="btn btn-sm" data-act="open-history" data-day="${esc(st.previousDayOpen.day)}">Zobraziť v histórii</button></div>`);
 
     // 2026-11-18 (Pali): rýchla zmena ambulancie priamo v riadku radu k lekárovi (2026-11-23 aj v rade k sestre)
-    const roomQuick = (t, dis) => `<select class="room-sel amb-pill ${t.homeRoomId ? 'c' + ((Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1) : 'any'} needs-online" data-room-for="${t.id}" ${dis} aria-label="Ambulancia pacienta ${esc(t.code)}" title="Zmeniť ambulanciu">
+    const roomQuick = (t, dis) => `<select class="room-sel amb-pill ${roomColor(t.homeRoomId)} needs-online" data-room-for="${t.id}" ${dis} aria-label="Ambulancia pacienta ${esc(t.code)}" title="Zmeniť ambulanciu">
       ${active.map((r) => `<option value="${r.id}" ${r.id === t.homeRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}<option value="" ${t.homeRoomId ? '' : 'selected'}>Ktorákoľvek</option></select>`;
     const waitRows = waitingNurse.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>'}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : ambPill(t.homeRoomId, t.homeRoomName)}${t.source === 'card' ? '' : ' ' + printBadge(t.print)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
       <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${plannedBadge(t, now)}</span><span class="tl t-arr"><i>príchod</i> <b>${esc(fmtTime(t.createdAt))}</b></span><span class="tl t-wait"><i>čaká</i> ${waitBadge(t, t.createdAt, now)}</span></td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="${isDocAcc ? 'Pacienta si vezmete rovno k sebe (bez sestry)' : 'Vyvolať k sestre'}">${isDocAcc ? 'Vyvolať k sebe' : 'Vyvolať'}${i > 0 || isDocAcc ? '…' : ''}</button>
@@ -506,7 +523,7 @@
       </div></td></tr>`).join('');
 
     const docRows = waitingDoc.map((t, i) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : (t.homeRoomName ? `<span class="amb-pill c${(Math.max(0, active.findIndex((r) => r.id === t.homeRoomId)) % 3) + 1}">${esc(t.homeRoomName)}</span>` : '<span class="amb-pill any">Ktorákoľvek</span>')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      <td class="code">${esc(t.code)}</td><td class="t-room">${nurse ? roomQuick(t, dis) : ambPill(t.homeRoomId, t.homeRoomName)}${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
       <td class="nw t-times"><span class="tl t-plan"><i>termín</i> ${plannedBadge(t, now)}</span><span class="tl"><i>u sestry</i> ${t.nurseCalledAt ? `<b>${esc(fmtTime(t.nurseCalledAt))}</b>` : '<span class="hint" title="Pacient nebol u sestry">—</span>'}</span><span class="tl"><i>k lekárovi</i> <b>${esc(fmtTime(t.toDoctorAt))}</b></span><span class="tl t-wait"><i>čaká</i> ${waitBadge(t, t.toDoctorAt || t.createdAt, now)}</span></td>
       <td class="actions"><div class="acts">
         <button class="btn btn-sm btn-primary needs-online" data-act="call" data-id="${t.id}" ${dis} title="Vyvolať k lekárovi – na TV sa ukáže lekár">Vyvolať k lekárovi${i > 0 ? '…' : ''}</button>
@@ -519,8 +536,8 @@
     const stagePill = (t) => (t.stage === 'doctor' ? '<span class="stage-pill doc">u lekára</span>'
       : t.stage === 'final' ? '<span class="stage-pill nurse fin">u sestry · ukončenie</span>' : '<span class="stage-pill nurse">u sestry</span>');
     // 2026-11-18 (Pali): po lekárovi ide pacient späť k sestre na ukončenie (platba, papiere) – „Ukončený“ potvrdí až sestra
-    const finalRow = (t) => `<tr data-ticket="${t.id}" class="is-final">
-      <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">od lekára ${esc(fmtTime(t.finalAt))}</td>
+    const finalRow = (t) => `<tr data-ticket="${t.id}" class="is-final ${roomColor(t.roomId)}">
+      <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${t.roomName ? ambPill(t.roomId, t.roomName) : ''}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">od lekára ${esc(fmtTime(t.finalAt))}</td>
       <td class="c-count">${t.callCount}×</td>
       <td class="actions"><div class="acts">
         ${nurse ? `<button class="btn btn-sm btn-primary needs-online" data-act="done" data-id="${t.id}" ${dis} title="Pacient zaplatil, má papiere a odchádza">✓ Ukončený</button>` : ''}
@@ -529,8 +546,8 @@
         <button class="btn btn-sm btn-ghost needs-online" data-act="note" data-id="${t.id}" ${dis} title="Typ pacienta a identifikátor (vidí len personál)">🏷 Identifikátor</button>` : ''}
         ${nurse ? `<button class="btn btn-sm needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Pacient musí ísť do inej ambulancie (napr. k inému lekárovi) – odíde do čakárne a zaradí sa do jej radu">⇄ Zmeniť ambulanciu</button>` : ''}
       </div></td></tr>`;
-    const calledRow = (t) => (t.stage === 'final' ? finalRow(t) : `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${esc(t.roomName || '')}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
+    const calledRow = (t) => (t.stage === 'final' ? finalRow(t) : `<tr data-ticket="${t.id}" class="${roomColor(t.roomId)}">
+      <td class="code">${esc(t.code)}</td><td class="c-room">${stagePill(t)} ${t.roomName ? ambPill(t.roomId, t.roomName) : ''}${hasPriv(t) ? ' ' + identPill(t) : ''}</td><td class="c-time">vyvolaný ${esc(fmtTime(t.calledAt))}</td>
       <td class="c-count">${t.callCount}×</td>
       <td class="actions"><div class="acts">
         ${nurse && t.stage !== 'doctor' ? `<button class="btn btn-sm btn-primary needs-online" data-act="to-doctor" data-id="${t.id}" ${dis} title="Pacient ide von do čakárne a lekár si ho vyvolá – na TV sa ukáže lekár">→ K lekárovi</button>
@@ -556,7 +573,7 @@
     const finRows = finished.slice(0, 60).map((t) => `<tr data-ticket="${t.id}">
       <td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
       <td class="f-pat">${hasPriv(t) ? identPill(t) : '<span class="hint">—</span>'}</td>
-      <td>${esc(t.roomName || t.homeRoomName || '')}</td>
+      <td>${t.roomName || t.homeRoomName ? ambPill(t.roomName ? t.roomId : t.homeRoomId, t.roomName || t.homeRoomName) : ''}</td>
       <td class="nw">${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</td>
       <td class="nw">${tm(t.createdAt)}</td><td class="nw">${tm(t.nurseCalledAt)}</td><td class="nw">${tm(t.toDoctorAt)}</td>
       <td class="nw">${tm(t.stage === 'doctor' || t.stage === 'final' ? t.calledAt : null)}</td><td class="nw">${tm(t.finalAt)}</td><td class="nw"><b>${tm(t.finishedAt)}</b></td>
@@ -597,7 +614,7 @@
     const scroll = window.scrollY;
     const fin = document.querySelector('.fin-wrap');
     const finScroll = fin ? fin.scrollTop : 0;
-    // pracovisko: veľký názov ambulancie, kam sa vyvoláva (farba ako na TV: 1. červená, 2. sivá, 3. čierna)
+    // pracovisko: veľký názov ambulancie, kam sa vyvoláva – vo farbe ambulancie (roomColor)
     const ri = Math.max(0, active.findIndex((r) => r.id === S.roomId));
     const roomNow = active[ri];
     const roomNo = roomNow ? ((String(roomNow.name).match(/(\d+)/) || [])[1] || String(ri + 1)) : '–';
@@ -605,7 +622,7 @@
     // predvolené podľa typu konta, voľba sa pamätá pre konto na tomto zariadení
     const pohlad = pohladGet();
     $view.innerHTML = `<div class="dash pohlad-${pohlad}">
-      <div class="a-room stack"><section class="roombar c${(ri % 3) + 1}" aria-label="Pracovisko">
+      <div class="a-room stack"><section class="roombar ${roomNow ? roomColor(roomNow.id) : ''}" aria-label="Pracovisko">
         <div class="rb-id"><div class="rb-num" aria-hidden="true">${esc(roomNo)}</div>
           <div class="rb-text"><div class="rb-kicker">Vyvolávate do</div><div class="rb-name" id="room-name">${roomNow ? esc(roomNow.name) : '⚠ Vyberte pracovisko'}</div></div></div>
         <div class="rb-btns">
@@ -1153,8 +1170,8 @@
       const evBy = {};
       for (const e of h.events) (evBy[e.ticketId] = evBy[e.ticketId] || []).push(e);
       const rows = h.tickets.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
-        <td>${esc(fmtTime(t.createdAt))}</td><td>${esc(t.roomName || '')}</td><td>${printBadge(t.print)}</td>
-        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `<span class="ev-t">${esc(fmtTime(e.at))}</span> ${evLine(e, arr.slice(0, k))}`).join('<br>')}</td></tr>`).join('');
+        <td>${esc(fmtTime(t.createdAt))}</td><td>${t.roomName || t.homeRoomName ? ambPill(t.roomName ? t.roomId : t.homeRoomId, t.roomName || t.homeRoomName) : ''}</td><td>${printBadge(t.print)}</td>
+        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `<span class="ev-t">${esc(fmtTime(e.at))}</span> ${ambColorText(evLine(e, arr.slice(0, k)))}`).join('<br>')}</td></tr>`).join('');
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${h.tickets.length} čísel</span></div>

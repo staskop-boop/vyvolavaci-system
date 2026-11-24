@@ -190,7 +190,6 @@ td.nw, td.code { white-space: nowrap; }
 .stage-pill { display: inline-block; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
 .stage-pill.nurse { color: #0b5d3b; background: #dff3e8; }
 .stage-pill.doc { color: #fff; background: #111; }
-.amb-pill.c2 { background: #ECECEE; color: var(--grey); } .amb-pill.c3 { background: #fff; color: var(--black); box-shadow: inset 0 0 0 1.5px #c9c9c9; }
 .amb-pill.any { background: var(--blush); color: var(--grey); }
 .t-plan b { font-size: 19px; font-variant-numeric: tabular-nums; }
 .fin-wrap { max-height: 340px; overflow: auto; margin: 0 -6px; padding: 0 6px; }
@@ -298,7 +297,6 @@ td.nw, td.code { white-space: nowrap; }
 .rb-id { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .rb-num { width: 64px; height: 64px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: #fff;
   font-family: var(--font-display); font-weight: 800; font-size: 38px; background: var(--rb, var(--red)); box-shadow: 0 8px 20px rgba(26,26,26,0.18); flex: none; }
-.roombar.c1 { --rb: var(--red); } .roombar.c2 { --rb: #6B6A6A; } .roombar.c3 { --rb: var(--black); }
 .rb-kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--grey); }
 .rb-name { font-family: var(--font-display); font-weight: 800; font-size: 32px; line-height: 1.1; color: var(--black); }
 .rb-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
@@ -478,3 +476,16 @@ select.room-sel:focus-visible { outline: 3px solid var(--adna-primary); outline-
 .fin #fin-close { font-size: 19px; padding: 14px 34px; }
 @media (max-width: 520px) { .fin-tiles { grid-template-columns: 1fr; } .fin-body { padding: 66px 18px 22px; } }
 @media (prefers-reduced-motion: reduce) { .fin, .fin-medal { animation: none; } }
+
+/* 2026-11-24 (Pali): ambulancie farebne rozlíšené na prvý pohľad – každá má stálu farbu (1 modrá, 2 fialová, 3 tyrkysová, 4 hnedá).
+   Farby sú mimo významových farieb (červená AdNa, zelená = u sestry/ukončený, žltá = neprítomný/typ, čierna = u lekára). */
+.rc1 { --rc: #1F5BB5; --rc-bg: #EAF1FC; } .rc2 { --rc: #7B2F9E; --rc-bg: #F4EBF9; }
+.rc3 { --rc: #0E7480; --rc-bg: #E6F4F5; } .rc4 { --rc: #9A4A12; --rc-bg: #FBEFE6; }
+.amb-pill[class*=rc] { background: var(--rc); color: #fff; box-shadow: none; }
+select.amb-pill[class*=rc] option, select.amb-pill.any option { background: #fff; color: var(--black); }
+.roombar[class*=rc] { --rb: var(--rc); border-left: 8px solid var(--rc); }
+.roombar[class*=rc] .rb-name { color: var(--rc); }
+#tbl-called tr[class*=rc] { border-left: 8px solid var(--rc) !important; }
+#tbl-called td.c-room .amb-pill { font-family: var(--font-display); font-size: 18px; font-weight: 800; padding: 3px 12px; vertical-align: middle; }
+.amb-txt[class*=rc] { color: var(--rc); font-weight: 800; }
+#hist-detail .ev-note .amb-txt { font-style: normal; }
