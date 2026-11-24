@@ -1223,7 +1223,7 @@ class Store extends EventEmitter {
     const groups = new Map();
     const g = (name) => {
       if (!groups.has(name)) groups.set(name, { doctor: name, patients: 0, done: 0, absent: 0, open: 0, days: new Set(), rooms: new Set(),
-        waits: [], delays: [], exams: [], onTime: 0, late15: 0, nurseTimes: [], doctorWaits: [], doctorTimes: [], direct: 0, toDoctor: 0 });
+        waits: [], delays: [], docDelays: [], docLate15: 0, exams: [], onTime: 0, late15: 0, nurseTimes: [], doctorWaits: [], doctorTimes: [], direct: 0, toDoctor: 0 });
       return groups.get(name);
     };
     const min = (a, b) => (Date.parse(a) - Date.parse(b)) / 60000;
@@ -1259,6 +1259,10 @@ class Store extends EventEmitter {
           s.delays.push(d);
           if (d <= 5) s.onTime++;
           if (d > 15) s.late15++;
+          // 2026-11-24 (Pali): meškanie až po vstup k LEKÁROVI – termín (alebo neskorší príchod) → vyvolanie lekárom.
+          // Vstup k sestre načas ešte neznamená, že pacient nečakal na lekára; toto je meškanie, ktoré pacient reálne pocíti.
+          const ds = two ? x.doctorStart : visitStart;
+          if (ds) { const dd = (Date.parse(ds) - Math.max(Date.parse(t.planned_at), Date.parse(t.created_at) || 0)) / 60000; if (dd > -8 * 60 && dd < 8 * 60) { s.docDelays.push(dd); if (dd > 15) s.docLate15++; } }
         }
         // trvanie: lekár = u lekára, sestra = u sestry, ambulancia = celá návšteva od vstupu k sestre
         if (groupBy === 'nurse') { if (two && x.nurseCall && (x.sent || t.status === 'done')) { const nt = min(x.sent || t.finished_at, x.nurseCall); if (ok(nt)) s.exams.push(nt); } }
@@ -1274,7 +1278,9 @@ class Store extends EventEmitter {
     const out = (s) => ({ doctor: s.doctor, patients: s.patients, done: s.done, absent: s.absent, open: s.open, days: s.days.size, rooms: [...s.rooms],
       avgWait: avg(s.waits), medianWait: median(s.waits), maxWait: s.waits.length ? Math.round(Math.max(...s.waits)) : null,
       planned: s.delays.length, avgDiff: avg(s.delays), avgDelay: avg(s.delays.map((d) => Math.max(0, d))), maxDelay: s.delays.length ? Math.round(Math.max(0, ...s.delays)) : null,
-      onTime: s.onTime, late15: s.late15, avgExam: avg(s.exams), medianExam: median(s.exams),
+      onTime: s.onTime, late15: s.late15,
+      docPlanned: s.docDelays.length, avgDocDiff: avg(s.docDelays), maxDocDelay: s.docDelays.length ? Math.round(Math.max(0, ...s.docDelays)) : null, docLate15: s.docLate15,
+      avgExam: avg(s.exams), medianExam: median(s.exams),
       avgNurse: avg(s.nurseTimes), avgDoctorWait: avg(s.doctorWaits), avgDoctor: avg(s.doctorTimes), toDoctor: s.toDoctor, direct: s.direct });
     const doctors = [...groups.values()].filter((s) => s !== all).map(out)
       .sort((a, b) => (a.doctor === UNKNOWN) - (b.doctor === UNKNOWN) || b.patients - a.patients || a.doctor.localeCompare(b.doctor, 'sk'));
@@ -1289,6 +1295,7 @@ class Store extends EventEmitter {
     const r = this.doctorStats(day, day, 'room');
     const strip = (d) => ({ name: d.doctor, patients: d.patients, done: d.done, absent: d.absent, open: d.open, avgWait: d.avgWait, maxWait: d.maxWait,
       planned: d.planned, avgDiff: d.avgDiff, avgDelay: d.avgDelay, maxDelay: d.maxDelay, onTime: d.onTime, late15: d.late15, avgExam: d.avgExam,
+      docPlanned: d.docPlanned, avgDocDiff: d.avgDocDiff, maxDocDelay: d.maxDocDelay, docLate15: d.docLate15,
       avgNurse: d.avgNurse, avgDoctorWait: d.avgDoctorWait, avgDoctor: d.avgDoctor, toDoctor: d.toDoctor, direct: d.direct });
     const waiting = this.db.prepare("SELECT COUNT(*) AS n FROM tickets WHERE day = ? AND status = 'waiting'").get(day).n;
     return { day, total: strip(r.total), rooms: r.doctors.map(strip).sort((a, b) => a.name.localeCompare(b.name, 'sk')), waiting };

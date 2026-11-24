@@ -74,7 +74,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
   try {
     await startServer();
     const printerPort = await startPrinter(0);
-    browser = await chromium.launch();
+    browser = await chromium.launch(process.env.ADNA_CHROME ? { executablePath: process.env.ADNA_CHROME } : {});
     const ctxA = await browser.newContext({ viewport: { width: 1440, height: 950 }, locale: 'sk-SK' });
     const A = await ctxA.newPage();
     const errors = [];

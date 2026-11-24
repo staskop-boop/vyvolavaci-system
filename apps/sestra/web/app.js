@@ -1169,16 +1169,36 @@
       const h = await api('/api/staff/history?day=' + encodeURIComponent(S.historyDay));
       const evBy = {};
       for (const e of h.events) (evBy[e.ticketId] = evBy[e.ticketId] || []).push(e);
-      const rows = h.tickets.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
+      // 2026-11-24 (Pali): filter podľa ambulancie a semafor pri časoch vyvolania – zelená v čase (do 5 min), oranžová 6–15 min, červená tučne nad 15 min
+      const roomOf = (t) => t.roomName || t.homeRoomName || '';
+      const roomNames = [...new Set(h.tickets.map(roomOf).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'sk'));
+      if (S.histRoom && !roomNames.includes(S.histRoom)) S.histRoom = '';
+      const shown = S.histRoom ? h.tickets.filter((t) => roomOf(t) === S.histRoom) : h.tickets;
+      const lateOf = (t, e) => Math.round((new Date(e.at).getTime() - Math.max(new Date(t.plannedAt || t.createdAt).getTime(), new Date(t.createdAt).getTime() || 0)) / 60000);
+      const sem = (m) => (m > 15 ? 't-red' : m > 5 ? 't-amber' : 't-green');
+      let nRed = 0, nAmber = 0, nGreen = 0;
+      const evTime = (t, e, prev) => {
+        const first = e.type === 'call' && !prev.some((p) => p.type === 'call' && (p.stage || '') === (e.stage || ''));
+        if (!first || e.stage === 'final') return `<span class="ev-t">${esc(fmtTime(e.at))}</span>`;
+        const m = lateOf(t, e), c = sem(m);
+        if (e.stage === 'doctor' || !e.stage) { if (c === 't-red') nRed++; else if (c === 't-amber') nAmber++; else nGreen++; }
+        const txt = m > 5 ? `+${fmtMin(m)}` : 'v čase';
+        return `<span class="ev-t ${c}" title="${t.plannedAt ? 'Oproti termínu' : 'Od príchodu'} ${esc(fmtTime(t.plannedAt || t.createdAt))}">${esc(fmtTime(e.at))} (${txt})</span>`;
+      };
+      const rows = shown.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
         <td>${esc(fmtTime(t.createdAt))}</td><td>${t.roomName || t.homeRoomName ? ambPill(t.roomName ? t.roomId : t.homeRoomId, t.roomName || t.homeRoomName) : ''}</td><td>${printBadge(t.print)}</td>
-        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `<span class="ev-t">${esc(fmtTime(e.at))}</span> ${ambColorText(evLine(e, arr.slice(0, k)))}`).join('<br>')}</td></tr>`).join('');
+        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `${evTime(t, e, arr.slice(0, k))} ${ambColorText(evLine(e, arr.slice(0, k)))}`).join('<br>')}</td></tr>`).join('');
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
-        <span class="hint">${h.tickets.length} čísel</span></div>
+        <span class="hint">${shown.length} čísel${S.histRoom ? ` z ${h.tickets.length}` : ''}</span></div>
+        ${roomNames.length > 1 ? `<div class="hist-filter" role="group" aria-label="Filter podľa ambulancie"><button class="btn ${!S.histRoom ? 'active' : ''}" data-hroom="">Všetky ambulancie</button>${roomNames.map((n) => `<button class="btn ${S.histRoom === n ? 'active' : ''}" data-hroom="${esc(n)}">${esc(n)}</button>`).join('')}</div>` : ''}
+        <p class="hint hist-legend">Čas vyvolania oproti termínu (pri neskorom príchode alebo bez termínu od príchodu): <span class="t-green">zelená = v čase (do 5 min)</span> · <span class="t-amber">oranžová = mešká 6 – 15 min</span> · <span class="t-red">červená = mešká viac ako 15 min</span>.
+          K lekárovi: <span class="t-green">${nGreen} v čase</span>, <span class="t-amber">${nAmber} s malým meškaním</span>, <span class="t-red">${nRed} s veľkým meškaním</span>.</p>
         ${openPast ? `<div class="alert alert-warn"><div class="grow"><b>${openPast} neukončené čísla</b> z tohto dňa ostali v stave Čaká alebo Vyvolaný.
           Do nového dňa sa neprenášajú. Uzavretím ich označíte ako Neprítomný.</div>
           <button class="btn btn-danger" id="btn-close-past">Uzavrieť neukončené…</button></div>` : ''}
-        ${h.tickets.length ? `<table><thead><tr><th>Číslo</th><th>Stav</th><th>Príchod</th><th>Ambulancia</th><th>Lístok</th><th>Priebeh</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">V tento deň nie sú žiadne čísla.</div>'}`;
+        ${shown.length ? `<table><thead><tr><th>Číslo</th><th>Stav</th><th>Príchod</th><th>Ambulancia</th><th>Lístok</th><th>Priebeh</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="empty">V tento deň nie sú žiadne čísla.</div>'}`;
+      document.querySelectorAll('#hist-detail [data-hroom]').forEach((b) => { b.onclick = () => { S.histRoom = b.dataset.hroom; renderHistory(); }; });
       const bc = document.getElementById('btn-close-past');
       if (bc) bc.onclick = () => modal({
         title: 'Uzavrieť neukončené čísla?', okText: 'Uzavrieť', okClass: 'btn-danger solid',
@@ -1216,7 +1236,30 @@
       ${k(wd.length, 'čaká na lekára', oldest(wd, (t) => t.toDoctorAt))}
       ${k(c.filter((t) => t.stage === 'doctor').length, 'u lekára')}
       ${k(c.filter((t) => t.stage === 'final').length, 'u sestry na ukončení')}
-      ${k(ts.filter((t) => t.status === 'done').length, 'ukončených dnes')}</div></section>`;
+      ${k(ts.filter((t) => t.status === 'done').length, 'ukončených dnes')}</div>${liveRooms(w, c)}</section>`;
+  }
+  /** 2026-11-24 (Pali): ktorá ambulancia je práve ako zaplnená a aké má aktuálne meškanie oproti termínom. */
+  function liveRooms(w, c) {
+    const room = (t) => t.roomName || t.homeRoomName || 'Bez ambulancie';
+    const names = [...new Set([...w, ...c].map(room))].sort((a, b) => a.localeCompare(b, 'sk'));
+    if (!names.length) return '';
+    const now = Date.now();
+    // aktuálne meškanie = ako dlho po termíne (alebo po neskoršom príchode) ešte pacient čaká na vstup k lekárovi
+    const late = (t) => { if (!t.plannedAt) return null; const from = Math.max(new Date(t.plannedAt).getTime(), new Date(t.createdAt).getTime() || 0); return Math.round((now - from) / 60000); };
+    const row = (n) => {
+      const W = w.filter((t) => room(t) === n), C = c.filter((t) => room(t) === n);
+      const wn = W.filter((t) => (t.stage || 'nurse') === 'nurse').length, wd = W.filter((t) => t.stage === 'doctor').length;
+      const un = C.filter((t) => t.stage !== 'doctor' && t.stage !== 'final').length, ud = C.filter((t) => t.stage === 'doctor').length, uf = C.filter((t) => t.stage === 'final').length;
+      const ls = [...W, ...C.filter((t) => t.stage !== 'doctor' && t.stage !== 'final')].map(late).filter((x) => x != null);
+      const mx = ls.length ? Math.max(...ls) : null;
+      const cell = (v) => `<td class="num">${v ? `<b>${v}</b>` : '<span class="hint">0</span>'}</td>`;
+      return `<tr><td class="doc">${esc(n)} ${n === 'Bez ambulancie' ? '' : ud ? '<span class="badge-busy">obsadená – pacient u lekára</span>' : un || uf ? '<span class="badge-part">pacient u sestry</span>' : '<span class="badge-free">lekár voľný</span>'}</td>
+        ${cell(wn)}${cell(un)}${cell(wd)}${cell(ud)}${cell(uf)}
+        <td class="num">${mx == null ? '–' : mx > 5 ? `<b class="d-late">mešká ${fmtMin(mx)}</b>` : '<b class="d-ok">v čase</b>'}</td></tr>`;
+    };
+    return `<div class="stats-scroll" style="margin-top:12px"><table class="stats-table"><thead><tr><th>Ambulancia</th><th class="num">Čaká na sestru</th><th class="num">U sestry</th>
+      <th class="num">Čaká na lekára</th><th class="num">U lekára</th><th class="num">Na ukončení</th><th class="num">Aktuálne meškanie</th></tr></thead><tbody>${names.map(row).join('')}</tbody></table></div>
+      <p class="hint">Aktuálne meškanie = najdlhší čas po termíne, počas ktorého pacient tejto ambulancie ešte čaká na vstup k lekárovi (pri neskorom príchode sa počíta od príchodu).</p>`;
   }
   let liveTimer = null;
   function liveRefresh() {
@@ -1329,6 +1372,7 @@
     if (v < 0) return `<b class="d-early" title="Priemerne skôr, než bol termín">predstih ${mins(-v)}</b>`;
     return '<b class="d-ok" title="Priemerne presne podľa termínu">v čase</b>';
   };
+  const docDelayHtml = (d) => { if (!d || !d.docPlanned) return '<b>–</b>'; const v = d.avgDocDiff; return v > 0 ? `<b class="d-late" title="Priemerné meškanie vstupu k lekárovi oproti termínu">mešká ${mins(v)}</b>` : v < 0 ? `<b class="d-early">predstih ${mins(-v)}</b>` : '<b class="d-ok">v čase</b>'; };
   const mins = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + ' %' : '–');
 
@@ -1382,6 +1426,7 @@
       <td class="num">${mins(d.avgWait)}</td><td class="num">${mins(d.medianWait)}</td>
       <td class="num">${d.planned}</td><td class="num">${delayHtml(d)}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
       <td class="num">${pct(d.onTime, d.planned)}</td><td class="num ${d.late15 ? 'bad' : ''}">${d.planned ? d.late15 : '–'}</td>
+      ${grp !== 'nurse' ? `<td class="num">${docDelayHtml(d)}</td><td class="num">${d.docPlanned ? mins(d.maxDocDelay) : '–'}</td><td class="num ${d.docLate15 ? 'bad' : ''}">${d.docPlanned ? d.docLate15 : '–'}</td>` : ''}
       <td class="num">${mins(d.avgExam)}</td>${grp === 'room' ? `<td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td>` : ''}</tr>`;
     const G = { doctor: { who: 'Lekár', wait: 'Ø čakanie na lekára', exam: 'Ø u lekára' }, nurse: { who: 'Sestra', wait: 'Ø čakanie', exam: 'Ø u sestry' },
       room: { who: 'Ambulancia', wait: 'Ø čakanie', exam: 'Ø celá návšteva' } }[grp];
@@ -1389,18 +1434,20 @@
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov</span></div>
         <div class="stats-kpi"><b>${mins(t.avgWait)}</b><span>priemerné čakanie od príchodu</span></div>
-        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie oproti plánovanému času</span></div>
+        <div class="stats-kpi">${delayHtml(t)}<span>priemerné meškanie vstupu k sestre oproti termínu</span></div>
+        ${grp !== 'nurse' ? `<div class="stats-kpi">${docDelayHtml(t)}<span>priemerné meškanie vstupu k lekárovi oproti termínu${t.docPlanned ? ` (najviac ${mins(t.maxDocDelay)})` : ''}</span></div>` : ''}
         <div class="stats-kpi"><b>${pct(t.onTime, t.planned)}</b><span>pacientov s plánom vyvolaných načas (do 5 min)</span></div>
         <div class="stats-kpi"><b>${mins(t.avgExam)}</b><span>priemerná dĺžka vyšetrenia</span></div>
       </section>
       <section class="card"><div class="stats-scroll"><table class="stats-table"><thead><tr>
         <th>${G.who}</th><th class="num">Dni</th><th class="num">Pacienti</th><th class="num">Ukončení</th><th class="num">Neprítomní</th>
         <th class="num">${G.wait}</th><th class="num">Medián čak.</th>
-        <th class="num">S plán. časom</th><th class="num">Ø meškanie</th><th class="num">Max. meškanie</th><th class="num">Načas</th><th class="num">Mešk. &gt; 15 min</th>
+        <th class="num">S plán. časom</th><th class="num">Ø mešk. k sestre</th><th class="num">Max. k sestre</th><th class="num">Načas</th><th class="num">K sestre &gt; 15 min</th>
+        ${grp !== 'nurse' ? '<th class="num">Ø mešk. k lekárovi</th><th class="num">Max. k lekárovi</th><th class="num">K lekárovi &gt; 15 min</th>' : ''}
         <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}</tr></thead>
         <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
         <p class="hint">${r.twoStepSince ? `Od ${esc(fmtDay(r.twoStepSince))} má návšteva dva kroky – najprv sestra (čas objednania = vstup k sestre), potom lekár.
-          Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho; meškanie = vstup jeho pacienta k sestre oproti termínu (ak pacient prišiel neskôr, od príchodu).
+          Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho. <b>Meškanie k sestre</b> = vstup pacienta k sestre oproti termínu, <b>meškanie k lekárovi</b> = vyvolanie lekárom oproti termínu (ak pacient prišiel neskôr, od príchodu) – to je meškanie, ktoré pacient reálne pocíti. Priemer zahŕňa aj pacientov vzatých skôr (predstih ho znižuje), preto pozri aj maximum a počet nad 15 min.
           Pacient ukončený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
           Vyšetrenie = od vyvolania po „Ukončený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
           ${r.doctorDataSince ? `Lekári sa ukladajú od ${esc(fmtDay(r.doctorDataSince))}; staršie vyvolania sú v riadku „Lekár nebol zadaný“.` : 'Pri vyvolaniach zatiaľ nebol zadaný lekár – nastavte ho v Zozname tlačidlom Lekár.'}</p>

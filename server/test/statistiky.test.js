@@ -51,6 +51,8 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   assert.equal(prvy.avgWait, 8, 'čakanie na lekára (15 + 0) / 2');
   assert.equal(prvy.planned, 1, 'meškanie oproti termínu sa ukazuje aj pri lekárovi'); assert.equal(prvy.avgDelay, 20, 'vstup k sestre 30 − termín 10');
   assert.equal(prvy.avgExam, 20, 'u lekára od vyvolania lekárom po ukončenie');
+  assert.equal(prvy.docPlanned, 1); assert.equal(prvy.avgDocDiff, 45, 'meškanie k lekárovi: vyvolanie lekárom 55 − termín 10');
+  assert.equal(prvy.maxDocDelay, 45); assert.equal(prvy.docLate15, 1);
   assert.equal(prvy.avgNurse, 10); assert.equal(prvy.direct, 1); assert.equal(prvy.toDoctor, 2);
   const druhy = r.data.doctors.find((x) => x.doctor === 'MUDr. Test Druhý');
   assert.equal(druhy.patients, 1); assert.equal(druhy.open, 1);
