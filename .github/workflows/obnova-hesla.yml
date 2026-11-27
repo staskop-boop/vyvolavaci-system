@@ -1,0 +1,62 @@
+# Obnova hesla správcu na serveri v ambulancii – bez prístupu na server a bez odhlásenia sestier (2026-11-27).
+# 1. Settings → Secrets and variables → Actions → New repository secret: ADNA_NOVE_HESLO = nové heslo (aspoň 12 znakov).
+# 2. Actions → „Obnova hesla správcu“ → Run workflow.
+# Workflow heslo zašifruje verejným kľúčom servera (rozšifrovať ho vie len server) a zapíše do main;
+# server si ho pri aktualizácii (do 5 minút) nastaví. Heslo nie je nikde čitateľné – ani v repozitári, ani v logu.
+name: Obnova hesla správcu
+on:
+  workflow_dispatch:
+    inputs:
+      konto:
+        description: 'Konto, ktorému sa nastaví heslo'
+        default: 'admin'
+concurrency: { group: obnova-hesla, cancel-in-progress: false }
+permissions: { contents: write }
+jobs:
+  obnova:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      URL: https://vyvolavaci.adna.sk
+      HESLO: ${{ secrets.ADNA_NOVE_HESLO }}
+      KONTO: ${{ inputs.konto }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Kontrola tajomstva
+        run: |
+          [ -n "$HESLO" ] || { echo "::error::⚠ Chýba tajomstvo ADNA_NOVE_HESLO (Settings → Secrets and variables → Actions)."; exit 1; }
+          [ "${#HESLO}" -ge 12 ] || { echo "::error::⚠ Heslo v ADNA_NOVE_HESLO musí mať aspoň 12 znakov."; exit 1; }
+      - name: Verejný kľúč servera
+        run: |
+          for i in $(seq 1 40); do
+            curl -fsS -m 20 "$URL/api/public/obnova-kluc" -o kluc.json && break
+            echo "Server ešte nemá túto verziu (aktualizuje sa každých 5 min) – čakám…"; sleep 30
+          done
+          [ -s kluc.json ] || { echo "::error::⚠ Server neodpovedá na $URL/api/public/obnova-kluc."; exit 1; }
+          jq -r .fingerprint kluc.json
+      - name: Zašifrovať a zapísať do main
+        run: |
+          node -e '
+            const fs = require("fs"); const { zasifruj } = require("./server/src/obnova");
+            const k = JSON.parse(fs.readFileSync("kluc.json", "utf8"));
+            const z = zasifruj(k.publicKey, k.fingerprint, { id: "gh-" + process.env.GITHUB_RUN_ID, username: process.env.KONTO || "admin", password: process.env.HESLO });
+            fs.writeFileSync("server/src/obnova-hesla.json", JSON.stringify(z, null, 2) + "\n");'
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/src/obnova-hesla.json
+          git commit -q -m "Obnova hesla správcu (zašifrované pre server v ambulancii, beh $GITHUB_RUN_ID)"
+          for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
+      - name: Overenie – prihlásenie novým heslom
+        run: |
+          for i in $(seq 1 30); do
+            KOD=$(jq -cn --arg u "$KONTO" --arg p "$HESLO" '{username:$u, password:$p, deviceLabel:"Overenie obnovy hesla"}' \
+              | curl -s -o /dev/null -w '%{http_code}' -m 20 -c c.txt -H 'Content-Type: application/json' -d @- "$URL/api/auth/login")
+            if [ "$KOD" = 200 ]; then
+              curl -s -o /dev/null -m 20 -b c.txt -X POST -H 'Content-Type: application/json' -d '{}' "$URL/api/auth/logout"
+              echo "✓ Nové heslo pre konto $KONTO funguje na $URL."; exit 0
+            fi
+            echo "Server si heslo ešte nenastavil (HTTP $KOD) – čakám…"; sleep 30
+          done
+          echo "::error::⚠ Nové heslo sa do 15 minút neprejavilo – skontrolujte aktualizáciu servera v ambulancii."; exit 1

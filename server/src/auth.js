@@ -88,6 +88,23 @@ class Auth {
   }
 
   /**
+   * Obnova hesla na diaľku (obnova.js): nastaví heslo konta (správcu vytvorí, ak chýba), ale NEzruší doterajšie
+   * prihlásenia – sestry v ambulancii pri tom ostanú prihlásené (2026-11-27).
+   */
+  setPasswordKeepSessions(username, password) {
+    const name = plainName(username);
+    if (!/^[a-z0-9._-]{2,40}$/.test(name)) return { error: 'Neplatné meno konta.' };
+    const err = validatePassword(password);
+    if (err) return { error: err };
+    const ex = this.db.prepare('SELECT id, role FROM users WHERE username = ?').get(name);
+    if (ex) this.db.prepare('UPDATE users SET password_hash = ?, active = 1 WHERE id = ?').run(hashPassword(password), ex.id);
+    else if (name === 'admin') this.db.prepare('INSERT INTO users (username, password_hash, role, created_at) VALUES (?,?,?,?)').run(name, hashPassword(password), 'admin', clock.nowIso());
+    else return { error: `Konto „${name}“ neexistuje.` };
+    for (const k of [...this.failures.keys()]) if (k.endsWith(':' + name)) this.failures.delete(k);   // zrušiť dočasnú blokáciu po zlých pokusoch
+    return { username: name };
+  }
+
+  /**
    * Brzda proti hádaniu hesla: po 5 chybách na jedno konto z jednej IP 60 s pauza – len pre to konto.
    * 2026-11-17: predtým sa blokovala celá IP, a keďže celá ambulancia ide von cez jednu adresu (Cloudflare),
    * preklepy jedného človeka zablokovali prihlásenie všetkým. Celkovo z jednej IP najviac 20 chýb za minútu.

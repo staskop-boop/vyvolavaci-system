@@ -47,6 +47,8 @@ function createServer(opts = {}) {
   if (opts.news !== false) news.start();
   const weather = new Weather(() => store.getSettings(), { fetch: opts.weatherFetch });
   if (opts.weather !== false && opts.news !== false) weather.start();
+  // 2026-11-27: obnova hesla správcu na diaľku (server/src/obnova.js) – pred inštalačným kódom, aby ho nastavené heslo nevyžadovalo
+  const obnova = require('./obnova').pouziObnovu({ db: database, auth, dataDir: config.dataDir, subor: opts.obnovaSubor });
   const setupCode = auth.ensureSetupCode();
   if (setupCode && !opts.silentSetup) {
     log.info('Nie je nastavené heslo personálu. Otvorte /sestra/ a použite inštalačný kód', { file: path.join(config.dataDir, 'SETUP-KOD.txt') });
@@ -109,6 +111,12 @@ function createServer(opts = {}) {
 
   // ---------- verejné ----------
   app.get('/api/health', (req, res) => res.json({ ok: true, time: clock.nowIso(), day: clock.today(), boot: BOOT_ID }));
+  // verejný kľúč servera pre obnovu hesla (workflow ním heslo zašifruje); „posledna“ = kedy bola naposledy použitá obnova
+  app.get('/api/public/obnova-kluc', (req, res) => {
+    const r = database.prepare("SELECT value FROM settings WHERE key LIKE 'obnovaHesla:%' ORDER BY rowid DESC LIMIT 1").get();
+    let posledna = null; try { posledna = r ? JSON.parse(r.value).at : null; } catch {}
+    res.json({ publicKey: obnova.k.publicKey, fingerprint: obnova.k.fingerprint, posledna });
+  });
   app.get('/api/public/config', (req, res) => res.json(store.publicConfig()));
   app.get('/api/display/state', (req, res) => res.json(store.displayState()));
   app.get('/api/display/news', (req, res) => res.json(news.publicState()));
