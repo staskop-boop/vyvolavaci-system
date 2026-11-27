@@ -13,8 +13,11 @@ after(() => { clock.setOffset(0); return s.close(); });
 const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/Bratislava', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
   .format(new Date(clock.now().getTime() + minFromNow * 60000));
 
+let nearMidnight = false;   // druhý test nadväzuje na prvý
 test('neskorý príchod nezvýši sklz ambulancie; čakanie po termíne áno', async (t) => {
-  if (new Date(clock.now().getTime() - 55 * 60000).getDate() !== new Date(clock.now().getTime() + 50 * 60000).getDate()) return t.skip('okolo polnoci');
+  // deň podľa Europe/Bratislava (nie podľa časového pásma počítača – CI beží v UTC)
+  const bDay = (min) => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bratislava' }).format(new Date(clock.now().getTime() + min * 60000));
+  if (bDay(-55) !== bDay(50)) { nearMidnight = true; return t.skip('okolo polnoci'); }
   await staff.post('/api/staff/cards', { cardNo: '5', plannedTime: hm(10) });    // prišiel o 10 min skôr
   await staff.post('/api/staff/cards', { cardNo: '6', plannedTime: hm(-50) });   // prišiel o 50 min neskôr
   const st = (await staff.get('/api/staff/state')).data;
@@ -40,7 +43,8 @@ test('neskorý príchod nezvýši sklz ambulancie; čakanie po termíne áno', a
   assert.ok(r >= 29 && r <= 31, `5 prišiel včas a čakal 30 min po termíne → sklz ~30 min (je ${r})`);
 });
 
-test('po „ukončený“ ambulancia na TV nikoho nevyšetruje', async () => {
+test('po „ukončený“ ambulancia na TV nikoho nevyšetruje', async (t) => {
+  if (nearMidnight) return t.skip('okolo polnoci');
   const st = (await staff.get('/api/staff/state')).data;
   const room = st.rooms[0].id;
   let d = (await staff.get('/api/display/state')).data;
