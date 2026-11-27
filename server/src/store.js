@@ -1247,12 +1247,14 @@ class Store extends EventEmitter {
     const min = (a, b) => (Date.parse(a) - Date.parse(b)) / 60000;
     const ok = (m) => m >= 0 && m < 8 * 60;
     const all = g('__spolu__');
+    let nurseOnly = 0;
     for (let t of tickets) {
       const x = byT.get(t.id);
       if (!x || !x.first) continue;
       const two = x.twoStep;
       // v štatistike lekára sú len pacienti, ktorí k nemu prišli (pri dvoch krokoch); v štatistike sestier len dvojkrokové návštevy
-      if (groupBy === 'doctor' && two && !x.doctorStart) continue;
+      // pacient ukončený len u sestry (k lekárovi neišiel) sa lekárovi nepočíta – ale počet sa vráti, aby súčty sedeli s ambulanciami
+      if (groupBy === 'doctor' && two && !x.doctorStart) { if (!keyMap) nurseOnly++; continue; }
       if (groupBy === 'nurse' && !(two && x.nurseCall)) continue;
       let key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
       if (keyMap) { key = keyMap(key, UNKNOWN); if (key == null) continue; }   // napr. „ja“ / „ostatní spolu“
@@ -1311,7 +1313,7 @@ class Store extends EventEmitter {
       .sort((a, b) => (a.doctor === UNKNOWN) - (b.doctor === UNKNOWN) || b.patients - a.patients || a.doctor.localeCompare(b.doctor, 'sk'));
     const since = this.db.prepare("SELECT MIN(t.day) AS d FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.doctor IS NOT NULL").get();
     const twoSince = this.db.prepare("SELECT MIN(t.day) AS d FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.stage IS NOT NULL").get();
-    return { from, to, groupBy, doctors, total: out(all), doctorDataSince: since?.d || null, twoStepSince: twoSince?.d || null };
+    return { from, to, groupBy, doctors, total: out(all), nurseOnly, doctorDataSince: since?.d || null, twoStepSince: twoSince?.d || null };
   }
 
   /** Dnešný prehľad pre sestry: celé zariadenie a jednotlivé ambulancie (bez mien lekárov a bez histórie). */

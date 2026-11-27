@@ -208,7 +208,7 @@
         ${tile(fmtMin(t.avgNurse), 'priem. čas u sestry')}${tile(fmtMin(t.avgDoctor), 'priem. čas u lekára')}
         ${tile(pct, 'načas k sestre (do 5 min)')}${tile(t.late15 || 0, 'meškanie viac ako 15 min')}
       </div>
-      ${rows ? `<div class="scroll"><table class="tbl"><thead><tr><th>Ambulancia</th><th class="num">Pac.</th><th class="num">Hotovo</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div><p class="hint">Mešk. = priemer oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára.</p>` : ''}`
+      ${rows ? `<div class="scroll"><table class="tbl"><thead><tr><th>Ambulancia</th><th class="num">Pac.</th><th class="num">Hotovo</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div><p class="hint">Pac. = všetci pacienti ambulancie, aj tí, čo boli len u sestry. Mešk. = priemer oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára.</p>` : ''}`
       : '<p class="hint">Dnes ešte nikto nebol vyvolaný.</p>'}</section>`;
   }
 
@@ -261,11 +261,11 @@
     const body = S.weekErr ? `<p class="banner warn" role="alert">⚠ Štatistiky sa nepodarilo načítať: ${esc(S.weekErr)}</p>`
       : !rows ? '<p class="hint">Načítavam…</p>'
       : !rows.length ? '<p class="hint">Za toto obdobie nie sú žiadni pacienti.</p>'
-      : `<p class="hint">${oneDay ? esc(fmtDay(from)) : `${esc(fmtDay(from))} – ${esc(fmtDay(to))}`} · pacientov spolu: ${d.total.patients}, ukončených: ${d.total.done}</p>
+      : `<p class="hint">${oneDay ? esc(fmtDay(from)) : `${esc(fmtDay(from))} – ${esc(fmtDay(to))}`} · u lekárov: <b>${d.total.patients}</b> pacientov (ukončených ${d.total.done})${d.nurseOnly ? ` + <b>${d.nurseOnly}</b> len u sestry (k lekárovi nešli) = <b>${d.total.patients + d.nurseOnly}</b> v ambulanciách spolu` : ''}</p>
       <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Ukonč.</th>${oneDay ? '' : '<th class="num">Dní</th>'}<th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th>${anyForgot ? '<th class="num">Zabudnuté</th>' : ''}</tr></thead><tbody>
       ${rows.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.done ?? '–'}</td>${oneDay ? '' : `<td class="num">${r.days ?? '–'}</td>`}
         <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDocDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td>${anyForgot ? `<td class="num">${r.forgot ? `<b class="late">⚠ ${r.forgot}</b>` : '0'}</td>` : ''}</tr>`).join('')}
-      </tbody></table></div><p class="hint">Čakanie = priemerné čakanie, Mešk. = oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára. ${anyForgot ? ' Zabudnuté = pacient, ktorého lekár neposlal na ukončenie a server ho ukončil sám po 2 h.' : ''} Štatistiky sa počítajú od 23. 11. 2026.</p>`;
+      </tbody></table></div><p class="hint">Pac. = pacienti, ktorí boli u lekára. Čakanie = priemerné čakanie, Mešk. = oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára. ${anyForgot ? ' Zabudnuté = pacient, ktorého lekár neposlal na ukončenie a server ho ukončil sám po 2 h.' : ''} Štatistiky sa počítajú od 23. 11. 2026.</p>`;
     // zabudnuté ukončenia (pacient ostal na ukončení u sestry alebo u sestry) – podľa sestier
     const nf = S.nurseWeek && S.nurseWeek.from === from && S.nurseWeek.to === to ? (S.nurseWeek.doctors || []).filter((r) => r.forgot) : [];
     const df = rows ? rows.filter((r) => r.forgot) : [];
