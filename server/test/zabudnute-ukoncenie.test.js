@@ -58,3 +58,14 @@ test('čakajúci a ukončení pacienti sa nedotknú', async () => {
   assert.equal((await admin.get('/api/staff/state')).data.tickets.find((t) => t.code === 'Z3').status, 'waiting');
   await admin.post(`/api/staff/tickets/${a.data.ticket.id}/done`, {});
 });
+
+test('pacient ukončený len u sestry: lekárovi sa nepočíta, ale je v nurseOnly (súčty sedia s ambulanciami)', async () => {
+  const a = await admin.post('/api/staff/cards', { cardNo: 'Z4', plannedTime: '23:30', roomId: room.id });
+  await admin.post(`/api/staff/tickets/${a.data.ticket.id}/call`, { roomId: room.id });
+  await admin.post(`/api/staff/tickets/${a.data.ticket.id}/done`, {});
+  const day = (await admin.get('/api/staff/state')).data.day;
+  const doc = (await admin.get(`/api/admin/stats?from=${day}&to=${day}&groupBy=doctor`)).data;
+  const rm = (await admin.get(`/api/admin/stats?from=${day}&to=${day}&groupBy=room`)).data;
+  assert.equal(doc.nurseOnly, 1);
+  assert.equal(doc.total.patients + doc.nurseOnly, rm.total.patients);
+});

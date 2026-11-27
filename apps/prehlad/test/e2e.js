@@ -112,7 +112,7 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
     await step('Lekári za obdobie: Týždeň, Mesiac, Od – do', async () => {
       await page.click('[data-period="tyzden"]');
       await page.waitForSelector('text=Lekári tento týždeň');
-      await page.waitForFunction(() => /pacientov spolu/.test(document.querySelector('#lekari').innerText), null, { timeout: 5000 });
+      await page.waitForFunction(() => /u lekárov: \d+ pacientov/.test(document.querySelector('#lekari').innerText), null, { timeout: 5000 });
       await page.click('[data-period="mesiac"]');
       await page.waitForSelector('text=Lekári tento mesiac');
       await page.click('[data-period="vlastne"]');
