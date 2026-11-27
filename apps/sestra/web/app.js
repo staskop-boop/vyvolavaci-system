@@ -1464,7 +1464,7 @@
     if (!S.statsFrom) { const d = new Date(today + 'T12:00:00'); d.setDate(d.getDate() - 29); S.statsFrom = isoDay(d); }
     $view.innerHTML = `<div class="stack">
       <section class="card stack"><div class="section-title"><h2>Štatistiky</h2><span class="hint">Vidí len správca</span></div>
-        <div class="row" role="group" aria-label="Zobraziť podľa" style="gap:8px;flex-wrap:wrap">${[['doctor', 'Lekári'], ['nurse', 'Sestry'], ['room', 'Ambulancie']].map(([k, l]) =>
+        <div class="row" role="group" aria-label="Zobraziť podľa" style="gap:8px;flex-wrap:wrap">${[['doctor', 'Lekári'], ['nurse', 'Sestry'], ['room', 'Ambulancie'], ['type', 'Výkony']].map(([k, l]) =>
           `<button class="btn btn-sm ${(S.statsGroup || 'doctor') === k ? 'btn-primary' : ''}" type="button" data-group="${k}">${l}</button>`).join('')}</div>
         <form class="stats-filter" id="stats-form">
           <div class="field"><label for="st-from">Od</label><input type="date" id="st-from" value="${esc(S.statsFrom)}" max="${esc(today)}"></div>
@@ -1512,6 +1512,25 @@
       <td class="num ${d.forgot ? 'bad' : ''}">${d.forgot ? '⚠ ' + d.forgot : '0'}</td></tr>`;
     const G = { doctor: { who: 'Lekár', wait: 'Ø čakanie na lekára', exam: 'Ø u lekára' }, nurse: { who: 'Sestra', wait: 'Ø čakanie', exam: 'Ø u sestry' },
       room: { who: 'Ambulancia', wait: 'Ø čakanie', exam: 'Ø celá návšteva' } }[grp];
+    if (grp === 'type') {
+      // 2026-11-27 (Pali): skutočné časy podľa výkonu – podľa nich sa upraví časovanie pacientov (dĺžky služieb v Ambee)
+      const tr = (d, cls = '') => `<tr class="${cls}"><td class="doc">${esc(d.doctor)}</td><td class="num">${d.patients}</td>
+        <td class="num">${mins(d.avgNurse)}<div class="hint">medián ${mins(d.medianNurse)}</div></td>
+        <td class="num">${mins(d.avgDoctorWait)}<div class="hint">medián ${mins(d.medianDoctorWait)}</div></td>
+        <td class="num">${mins(d.avgDoctor)}<div class="hint">medián ${mins(d.medianDoctor)}</div></td>
+        <td class="num">${mins(d.avgExam)}<div class="hint">medián ${mins(d.medianExam)}</div></td>
+        <td class="num">${delayHtml(d)}</td><td class="num ${d.late15 ? 'bad' : ''}">${d.planned ? d.late15 : '–'}</td></tr>`;
+      out.innerHTML = `<div class="stack">${head}<section class="card"><div class="stats-scroll"><table class="stats-table"><thead><tr>
+        <th>Výkon (typ pacienta)</th><th class="num">Pacienti</th><th class="num">Ø u sestry</th><th class="num">Ø čakanie na lekára</th><th class="num">Ø u lekára</th>
+        <th class="num">Ø celá návšteva</th><th class="num">Ø mešk. k sestre</th><th class="num">K sestre &gt; 15 min</th></tr></thead>
+        <tbody>${r.doctors.map((d) => tr(d)).join('')}${r.doctors.length > 1 ? tr({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
+        <p class="hint"><b>Skutočné časy podľa výkonu</b> – podklad na nastavenie dĺžok služieb pri objednávaní. U sestry = od vyvolania sestrou po „K lekárovi“,
+          čakanie na lekára = od „K lekárovi“ po vyvolanie lekárom, u lekára = od vyvolania lekárom po „K sestre na ukončenie“ (alebo „Ukončený“),
+          celá návšteva = od vstupu k sestre po „Ukončený“. Medián je odolnejší voči výnimočne dlhým návštevám – na nastavenie časov je spoľahlivejší ako priemer.
+          Meškanie k sestre = vstup k sestre oproti termínu (termín = keď sestra vezme pacienta k sebe). Typ pacienta zadáva sestra pri pacientovi; bez neho je pacient v riadku „Výkon nezadaný“.</p>
+      </section></div>`;
+      return;
+    }
     out.innerHTML = `<div class="stack">${head}
       <section class="stats-kpis">
         <div class="stats-kpi"><b>${t.patients}</b><span>vyvolaných pacientov</span></div>

@@ -1244,12 +1244,14 @@ class Store extends EventEmitter {
    *   čas u sestry = poslanie k lekárovi (alebo ukončenie) − vyvolanie k sestre;
    * – lekár: čakanie = vyvolanie lekárom − poslanie od sestry (priamo k lekárovi = 0), vyšetrenie = ukončenie − začiatok u lekára.
    *   Meškanie oproti termínu (vstup k sestre − termín) sa od 23. 11. 2026 ukazuje aj pri lekárovi – za jeho pacientov (Pali).
+   * – výkon (groupBy 'type', 2026-11-27 Pali): skutočné časy podľa typu pacienta/služby – u sestry, čakanie na lekára, u lekára,
+   *   ako podklad na nastavenie dĺžok služieb (číselník Ambee).
    * Staršie záznamy (jeden krok, bez kroku v udalosti) sa počítajú ako doteraz: všetko lekárovi z posledného vyvolania.
    */
   doctorStats(from, to, groupBy = 'doctor', keyMap = null) {
     const D = /^\d{4}-\d{2}-\d{2}$/;
     if (!D.test(String(from || '')) || !D.test(String(to || '')) || from > to) throw bad('Neplatné obdobie.');
-    const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at, to_doctor_at FROM tickets
+    const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at, to_doctor_at, patient_type FROM tickets
       WHERE day BETWEEN ? AND ? AND call_count > 0`).all(from, to);
     const evs = this.db.prepare(`SELECT e.ticket_id, e.type, e.at, e.doctor, e.nurse, e.stage, e.note, r.name AS room FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
       LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse','to_final','final_back','auto_done') ORDER BY e.id`).all(from, to);
@@ -1291,7 +1293,7 @@ class Store extends EventEmitter {
       if (e.room) x.room = e.room;
       byT.set(e.ticket_id, x);
     }
-    const UNKNOWN = groupBy === 'nurse' ? 'Sestra nebola zadaná' : 'Lekár nebol zadaný';
+    const UNKNOWN = groupBy === 'nurse' ? 'Sestra nebola zadaná' : groupBy === 'type' ? 'Výkon nezadaný' : 'Lekár nebol zadaný';
     const groups = new Map();
     const g = (name) => {
       if (!groups.has(name)) groups.set(name, { doctor: name, patients: 0, done: 0, absent: 0, open: 0, days: new Set(), rooms: new Set(),
@@ -1319,7 +1321,7 @@ class Store extends EventEmitter {
         continue;
       }
       if (groupBy === 'nurse' && !(two && x.nurseCall)) continue;
-      let key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
+      let key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'type' ? t.patient_type || UNKNOWN : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
       if (keyMap) { key = keyMap(key, UNKNOWN); if (key == null) continue; }   // napr. „ja“ / „ostatní spolu“
       const visitStart = two ? x.nurseCall || x.first : x.first;   // vstup do ambulancie (k sestre)
       // automaticky ukončený pacient: ráta sa ako ukončený, ale časy (u sestry, u lekára) sa z neho nepočítajú
@@ -1371,7 +1373,7 @@ class Store extends EventEmitter {
       onTime: s.onTime, late15: s.late15,
       docPlanned: s.docDelays.length, avgDocDiff: avg(s.docDelays), maxDocDelay: s.docDelays.length ? Math.round(Math.max(0, ...s.docDelays)) : null, docLate15: s.docLate15,
       avgExam: avg(s.exams), medianExam: median(s.exams),
-      avgNurse: avg(s.nurseTimes), avgDoctorWait: avg(s.doctorWaits), avgDoctor: avg(s.doctorTimes), toDoctor: s.toDoctor, direct: s.direct, forgot: s.forgot });
+      avgNurse: avg(s.nurseTimes), avgDoctorWait: avg(s.doctorWaits), avgDoctor: avg(s.doctorTimes), medianNurse: median(s.nurseTimes), medianDoctor: median(s.doctorTimes), medianDoctorWait: median(s.doctorWaits), toDoctor: s.toDoctor, direct: s.direct, forgot: s.forgot });
     const doctors = [...groups.values()].filter((s) => s !== all).map(out)
       .sort((a, b) => (a.doctor === UNKNOWN) - (b.doctor === UNKNOWN) || b.patients - a.patients || a.doctor.localeCompare(b.doctor, 'sk'));
     const since = this.db.prepare("SELECT MIN(t.day) AS d FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.doctor IS NOT NULL").get();
