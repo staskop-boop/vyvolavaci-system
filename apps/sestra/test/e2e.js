@@ -352,7 +352,12 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
 
     // 11b. 2026-11-17: Ukončiť deň, ambulancia bez lekára, hlasitosť vyvolania
     await A.click('.tab[data-view=queue]');
-    await A.click('#btn-day-end'); await A.click('#m-ok');
+    await A.click('#btn-day-end');
+    // 2026-11-27 (Pali): neukončený (vyvolaný) pacient → upozornenie v okne ukončenia dňa
+    const openN = await A.evaluate(async () => (await (await fetch('/api/staff/state')).json()).tickets.filter((t) => t.status === 'called').length);
+    if (openN) { await A.locator('.day-end-open', { hasText: 'Neukončení pacienti' }).waitFor(); assert.equal(await A.textContent('#m-ok'), 'Aj tak ukončiť deň'); await shot(A, '26a-ukoncenie-dna-neukonceny'); }
+    else assert.equal(await A.locator('.day-end-open').count(), 0);
+    await A.click('#m-ok');
     // 2026-11-23 (Pali): poďakovanie s ohňostrojom pre toho, kto deň ukončil
     await A.locator('#fin #fin-title', { hasText: 'deň je za tebou' }).waitFor();
     assert.equal(await A.locator('#fin .fin-tile').count(), 3);

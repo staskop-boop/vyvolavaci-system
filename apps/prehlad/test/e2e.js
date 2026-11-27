@@ -118,7 +118,7 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
       await page.click('[data-period="vlastne"]');
       await page.waitForSelector('#lekari input[data-od]');
       assert.equal(await page.inputValue('#lekari input[data-do]'), await page.evaluate(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bratislava' }).format(new Date())));
-      await page.locator('#lekari').scrollIntoViewIfNeeded();
+      await page.evaluate(() => document.getElementById('lekari').scrollIntoView());
       await shot(page, 'prehlad-4-lekari-obdobie.png');
       // výber sa pamätá aj po obnovení stránky
       await page.reload(); await page.waitForSelector('#lekari input[data-od]');

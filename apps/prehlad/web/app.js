@@ -8,7 +8,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const S = { user: null, staff: null, conn: null, today: null, todayErr: null, week: null, lastAt: 0, statsTimer: null,
     // obdobie tabuľky lekárov (správca): dnes / tyzden / mesiac / rok / vlastne – pamätá sa v telefóne
-    period: (() => { try { return JSON.parse(localStorage.getItem('adna-prehlad-obdobie')) || { p: 'dnes' }; } catch { return { p: 'dnes' }; } })(), weekErr: null };
+    period: (() => { try { return JSON.parse(localStorage.getItem('adna-prehlad-obdobie')) || { p: 'dnes' }; } catch { return { p: 'dnes' }; } })(), weekErr: null, docToday: null };
   const view = $('#view');
 
   const fmtMin = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}` : `${m} min`);
@@ -31,7 +31,7 @@
   function showLogin(msg) {
     if (S.conn) { S.conn.stop(); S.conn = null; }
     clearInterval(S.statsTimer);
-    S.user = null; S.staff = null; S.today = null; S.todayErr = null; S.week = null; S.weekErr = null;   // po odhlásení nič z predchádzajúceho konta
+    S.user = null; S.staff = null; S.today = null; S.todayErr = null; S.week = null; S.weekErr = null; S.docToday = null; S.nurseWeek = null;   // po odhlásení nič z predchádzajúceho konta
     $('#topbar').hidden = true;
     view.innerHTML = `<section class="card login">
       <img class="login-logo" src="adna-logo.png" alt="AdNa s.r.o.">
@@ -86,7 +86,10 @@
       try { S.today = await api('/api/staff/today-stats'); S.todayErr = null; } catch (e) { if (e.status === 401) return showLogin('Prihlásenie vypršalo. Prihláste sa znova.'); S.todayErr = e.status === 403 ? null : e.message; }
     }
     if (S.user.role === 'admin') {
+      const td = isoDay(new Date());
+      try { S.docToday = await api(`/api/admin/stats?from=${td}&to=${td}&groupBy=doctor`); } catch { S.docToday = null; }
       const { from, to } = periodRange();
+      try { S.nurseWeek = await api(`/api/admin/stats?from=${from}&to=${to}&groupBy=nurse`); } catch { S.nurseWeek = null; }
       try { S.week = await api(`/api/admin/stats?from=${from}&to=${to}&groupBy=doctor`); S.weekErr = null; }
       catch (e) { S.week = null; S.weekErr = e.message; }
     }
@@ -111,6 +114,7 @@
         <div><h1>${esc(fmtDay(st.day))}</h1><p class="hint">Aktualizované ${fmtTime(st.serverTime)} · obnovuje sa samo</p></div>
         ${st.dayEnd ? `<span class="pill pill-dark">Deň ukončený o ${fmtTime(st.dayEnd.at)}</span>` : ''}
       </section>
+      ${(st.autoDone || []).map((a) => `<div class="banner warn" role="alert">⚠ Pacient č. <b>${esc(a.code)}</b>${a.room ? ` (${esc(a.room)})` : ''} bol o ${fmtTime(a.at)} ukončený automaticky – ${esc(a.note || 'zabudnuté ukončenie')}${a.who ? `: <b>${esc(a.who)}</b>` : ''} (od ${fmtTime(a.since)}).</div>`).join('')}
       ${st.announcement ? `<div class="banner info">Oznam na TV: ${esc(st.announcement.text || '')}</div>` : ''}
       <section class="card"><h2>Práve teraz</h2><div class="kpis">
         ${kpi(wn.length, 'čaká na sestru', wn.length ? 'najdlhšie ' + fmtMin(oldest(wn, (t) => t.createdAt)) : '')}
@@ -130,6 +134,7 @@
     window.scrollTo(0, y);
   }
 
+  const pac = (n) => (n === 1 ? 'pacienta' : 'pacientov');
   function renderRooms(st, w, c) {
     const rooms = (st.rooms || []).filter((r) => r.active);
     if (!rooms.length) return '';
@@ -150,9 +155,17 @@
         : atNurse.length || atFinal.length ? '<span class="pill pill-blush">Pacient u sestry</span>' : '<span class="pill pill-ok">Voľná</span>';
       const who = (list, label) => list.map((t) => `<li>Pacient č. <b class="code">${esc(t.code)}</b> – ${label} <span class="hint">od ${fmtTime(t.calledAt)} (${fmtMin(minsSince(t.calledAt))})</span></li>`).join('');
       const people = [st.doctors?.[r.id] && `Lekár: <b>${esc(st.doctors[r.id])}</b>`, st.nurses?.[r.id] && `Sestra: <b>${esc(st.nurses[r.id])}</b>`].filter(Boolean).join(' · ');
+      // koľko pacientov dnes lekár tejto ambulancie vyšetril (správca: podľa lekára, inak podľa ambulancie)
+      const dn = st.doctors?.[r.id];
+      const dRow = S.docToday && dn ? (S.docToday.doctors || []).find((x) => x.doctor === dn) : null;
+      const rRow = !S.docToday && S.today ? (S.today.rooms || []).find((x) => x.name === r.name) : null;
+      const examined = dRow ? `<p class="room-count">Lekár dnes vyšetril: <b>${dRow.patients}</b> ${pac(dRow.patients)}</p>`
+        : S.docToday && dn ? '<p class="room-count">Lekár dnes vyšetril: <b>0</b> pacientov</p>'
+        : rRow ? `<p class="room-count">Dnes v ambulancii: <b>${rRow.patients}</b> ${pac(rRow.patients)}</p>` : '';
       return `<article class="room">
         <div class="room-head"><h3>${esc(r.name)}</h3>${badge}</div>
         ${people ? `<p class="room-people">${people}</p>` : '<p class="room-people hint">Lekár a sestra dnes zatiaľ nezadaní</p>'}
+        ${examined}
         ${C.length ? `<ul class="room-now">${who(atNurse, 'u sestry')}${who(atDoc, 'u lekára')}${who(atFinal, 'na ukončení u sestry')}</ul>` : ''}
         <div class="room-nums">
           <span><b>${wn.length}</b> čaká na sestru</span><span><b>${wd.length}</b> čaká na lekára</span>
@@ -244,15 +257,21 @@
       for (const n of Object.values(S.staff.doctors)) if (n && !rows.some((r) => r.doctor === n)) rows.push({ doctor: n, patients: 0, done: 0, days: 0 });
     }
     const oneDay = from === to;
+    const anyForgot = !!(rows && rows.some((r) => r.forgot));
     const body = S.weekErr ? `<p class="banner warn" role="alert">⚠ Štatistiky sa nepodarilo načítať: ${esc(S.weekErr)}</p>`
       : !rows ? '<p class="hint">Načítavam…</p>'
       : !rows.length ? '<p class="hint">Za toto obdobie nie sú žiadni pacienti.</p>'
       : `<p class="hint">${oneDay ? esc(fmtDay(from)) : `${esc(fmtDay(from))} – ${esc(fmtDay(to))}`} · pacientov spolu: ${d.total.patients}, ukončených: ${d.total.done}</p>
-      <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Ukonč.</th>${oneDay ? '' : '<th class="num">Dní</th>'}<th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Ukonč.</th>${oneDay ? '' : '<th class="num">Dní</th>'}<th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th>${anyForgot ? '<th class="num">Zabudnuté</th>' : ''}</tr></thead><tbody>
       ${rows.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.done ?? '–'}</td>${oneDay ? '' : `<td class="num">${r.days ?? '–'}</td>`}
-        <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDocDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td></tr>`).join('')}
-      </tbody></table></div><p class="hint">Čakanie = priemerné čakanie, Mešk. = oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára. Štatistiky sa počítajú od 23. 11. 2026.</p>`;
-    return `<section class="card" id="lekari"><h2>${title}</h2><div class="chips" role="group" aria-label="Obdobie">${chips}</div>${custom}${body}</section>`;
+        <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDocDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td>${anyForgot ? `<td class="num">${r.forgot ? `<b class="late">⚠ ${r.forgot}</b>` : '0'}</td>` : ''}</tr>`).join('')}
+      </tbody></table></div><p class="hint">Čakanie = priemerné čakanie, Mešk. = oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára. ${anyForgot ? ' Zabudnuté = pacient, ktorého lekár neposlal na ukončenie a server ho ukončil sám po 2 h.' : ''} Štatistiky sa počítajú od 23. 11. 2026.</p>`;
+    // zabudnuté ukončenia (pacient ostal na ukončení u sestry alebo u sestry) – podľa sestier
+    const nf = S.nurseWeek && S.nurseWeek.from === from && S.nurseWeek.to === to ? (S.nurseWeek.doctors || []).filter((r) => r.forgot) : [];
+    const df = rows ? rows.filter((r) => r.forgot) : [];
+    const forgotBox = nf.length || df.length ? `<div class="banner warn" role="status">⚠ <b>Zabudnuté ukončenia</b> (server pacienta ukončil sám po 2 h):
+      ${[...nf.map((r) => `${esc(r.doctor)} ${r.forgot}×`), ...df.map((r) => `${esc(r.doctor)} ${r.forgot}× (neposlal na ukončenie)`)].join(', ')}</div>` : '';
+    return `<section class="card" id="lekari"><h2>${title}</h2><div class="chips" role="group" aria-label="Obdobie">${chips}</div>${custom}${forgotBox}${body}</section>`;
   }
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden && S.user) { loadStats(); render(); } });
