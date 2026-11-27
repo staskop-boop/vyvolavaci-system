@@ -67,6 +67,15 @@ test('štatistiky: sestra a lekár zvlášť (dva kroky), čakanie, meškanie a 
   assert.equal(fet.late15, 1);
   assert.ok(n.data.doctors.some((x) => x.doctor === 'Sestra nebola zadaná'));
 
+  // 2026-11-27 (Pali): časy podľa výkonu (typu pacienta) – podklad na nastavenie dĺžok služieb
+  db.prepare('UPDATE tickets SET patient_type = ? WHERE id = ?').run('Kontrola varixy', a.id);
+  const v = await admin.get(`/api/admin/stats?from=${day}&to=${day}&groupBy=type`);
+  assert.equal(v.status, 200);
+  const kv = v.data.doctors.find((x) => x.doctor === 'Kontrola varixy');
+  assert.equal(kv.patients, 1); assert.equal(kv.avgNurse, 10, 'u sestry 30 → 40'); assert.equal(kv.avgDoctorWait, 15, 'čakanie na lekára 40 → 55');
+  assert.equal(kv.avgDoctor, 20, 'u lekára 55 → 75'); assert.equal(kv.medianNurse, 10); assert.equal(kv.medianDoctor, 20); assert.equal(kv.avgDiff, 20, 'meškanie k sestre');
+  assert.equal(v.data.doctors.find((x) => x.doctor === 'Výkon nezadaný').patients, 3, 'b, c, d bez typu');
+
   assert.equal((await admin.get('/api/admin/stats?from=x&to=y')).status, 400);
 });
 

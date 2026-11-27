@@ -517,6 +517,13 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await shot(A, '25-statistiky-priebezne');
     await A.click('#stats-form [data-range="29"]');
     await A.locator('#live-now').waitFor();   // obdobie po dnešok je tiež priebežné
+    // 2026-11-27 (Pali): časy podľa výkonu – podklad na nové časovanie pacientov
+    await A.click('[data-group=type]');
+    await A.locator('.stats-table th', { hasText: 'Výkon (typ pacienta)' }).waitFor();
+    await A.locator('.stats-table th', { hasText: 'Ø u sestry' }).waitFor();
+    await A.locator('.stats-table th', { hasText: 'Ø u lekára' }).waitFor();
+    await shot(A, '28-statistiky-vykony');
+    await A.click('[data-group=doctor]');
     await A.click('.tab[data-view=queue]');
     ok('štatistiky za dnešok sa obnovujú samy a ukazujú stav „Práve teraz“');
 

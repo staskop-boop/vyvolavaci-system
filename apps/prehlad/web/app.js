@@ -200,7 +200,7 @@
     const pct = t.planned ? Math.round((t.onTime / t.planned) * 100) + ' %' : '–';
     const tile = (v, l) => `<div class="kpi kpi-soft"><b>${v}</b><span>${l}</span></div>`;
     const rows = (d.rooms || []).map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${r.patients}</td><td class="num">${r.done}</td>
-      <td class="num">${fmtMin(r.avgWait)}</td><td class="num">${diffText(r.avgDocDiff ?? r.avgDiff)}</td><td class="num">${fmtMin(r.avgDoctor ?? r.avgExam)}</td></tr>`).join('');
+      <td class="num">${fmtMin(r.avgWait)}</td><td class="num">${diffText(r.avgDiff)}</td><td class="num">${fmtMin(r.avgDoctor ?? r.avgExam)}</td></tr>`).join('');
     return `<section class="card"><h2>Dnes spolu</h2>
       ${t.patients ? `<div class="kpis">
         ${tile(t.patients, 'vyvolaných pacientov')}${tile(t.done, 'ukončených')}
@@ -208,7 +208,7 @@
         ${tile(fmtMin(t.avgNurse), 'priem. čas u sestry')}${tile(fmtMin(t.avgDoctor), 'priem. čas u lekára')}
         ${tile(pct, 'načas k sestre (do 5 min)')}${tile(t.late15 || 0, 'meškanie viac ako 15 min')}
       </div>
-      ${rows ? `<div class="scroll"><table class="tbl"><thead><tr><th>Ambulancia</th><th class="num">Pac.</th><th class="num">Hotovo</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div><p class="hint">Pac. = všetci pacienti ambulancie, aj tí, čo boli len u sestry. Mešk. = priemer oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára.</p>` : ''}`
+      ${rows ? `<div class="scroll"><table class="tbl"><thead><tr><th>Ambulancia</th><th class="num">Pac.</th><th class="num">Hotovo</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div><p class="hint">Pac. = všetci pacienti ambulancie, aj tí, čo boli len u sestry. Mešk. = vstup k sestre oproti termínu (termín = keď sestra vezme pacienta k sebe), U lek. = priemerný čas u lekára.</p>` : ''}`
       : '<p class="hint">Dnes ešte nikto nebol vyvolaný.</p>'}</section>`;
   }
 
@@ -265,8 +265,8 @@
       ${d.nurseOnly && d.nurseOnlyReasons && d.nurseOnlyReasons.length ? `<p class="hint nurse-only">Len u sestry – prečo: ${d.nurseOnlyReasons.map((x) => `${esc(x.reason)} <b>${x.count}</b>`).join(' · ')}</p>` : ''}
       <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Ukonč.</th>${oneDay ? '' : '<th class="num">Dní</th>'}<th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th>${anyForgot ? '<th class="num">Zabudnuté</th>' : ''}</tr></thead><tbody>
       ${rows.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.done ?? '–'}</td>${oneDay ? '' : `<td class="num">${r.days ?? '–'}</td>`}
-        <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDocDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td>${anyForgot ? `<td class="num">${r.forgot ? `<b class="late">⚠ ${r.forgot}</b>` : '0'}</td>` : ''}</tr>`).join('')}
-      </tbody></table></div><p class="hint">Pac. = pacienti, ktorí boli u lekára. Čakanie = priemerné čakanie, Mešk. = oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára. ${anyForgot ? ' Zabudnuté = pacient, ktorého lekár neposlal na ukončenie a server ho ukončil sám po 2 h.' : ''} Štatistiky sa počítajú od 23. 11. 2026.</p>`;
+        <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td>${anyForgot ? `<td class="num">${r.forgot ? `<b class="late">⚠ ${r.forgot}</b>` : '0'}</td>` : ''}</tr>`).join('')}
+      </tbody></table></div><p class="hint">Pac. = pacienti, ktorí boli u lekára. Čakanie = priemerné čakanie, Mešk. = vstup k sestre oproti termínu, U lek. = priemerný čas u lekára. ${anyForgot ? ' Zabudnuté = pacient, ktorého lekár neposlal na ukončenie a server ho ukončil sám po 2 h.' : ''} Štatistiky sa počítajú od 23. 11. 2026.</p>`;
     // zabudnuté ukončenia (pacient ostal na ukončení u sestry alebo u sestry) – podľa sestier
     const nf = S.nurseWeek && S.nurseWeek.from === from && S.nurseWeek.to === to ? (S.nurseWeek.doctors || []).filter((r) => r.forgot) : [];
     const df = rows ? rows.filter((r) => r.forgot) : [];

@@ -205,7 +205,7 @@ function createServer(opts = {}) {
     throw new AppError(403, 'FORBIDDEN', 'Prehľad je pre osobné konto lekára alebo sestry.');
   });
   app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(store.doctorStats(String(req.query.from || ''), String(req.query.to || ''),
-    ['doctor', 'nurse', 'room'].includes(req.query.groupBy) ? req.query.groupBy : 'doctor')));
+    ['doctor', 'nurse', 'room', 'type'].includes(req.query.groupBy) ? req.query.groupBy : 'doctor')));
   // Záloha databázy na stiahnutie (len správca) – používa sa pri presune na iný server (deploy/lokalny/prenos-udajov.sh).
   app.get('/api/admin/backup', requireAdmin, (req, res, next) => {
     const tmp = path.join(config.dataDir, `prenos-${Date.now().toString(36)}.db`);
