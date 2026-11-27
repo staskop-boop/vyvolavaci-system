@@ -32,7 +32,7 @@ test('ambulancia pacienta: výber, zmena, zrušenie', async (t) => {
     assert.equal(r.data.ticket.code, '5');
     r = await admin.post(`/api/staff/tickets/${t5.id}/room`, { roomId: 99999 });
     assert.equal(r.status, 400, 'neplatná ambulancia');
-    await admin.post(`/api/staff/tickets/${t5.id}/done`, {});
+    await admin.post(`/api/staff/tickets/${t5.id}/done`, { reason: 'len-sestra' });
     r = await admin.post(`/api/staff/tickets/${t5.id}/room`, { roomId: a2.id });
     assert.equal(r.status, 409, 'ukončeného nemožno presunúť');
     const day = (await admin.get('/api/staff/state')).data.day;

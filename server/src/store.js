@@ -102,6 +102,27 @@ const PATIENT_TYPES = [
   'Vstup', 'Vstup hemoroidy', 'Kontrola hemoroidy', 'Pooperačná kontrola hemoroidy',
 ];
 
+/**
+ * 2026-11-27 (Pali): keď sestra ukončí pacienta, ktorý nebol u lekára, musí vybrať dôvod.
+ * V udalosti „done“ sa ukladá id (note), pri „ine“ aj text („ine: …“). Poradie = poradie v ponuke.
+ */
+const DONE_REASONS = [
+  { id: 'zabudla', label: 'Zabudla prekliknúť k lekárovi', hint: 'pacient u lekára bol' },
+  { id: 'omyl', label: 'Omyl', hint: 'zlé tlačidlo alebo iný pacient' },
+  { id: 'len-sestra', label: 'Prišiel len k sestre', hint: 'odber, preväz, recept, papiere' },
+  { id: 'odisiel', label: 'Pacient odišiel bez lekára', hint: 'nechcel čakať, prišlo mu zle…' },
+  { id: 'lekar-netreba', label: 'Lekár ho nepotreboval vidieť', hint: 'rozhodol lekár' },
+  { id: 'ine', label: 'Iný dôvod', hint: 'napíšte, aký' },
+];
+const doneReasonLabel = (note) => {
+  if (!note) return null;
+  const [id, ...rest] = String(note).split(':');
+  const r = DONE_REASONS.find((x) => x.id === id.trim());
+  if (!r) return null;
+  const txt = rest.join(':').trim();
+  return r.id === 'ine' && txt ? `${r.label}: ${txt}` : r.label;
+};
+
 class Store extends EventEmitter {
   constructor(db) {
     super();
@@ -474,13 +495,15 @@ class Store extends EventEmitter {
       homeRoomId: t.home_room_id ?? null, homeRoomName: t.home_room_name ?? null,
       stage: t.stage || 'nurse', toDoctorAt: t.to_doctor_at ?? null, finalAt: t.final_at ?? null,
       nurseCalledAt: t.nurse_called_at ?? null, // 2026-11-18: kedy pacienta (prvýkrát) vyvolala sestra – zobrazuje sa v rade k lekárovi
+      wasAtDoctor: t.was_at_doctor == null ? this.wasAtDoctor(t.id) : !!t.was_at_doctor, // 2026-11-27: ukončenie bez lekára vyžaduje dôvod
       print: { status: t.print_status, message: t.print_message, attempts: t.print_attempts, printedAt: t.printed_at },
     };
     if (withNote) { out.staffNote = t.staff_note ?? null; out.patientType = t.patient_type ?? null; }
     return out;
   }
   getTicketRow(id) {
-    return this.db.prepare(`SELECT t.*, r.name AS room_name, h.name AS home_room_name, (SELECT MIN(e.at) FROM ticket_events e WHERE e.ticket_id = t.id AND e.type = 'call' AND (e.stage = 'nurse' OR e.stage IS NULL)) AS nurse_called_at FROM tickets t LEFT JOIN rooms r ON r.id = t.room_id LEFT JOIN rooms h ON h.id = t.home_room_id WHERE t.id = ?`).get(Number(id));
+    return this.db.prepare(`SELECT t.*, r.name AS room_name, h.name AS home_room_name, (SELECT MIN(e.at) FROM ticket_events e WHERE e.ticket_id = t.id AND e.type = 'call' AND (e.stage = 'nurse' OR e.stage IS NULL)) AS nurse_called_at, EXISTS (SELECT 1 FROM ticket_events e WHERE e.ticket_id = t.id AND ((e.type IN ('call','recall') AND e.stage = 'doctor')
+      OR (e.type = 'to_doctor' AND e.note = 'priamo') OR e.type = 'to_final')) AS was_at_doctor FROM tickets t LEFT JOIN rooms r ON r.id = t.room_id LEFT JOIN rooms h ON h.id = t.home_room_id WHERE t.id = ?`).get(Number(id));
   }
   getTicket(id, withNote = false) { return this.rowToTicket(this.getTicketRow(id), withNote); }
 
@@ -998,7 +1021,33 @@ class Store extends EventEmitter {
     this.changed('tickets');
     return { ticket: this.getTicket(id) };
   }
-  done(id, userId) { return this.transition(id, 'done', ['waiting', 'called'], userId, 'done'); }
+  /** Bol pacient (dnes, toto číslo) u lekára? – vyvolanie lekárom, poslanie priamo k lekárovi alebo od lekára na ukončenie. */
+  wasAtDoctor(ticketId) {
+    return !!this.db.prepare(`SELECT 1 FROM ticket_events WHERE ticket_id = ? AND ((type IN ('call','recall') AND stage = 'doctor')
+      OR (type = 'to_doctor' AND note = 'priamo') OR type = 'to_final') LIMIT 1`).get(ticketId);
+  }
+
+  /**
+   * Ukončenie pacienta. 2026-11-27 (Pali): ak pacient nebol u lekára, je povinný dôvod (reason = id z DONE_REASONS,
+   * pri „ine“ aj reasonText). Dôvod sa uloží do udalosti spolu s menom sestry/lekára ambulancie.
+   */
+  done(id, userId, reason, reasonText) {
+    const row = this.getTicketRow(id);
+    if (!['waiting', 'called'].includes(row.status) || row.stage === 'final' || this.wasAtDoctor(row.id)) return this.transition(id, 'done', ['waiting', 'called'], userId, 'done');
+    const r = DONE_REASONS.find((x) => x.id === reason);
+    if (!r) throw bad(`Pacient ${row.code} nebol u lekára – vyberte, prečo ho ukončujete.`);
+    let note = r.id;
+    if (r.id === 'ine') note = 'ine: ' + str(String(reasonText || ''), 200, 'Dôvod');
+    const res = this.transition(id, 'done', ['waiting', 'called'], userId, 'done');
+    // transition zapísal udalosť bez dôvodu – doplníme dôvod, krok a mená (sestra/lekár ambulancie)
+    const ev = this.db.prepare("SELECT id, room_id FROM ticket_events WHERE ticket_id = ? AND type = 'done' ORDER BY id DESC LIMIT 1").get(row.id);
+    const a = this.actorNames(userId);
+    const room = ev.room_id;
+    this.db.prepare('UPDATE ticket_events SET note = ?, stage = ?, nurse = ?, doctor = ? WHERE id = ?').run(note, row.stage,
+      a.nurse || (room != null && this.nursesToday()[room]) || null, a.doctor || (room != null && this.doctorsToday()[room]) || null, ev.id);
+    log.info('Ukončený bez lekára', { code: row.code, reason: note });
+    return res;
+  }
   absent(id, userId) { return this.transition(id, 'absent', ['waiting', 'called'], userId, 'absent'); }
   requeue(id, userId) { return this.transition(id, 'waiting', ['called', 'absent', 'done'], userId, 'requeue'); }
 
@@ -1151,6 +1200,7 @@ class Store extends EventEmitter {
       day, serverTime: clock.nowIso(),
       tickets: this.listTickets(day, withNote),
       patientTypes: PATIENT_TYPES,
+      doneReasons: DONE_REASONS,
       counts: this.counts(day),
       rooms: this.listRooms(),
       settings: s,
@@ -1203,6 +1253,10 @@ class Store extends EventEmitter {
       WHERE day BETWEEN ? AND ? AND call_count > 0`).all(from, to);
     const evs = this.db.prepare(`SELECT e.ticket_id, e.type, e.at, e.doctor, e.nurse, e.stage, e.note, r.name AS room FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
       LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse','to_final','final_back','auto_done') ORDER BY e.id`).all(from, to);
+    // dôvod ukončenia bez lekára (posledné ukončenie čísla)
+    const reasonOf = new Map();
+    for (const e of this.db.prepare(`SELECT e.ticket_id, e.note FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
+      WHERE t.day BETWEEN ? AND ? AND e.type = 'done' ORDER BY e.id`).all(from, to)) reasonOf.set(e.ticket_id, e.note);
     const byT = new Map();
     for (const e of evs) {
       const x = byT.get(e.ticket_id) || { first: null, lastCall: null, doctor: null, nurse: null, room: null, twoStep: false,
@@ -1248,13 +1302,22 @@ class Store extends EventEmitter {
     const ok = (m) => m >= 0 && m < 8 * 60;
     const all = g('__spolu__');
     let nurseOnly = 0;
+    const nurseOnlyReasons = {};
     for (let t of tickets) {
       const x = byT.get(t.id);
       if (!x || !x.first) continue;
       const two = x.twoStep;
       // v štatistike lekára sú len pacienti, ktorí k nemu prišli (pri dvoch krokoch); v štatistike sestier len dvojkrokové návštevy
       // pacient ukončený len u sestry (k lekárovi neišiel) sa lekárovi nepočíta – ale počet sa vráti, aby súčty sedeli s ambulanciami
-      if (groupBy === 'doctor' && two && !x.doctorStart) { if (!keyMap) nurseOnly++; continue; }
+      if (groupBy === 'doctor' && two && !x.doctorStart) {
+        if (!keyMap) {
+          nurseOnly++;
+          const why = x.auto ? 'Zabudnuté ukončenie (automaticky)' : t.status === 'absent' ? 'Neprítomný' : t.status === 'done'
+            ? doneReasonLabel(reasonOf.get(t.id)) || 'Dôvod nezadaný (pred 27. 11.)' : 'Ešte neukončený';
+          nurseOnlyReasons[why] = (nurseOnlyReasons[why] || 0) + 1;
+        }
+        continue;
+      }
       if (groupBy === 'nurse' && !(two && x.nurseCall)) continue;
       let key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
       if (keyMap) { key = keyMap(key, UNKNOWN); if (key == null) continue; }   // napr. „ja“ / „ostatní spolu“
@@ -1313,7 +1376,7 @@ class Store extends EventEmitter {
       .sort((a, b) => (a.doctor === UNKNOWN) - (b.doctor === UNKNOWN) || b.patients - a.patients || a.doctor.localeCompare(b.doctor, 'sk'));
     const since = this.db.prepare("SELECT MIN(t.day) AS d FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.doctor IS NOT NULL").get();
     const twoSince = this.db.prepare("SELECT MIN(t.day) AS d FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.stage IS NOT NULL").get();
-    return { from, to, groupBy, doctors, total: out(all), nurseOnly, doctorDataSince: since?.d || null, twoStepSince: twoSince?.d || null };
+    return { from, to, groupBy, doctors, total: out(all), nurseOnly, nurseOnlyReasons: Object.entries(nurseOnlyReasons).sort((a, b) => b[1] - a[1]).map(([reason, count]) => ({ reason, count })), doctorDataSince: since?.d || null, twoStepSince: twoSince?.d || null };
   }
 
   /** Dnešný prehľad pre sestry: celé zariadenie a jednotlivé ambulancie (bez mien lekárov a bez histórie). */
@@ -1426,4 +1489,4 @@ class Store extends EventEmitter {
 
 const AUTO_FINISH_MIN = 120;   // po koľkých minútach bez ďalšieho kroku sa pacient ukončí sám
 
-module.exports = { AUTO_FINISH_MIN, Store, AppError, DEFAULT_SETTINGS, STATUS_TEXT, PATIENT_TYPES };
+module.exports = { AUTO_FINISH_MIN, Store, AppError, DEFAULT_SETTINGS, STATUS_TEXT, PATIENT_TYPES, DONE_REASONS, doneReasonLabel };

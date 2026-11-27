@@ -107,7 +107,7 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
     const t4 = st.tickets.find((t) => t.code === '4');
     const t7 = st.tickets.find((t) => t.code === '7');
     const t15 = st.tickets.find((t) => t.code === '15');
-    await api('POST', `/api/staff/tickets/${t7.id}/done`, {}).catch(() => {});
+    await api('POST', `/api/staff/tickets/${t7.id}/done`, { reason: 'omyl' }).catch(() => {});
     await api('POST', `/api/staff/tickets/${t7.id}/absent`, {}).catch(() => {});
     await api('POST', `/api/staff/tickets/${t15.id}/absent`, {});
     await api('POST', `/api/staff/tickets/${t4.id}/call`, { roomId: rooms[0].id });
@@ -125,7 +125,7 @@ const hm = (minFromNow) => new Intl.DateTimeFormat('sk-SK', { timeZone: 'Europe/
   await step('po „vybavený“ zmizne číslo z „Práve vyšetrujeme“', async () => {
     const st = await api('GET', '/api/staff/state');
     const t4 = st.tickets.find((t) => t.code === '4');
-    await api('POST', `/api/staff/tickets/${t4.id}/done`, {});
+    await api('POST', `/api/staff/tickets/${t4.id}/done`, { reason: 'len-sestra' });
     const row = page.locator(`#roomRows .room[data-room="${rooms[0].id}"]`);
     await row.locator('.tile.empty').waitFor({ timeout: 8000 });
     assert.equal(await row.locator('.tile').innerText(), '–');

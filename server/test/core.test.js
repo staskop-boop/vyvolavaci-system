@@ -63,7 +63,7 @@ test('vyvolanie, zopakovanie, ukončený, neprítomný, vrátenie medzi čakajú
   assert.equal(d.current.code, w.code);
   const r = await staff.post(`/api/staff/tickets/${w.id}/recall`, {});
   assert.equal(r.data.call.repeat, true); assert.equal(r.data.ticket.callCount, 2);
-  assert.equal((await staff.post(`/api/staff/tickets/${w.id}/done`, {})).data.ticket.status, 'done');
+  assert.equal((await staff.post(`/api/staff/tickets/${w.id}/done`, { reason: 'omyl' })).data.ticket.status, 'done');
   assert.equal((await staff.post(`/api/staff/tickets/${w.id}/recall`, {})).status, 409);
   assert.equal((await staff.post(`/api/staff/tickets/${w.id}/requeue`, {})).data.ticket.status, 'waiting');
   assert.equal((await staff.post(`/api/staff/tickets/${w.id}/absent`, {})).data.ticket.status, 'absent');

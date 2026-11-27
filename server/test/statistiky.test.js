@@ -74,7 +74,7 @@ test('staršie záznamy bez kroku sa počítajú ako doteraz (všetko lekárovi)
   const st = (await admin.get('/api/staff/state')).data;
   const e = await reg();
   await admin.post(`/api/staff/tickets/${e.id}/call`, { roomId: st.rooms[0].id });
-  await admin.post(`/api/staff/tickets/${e.id}/done`);
+  await admin.post(`/api/staff/tickets/${e.id}/done`, { reason: 'len-sestra' });
   const db = s.store.db;
   db.prepare("UPDATE ticket_events SET stage = NULL, nurse = NULL, doctor = 'MUDr. Starý Záznam' WHERE ticket_id = ?").run(e.id);
   const r = await admin.get(`/api/admin/stats?from=${st.day}&to=${st.day}`);
