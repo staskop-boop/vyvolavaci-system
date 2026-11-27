@@ -95,7 +95,7 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
       assert.match(t, /Ambulancie/);
       assert.match(t, /MUDr\. Kováč/);
       assert.match(t, /Bc\. Nováková/);
-      assert.match(t, /K1\s*u lekára/);
+      assert.match(t, /Pacient č\. K1 – u lekára/);
       assert.match(t, /Čakáreň/);
       assert.match(t, /K2/);
     });
@@ -104,15 +104,32 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
     });
     await step('Dnešné štatistiky a týždeň pre správcu', async () => {
       await page.waitForSelector('text=Dnes spolu');
-      await page.waitForSelector('text=Tento týždeň podľa lekárov');
+      await page.waitForSelector('text=Lekári dnes');
+      await page.waitForFunction(() => /Lekári dnes[\s\S]*MUDr\. Kováč/.test(document.querySelector('#lekari')?.innerText || ''), null, { timeout: 5000 });
       await page.waitForSelector('a[href="/sestra/"]');
       await shot(page, 'prehlad-2-stav.png');
+    });
+    await step('Lekári za obdobie: Týždeň, Mesiac, Od – do', async () => {
+      await page.click('[data-period="tyzden"]');
+      await page.waitForSelector('text=Lekári tento týždeň');
+      await page.waitForFunction(() => /pacientov spolu/.test(document.querySelector('#lekari').innerText), null, { timeout: 5000 });
+      await page.click('[data-period="mesiac"]');
+      await page.waitForSelector('text=Lekári tento mesiac');
+      await page.click('[data-period="vlastne"]');
+      await page.waitForSelector('#lekari input[data-od]');
+      assert.equal(await page.inputValue('#lekari input[data-do]'), await page.evaluate(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bratislava' }).format(new Date())));
+      await page.evaluate(() => document.getElementById('lekari').scrollIntoView());
+      await shot(page, 'prehlad-4-lekari-obdobie.png');
+      // výber sa pamätá aj po obnovení stránky
+      await page.reload(); await page.waitForSelector('#lekari input[data-od]');
+      await page.click('[data-period="dnes"]');
+      await page.waitForSelector('text=Lekári dnes');
     });
     await step('Zmena v ambulancii sa prejaví sama (bez obnovenia)', async () => {
       const s = await admin('/api/staff/state');
       const k2 = s.tickets.find((t) => t.code === 'K2');
       await admin(`/api/staff/tickets/${k2.id}/call`, { roomId: s.rooms[1].id });
-      await page.waitForFunction(() => /K2\s*u sestry/.test(document.querySelector('main').innerText), null, { timeout: 5000 });
+      await page.waitForFunction(() => /Pacient č\. K2 – u sestry/.test(document.querySelector('main').innerText), null, { timeout: 5000 });
     });
     await step('Pri výpadku servera upozornenie s ⚠', async () => {
       await new Promise((r) => { server.once('exit', r); server.kill('SIGKILL'); });
@@ -131,7 +148,7 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
       await page.waitForSelector('text=Práve teraz');
       await page.waitForTimeout(800);
       const t = await page.textContent('main');
-      assert.ok(!/Dnes spolu/.test(t) && !/Tento týždeň/.test(t));
+      assert.ok(!/Dnes spolu/.test(t) && !/Lekári dnes|Lekári tento/.test(t));
       assert.equal(await page.textContent('#brand-sub'), 'MUDr. Kováč');
     });
     await step('Bez JavaScriptových chýb', async () => { assert.deepEqual(errors, []); });

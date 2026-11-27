@@ -111,3 +111,15 @@ main > * + * { margin-top: 12px; }
 .tbl td { padding: 8px 6px; border-bottom: 1px solid #f1e6e6; vertical-align: top; }
 .tbl .num { text-align: right; white-space: nowrap; }
 .foot { text-align: center; }
+
+/* výber obdobia – tabuľka lekárov */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.chip { border: 1.5px solid var(--adna-border); background: #fff; color: var(--black); border-radius: 999px; padding: 8px 14px;
+  font: inherit; font-size: 15px; font-weight: 700; min-height: 40px; cursor: pointer; }
+.chip-on { background: var(--red); border-color: var(--red); color: #fff; }
+.chip:focus-visible { outline: 3px solid var(--black); outline-offset: 2px; }
+.range { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.range label { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.range input { font: inherit; padding: 8px 10px; border: 1.5px solid var(--adna-border); border-radius: 10px; min-height: 40px; }
+.room-count { margin: 2px 0 8px; font-size: 16px; }
+.room-count b { font-family: var(--font-display); font-size: 20px; color: var(--black); }

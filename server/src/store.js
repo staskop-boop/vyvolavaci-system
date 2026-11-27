@@ -1161,6 +1161,7 @@ class Store extends EventEmitter {
       dayEnd: this.dayEnd(),
       printer: { enabled: s.printer.enabled, lastStatus: lp.status, lastMessage: lp.message, lastCheckedAt: lp.checkedAt },
       previousDayOpen: prev ? { day: prev.day, count: prev.n } : null,
+      autoDone: this.autoDoneToday(day),
     };
   }
 
@@ -1201,11 +1202,16 @@ class Store extends EventEmitter {
     const tickets = this.db.prepare(`SELECT id, day, status, created_at, planned_at, finished_at, to_doctor_at FROM tickets
       WHERE day BETWEEN ? AND ? AND call_count > 0`).all(from, to);
     const evs = this.db.prepare(`SELECT e.ticket_id, e.type, e.at, e.doctor, e.nurse, e.stage, e.note, r.name AS room FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id
-      LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse','to_final','final_back') ORDER BY e.id`).all(from, to);
+      LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day BETWEEN ? AND ? AND e.type IN ('call','recall','to_doctor','to_nurse','to_final','final_back','auto_done') ORDER BY e.id`).all(from, to);
     const byT = new Map();
     for (const e of evs) {
       const x = byT.get(e.ticket_id) || { first: null, lastCall: null, doctor: null, nurse: null, room: null, twoStep: false,
         nurseCall: null, sent: null, direct: false, doctorStart: null, final: null };
+      if (e.type === 'auto_done') {
+        // zabudnuté ukončenie – kto ho mal ukončiť (sestra pri ukončení/u sestry, lekár keď ho neposlal ďalej)
+        x.auto = { stage: e.stage, doctor: e.doctor, nurse: e.nurse };
+        byT.set(e.ticket_id, x); continue;
+      }
       if (e.stage) x.twoStep = true;
       if (e.type === 'to_final') {
         x.final = e.at;   // lekár skončil, pacient ide k sestre na ukončenie – čas u lekára sa počíta potiaľto
@@ -1235,13 +1241,13 @@ class Store extends EventEmitter {
     const groups = new Map();
     const g = (name) => {
       if (!groups.has(name)) groups.set(name, { doctor: name, patients: 0, done: 0, absent: 0, open: 0, days: new Set(), rooms: new Set(),
-        waits: [], delays: [], docDelays: [], docLate15: 0, exams: [], onTime: 0, late15: 0, nurseTimes: [], doctorWaits: [], doctorTimes: [], direct: 0, toDoctor: 0 });
+        waits: [], delays: [], docDelays: [], docLate15: 0, exams: [], forgot: 0, onTime: 0, late15: 0, nurseTimes: [], doctorWaits: [], doctorTimes: [], direct: 0, toDoctor: 0 });
       return groups.get(name);
     };
     const min = (a, b) => (Date.parse(a) - Date.parse(b)) / 60000;
     const ok = (m) => m >= 0 && m < 8 * 60;
     const all = g('__spolu__');
-    for (const t of tickets) {
+    for (let t of tickets) {
       const x = byT.get(t.id);
       if (!x || !x.first) continue;
       const two = x.twoStep;
@@ -1251,9 +1257,15 @@ class Store extends EventEmitter {
       let key = groupBy === 'room' ? x.room || 'Neznáma ambulancia' : groupBy === 'nurse' ? x.nurse || UNKNOWN : x.doctor || UNKNOWN;
       if (keyMap) { key = keyMap(key, UNKNOWN); if (key == null) continue; }   // napr. „ja“ / „ostatní spolu“
       const visitStart = two ? x.nurseCall || x.first : x.first;   // vstup do ambulancie (k sestre)
+      // automaticky ukončený pacient: ráta sa ako ukončený, ale časy (u sestry, u lekára) sa z neho nepočítajú
+      const tReal = t;
+      if (x.auto) t = { ...t, status: 'auto', finished_at: null };
+      // zabudnuté ukončenie patrí tomu, kto ho mal urobiť: lekárovi (krok u lekára), inak sestre
+      const forgot = x.auto && (groupBy === 'room' || (groupBy === 'doctor' ? x.auto.stage === 'doctor' : x.auto.stage !== 'doctor'));
       for (const s of [g(key), all]) {
         s.patients++;
-        if (t.status === 'done') s.done++; else if (t.status === 'absent') s.absent++; else s.open++;
+        if (tReal.status === 'done') s.done++; else if (tReal.status === 'absent') s.absent++; else s.open++;
+        if (forgot) s.forgot++;
         s.days.add(t.day); if (x.room) s.rooms.add(x.room);
         // čas u sestry, čakanie na lekára a čas u lekára (pri dvoch krokoch)
         if (two && x.nurseCall) { const nt = min(x.sent || (t.status === 'done' ? t.finished_at : null) || x.nurseCall, x.nurseCall); if (ok(nt) && (x.sent || t.status === 'done')) s.nurseTimes.push(nt); }
@@ -1294,7 +1306,7 @@ class Store extends EventEmitter {
       onTime: s.onTime, late15: s.late15,
       docPlanned: s.docDelays.length, avgDocDiff: avg(s.docDelays), maxDocDelay: s.docDelays.length ? Math.round(Math.max(0, ...s.docDelays)) : null, docLate15: s.docLate15,
       avgExam: avg(s.exams), medianExam: median(s.exams),
-      avgNurse: avg(s.nurseTimes), avgDoctorWait: avg(s.doctorWaits), avgDoctor: avg(s.doctorTimes), toDoctor: s.toDoctor, direct: s.direct });
+      avgNurse: avg(s.nurseTimes), avgDoctorWait: avg(s.doctorWaits), avgDoctor: avg(s.doctorTimes), toDoctor: s.toDoctor, direct: s.direct, forgot: s.forgot });
     const doctors = [...groups.values()].filter((s) => s !== all).map(out)
       .sort((a, b) => (a.doctor === UNKNOWN) - (b.doctor === UNKNOWN) || b.patients - a.patients || a.doctor.localeCompare(b.doctor, 'sk'));
     const since = this.db.prepare("SELECT MIN(t.day) AS d FROM ticket_events e JOIN tickets t ON t.id = e.ticket_id WHERE e.doctor IS NOT NULL").get();
@@ -1355,7 +1367,49 @@ class Store extends EventEmitter {
   }
 
   /** Kontrola zmeny dňa (volá sa periodicky). */
+  /**
+   * 2026-11-27 (Pali): keď niekto zabudne pacienta ukončiť, po 2 hodinách od posledného kroku ho server ukončí sám.
+   * Zapíše udalosť auto_done s krokom (u sestry / u lekára / na ukončení) a menom toho, kto mal pacienta ukončiť –
+   * sestra a správca dostanú upozornenie a v štatistikách sa to ráta ako „zabudnuté ukončenie“. Časy návštevy sa z toho nerátajú.
+   */
+  autoFinish(nowIso = clock.nowIso()) {
+    const day = clock.today();
+    const limit = new Date(Date.parse(nowIso) - AUTO_FINISH_MIN * 60000).toISOString();
+    const rows = this.db.prepare(`SELECT id, code, room_id, stage, called_at, final_at FROM tickets WHERE day = ? AND status = 'called'
+      AND COALESCE(CASE WHEN stage = 'final' THEN final_at END, called_at) <= ?`).all(day, limit);
+    if (!rows.length) return [];
+    const done = [];
+    tx(this.db, () => {
+      for (const r of rows) {
+        const stage = r.stage || 'nurse';
+        const since = (stage === 'final' && r.final_at) || r.called_at;
+        const u = this.db.prepare("UPDATE tickets SET status = 'done', finished_at = ?, version = version + 1 WHERE id = ? AND status = 'called'").run(nowIso, r.id);
+        if (!u.changes) continue;
+        const note = stage === 'final' ? 'zabudnuté ukončenie u sestry' : stage === 'doctor' ? 'lekár neposlal na ukončenie' : 'sestra neposlala ďalej';
+        // posledný, kto s pacientom pracoval v tomto kroku (z udalostí), inak kto je dnes zadaný pri ambulancii
+        const last = this.db.prepare(`SELECT doctor, nurse FROM ticket_events WHERE ticket_id = ? AND type IN ('call','recall','to_final','to_doctor')
+          ORDER BY id DESC LIMIT 1`).get(r.id) || {};
+        const doctor = last.doctor || (r.room_id != null && this.doctorsToday()[r.room_id]) || null;
+        const nurse = last.nurse || (r.room_id != null && this.nursesToday()[r.room_id]) || null;
+        this.db.prepare(`INSERT INTO ticket_events (ticket_id, type, at, room_id, user_id, note, doctor, nurse, stage) VALUES (?, 'auto_done', ?, ?, NULL, ?, ?, ?, ?)`)
+          .run(r.id, nowIso, r.room_id, note, doctor, nurse, stage);
+        done.push({ code: r.code, stage, since });
+      }
+    });
+    if (done.length) { log.warn('Automaticky ukončení pacienti (zabudnuté ukončenie)', { count: done.length, codes: done.map((d) => d.code) }); this.changed('tickets'); }
+    return done;
+  }
+
+  /** Dnešné automatické ukončenia – upozornenie pre sestru a správcu (kto zabudol ukončiť). */
+  autoDoneToday(day = clock.today()) {
+    return this.db.prepare(`SELECT e.at, e.stage, e.doctor, e.nurse, e.note, t.code, t.called_at, t.final_at, r.name AS room FROM ticket_events e
+      JOIN tickets t ON t.id = e.ticket_id LEFT JOIN rooms r ON r.id = e.room_id WHERE t.day = ? AND e.type = 'auto_done' ORDER BY e.id`).all(day)
+      .map((e) => ({ code: e.code, room: e.room, stage: e.stage, at: e.at, since: (e.stage === 'final' && e.final_at) || e.called_at,
+        who: e.stage === 'doctor' ? e.doctor : e.nurse, note: e.note }));
+  }
+
   tick() {
+    try { this.autoFinish(); } catch (e) { log.warn('Automatické ukončenie zlyhalo', { error: e.message }); }
     const d = clock.today();
     if (d !== this.currentDay) {
       log.info('Nový deň', { from: this.currentDay, to: d });
@@ -1368,4 +1422,6 @@ class Store extends EventEmitter {
   changed(kind) { this.rev++; this.emit('change', kind); }
 }
 
-module.exports = { Store, AppError, DEFAULT_SETTINGS, STATUS_TEXT, PATIENT_TYPES };
+const AUTO_FINISH_MIN = 120;   // po koľkých minútach bez ďalšieho kroku sa pacient ukončí sám
+
+module.exports = { AUTO_FINISH_MIN, Store, AppError, DEFAULT_SETTINGS, STATUS_TEXT, PATIENT_TYPES };

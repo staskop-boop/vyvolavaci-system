@@ -493,6 +493,12 @@
         <b>Lístok ${esc(t.code)}: ${esc(PRINT_TEXT[t.print.status])}.</b> ${esc(t.print.message || '')}</div>
         <button class="btn btn-sm needs-online" data-act="reprint" data-id="${t.id}" ${dis}>Znovu vytlačiť lístok</button></div>`);
     }
+    // 2026-11-27 (Pali): server ukončil zabudnutého pacienta sám po 2 h – upozornenie, kto ho zabudol ukončiť
+    for (const a of st.autoDone || []) {
+      if (S.user.doctorName && a.stage !== 'doctor') continue;   // lekárovi len jeho vlastné
+      alerts.push(`<div class="alert alert-warn" role="alert"><div class="grow"><b>Pacient ${esc(a.code)}${a.room ? ` (${esc(a.room)})` : ''} bol o ${esc(fmtTime(a.at))} ukončený automaticky</b> –
+        ${esc(a.note || 'zabudnuté ukončenie')}${a.who ? `: <b>${esc(a.who)}</b>` : ''} (bez ďalšieho kroku od ${esc(fmtTime(a.since))}). Ráta sa to do štatistiky „Zabudnuté ukončenie“.</div></div>`);
+    }
     if (st.dayEnd) alerts.push(`<div class="alert alert-info day-end" role="status"><div class="grow"><b>🏁 Deň je ukončený (od ${esc(fmtTime(st.dayEnd.at))}).</b>
       Tablet už nevydáva poradové čísla a obrazovka v čakárni oznamuje, že dnes už nových pacientov neprijímame. Čakajúcich ešte môžete vyvolať.</div>
       ${nurse ? `<button class="btn btn-sm needs-online" data-act="day-reopen" ${dis}>Obnoviť príjem</button>` : ''}</div>`);
@@ -819,8 +825,18 @@
   /** 2026-11-17 (Pali): „Ukončiť deň“ – dnes už nových pacientov neprijímame (tablet nevydáva čísla, TV ukáže oznam). */
   async function endDay() {
     const w = S.staff.counts.waiting;
-    const ok = await confirmDialog('Ukončiť deň?', `Tablet prestane vydávať poradové čísla a obrazovka v čakárni oznámi, že dnes už nových pacientov neprijímame.
-      ${w ? `Čakajúcich pacientov (${w}) môžete ešte normálne vyvolať.` : 'Nikto nečaká – TV ukáže „Dnes už neordinujeme“.'} Príjem sa dá kedykoľvek obnoviť, zajtra sa začne sám.`, 'Ukončiť deň');
+    const text = `Tablet prestane vydávať poradové čísla a obrazovka v čakárni oznámi, že dnes už nových pacientov neprijímame.
+      ${w ? `Čakajúcich pacientov (${w}) môžete ešte normálne vyvolať.` : 'Nikto nečaká – TV ukáže „Dnes už neordinujeme“.'} Príjem sa dá kedykoľvek obnoviť, zajtra sa začne sám.`;
+    // 2026-11-27 (Pali): keď pri ukončení dňa visí neukončený pacient, upozorniť na to
+    const STAGE_TXT = { nurse: 'u sestry', doctor: 'u lekára', final: 'na ukončení u sestry' };
+    const open = S.staff.tickets.filter((t) => t.status === 'called');
+    const ok = open.length
+      ? await modal({ title: 'Ukončiť deň?', okText: 'Aj tak ukončiť deň', okClass: 'btn-primary', body: `
+        <div class="alert alert-warn day-end-open" role="alert"><div class="grow"><b>Neukončení pacienti (${open.length}):</b>
+          <ul>${open.map((t) => `<li><b>${esc(t.code)}</b> – ${esc(roomName(t.roomId) || '')} ${esc(STAGE_TXT[t.stage || 'nurse'] || '')} od ${esc(fmtTime(t.stage === 'final' && t.finalAt ? t.finalAt : t.calledAt))}</li>`).join('')}</ul>
+          Ukončite ich tlačidlom <b>Ukončený</b>. Inak ich server po 2 hodinách ukončí sám a zaráta sa to ako zabudnuté ukončenie.</div></div>
+        <p>${esc(text)}</p>` })
+      : await confirmDialog('Ukončiť deň?', text, 'Ukončiť deň');
     if (!ok) return;
     const r = await act(() => api('/api/staff/day-end', { body: { ended: true } }), 'Deň je ukončený – nové čísla sa už nevydávajú.');
     if (r) celebrate();
@@ -1126,7 +1142,7 @@
 
   // ---------- história ----------
   const EV_TEXT = { created: 'Registrácia', planned: 'Plánovaný čas', call: 'Vyvolanie', recall: 'Zopakované vyvolanie', done: 'Ukončený', absent: 'Neprítomný',
-    requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', to_nurse: 'Vrátený do radu k sestre', to_final: 'Od lekára k sestre na ukončenie', final_back: 'Z ukončenia späť k lekárovi', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', display_cleared: 'Vyčistenie obrazovky' };
+    requeue: 'Vrátený medzi čakajúcich', to_doctor: 'Poslaný k lekárovi', to_nurse: 'Vrátený do radu k sestre', to_final: 'Od lekára k sestre na ukončenie', final_back: 'Z ukončenia späť k lekárovi', moved: 'Zmena ambulancie', edited: 'Zmena čísla', print: 'Tlač lístka', reprint: 'Opakovaná tlač', day_closed: 'Ukončenie dňa', auto_done: '⚠ Automaticky ukončený (zabudnuté ukončenie)', display_cleared: 'Vyčistenie obrazovky' };
 
   /**
    * 2026-11-18 (Pali): priebeh v histórii presnejšie – kto pacienta vyvolal (sestra / lekár) a kto ho kam poslal.
@@ -1153,7 +1169,7 @@
       case 'done': { const st = lastStage(), c = wasCalled();
         return st === 'final' ? 'Ukončený sestrou (po lekárovi)' : st === 'doctor' ? (c ? 'Ukončený u lekára' : 'Ukončený v rade k lekárovi (bez vyvolania)') : st === 'nurse' ? 'Ukončený sestrou (bez lekára)' : 'Ukončený'; }
       case 'absent': { const st = lastStage(); return 'Neprítomný' + (st === 'doctor' ? ' (pri lekárovi)' : st ? ' (pri sestre)' : ''); }
-      default: return esc(EV_TEXT[e.type] || e.type) + (e.note && (e.type === 'day_closed' || e.type === 'moved' || e.type === 'edited') ? ` <span class="ev-note">(${esc(e.note)})</span>` : '');
+      default: return esc(EV_TEXT[e.type] || e.type) + (e.note && (e.type === 'day_closed' || e.type === 'moved' || e.type === 'edited' || e.type === 'auto_done') ? ` <span class="ev-note">(${esc(e.note)})</span>` : '');
     }
   }
 
@@ -1445,7 +1461,8 @@
       <td class="num">${d.planned}</td><td class="num">${delayHtml(d)}</td><td class="num">${d.planned ? mins(d.maxDelay) : '–'}</td>
       <td class="num">${pct(d.onTime, d.planned)}</td><td class="num ${d.late15 ? 'bad' : ''}">${d.planned ? d.late15 : '–'}</td>
       ${grp !== 'nurse' ? `<td class="num">${docDelayHtml(d)}</td><td class="num">${d.docPlanned ? mins(d.maxDocDelay) : '–'}</td><td class="num ${d.docLate15 ? 'bad' : ''}">${d.docPlanned ? d.docLate15 : '–'}</td>` : ''}
-      <td class="num">${mins(d.avgExam)}</td>${grp === 'room' ? `<td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td>` : ''}</tr>`;
+      <td class="num">${mins(d.avgExam)}</td>${grp === 'room' ? `<td class="num">${mins(d.avgNurse)}</td><td class="num">${mins(d.avgDoctorWait)}</td><td class="num">${mins(d.avgDoctor)}</td>` : ''}
+      <td class="num ${d.forgot ? 'bad' : ''}">${d.forgot ? '⚠ ' + d.forgot : '0'}</td></tr>`;
     const G = { doctor: { who: 'Lekár', wait: 'Ø čakanie na lekára', exam: 'Ø u lekára' }, nurse: { who: 'Sestra', wait: 'Ø čakanie', exam: 'Ø u sestry' },
       room: { who: 'Ambulancia', wait: 'Ø čakanie', exam: 'Ø celá návšteva' } }[grp];
     out.innerHTML = `<div class="stack">${head}
@@ -1462,12 +1479,12 @@
         <th class="num">${G.wait}</th><th class="num">Medián čak.</th>
         <th class="num">S plán. časom</th><th class="num">Ø mešk. k sestre</th><th class="num">Max. k sestre</th><th class="num">Načas</th><th class="num">K sestre &gt; 15 min</th>
         ${grp !== 'nurse' ? '<th class="num">Ø mešk. k lekárovi</th><th class="num">Max. k lekárovi</th><th class="num">K lekárovi &gt; 15 min</th>' : ''}
-        <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}</tr></thead>
+        <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}<th class="num" title="Pacient ostal neukončený a server ho po 2 hodinách ukončil sám">Zabudnuté ukončenie</th></tr></thead>
         <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
         <p class="hint">${r.twoStepSince ? `Od ${esc(fmtDay(r.twoStepSince))} má návšteva dva kroky – najprv sestra (čas objednania = vstup k sestre), potom lekár.
           Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho. <b>Meškanie k sestre</b> = vstup pacienta k sestre oproti termínu, <b>meškanie k lekárovi</b> = vyvolanie lekárom oproti termínu (ak pacient prišiel neskôr, od príchodu) – to je meškanie, ktoré pacient reálne pocíti. Priemer zahŕňa aj pacientov vzatých skôr (predstih ho znižuje), preto pozri aj maximum a počet nad 15 min.
           Pacient ukončený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.
-          Vyšetrenie = od vyvolania po „Ukončený“. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
+          Vyšetrenie = od vyvolania po „Ukončený“. <b>Zabudnuté ukončenie</b> = pacient ostal neukončený a server ho po 2 h ukončil sám (sestre, ak ostal u nej alebo na ukončení; lekárovi, ak ho neposlal na ukončenie) – do časov sa nepočíta. Lekár sa berie z ambulancie, ktorú sestra mala v čase vyvolania nastavenú.
           ${r.doctorDataSince ? `Lekári sa ukladajú od ${esc(fmtDay(r.doctorDataSince))}; staršie vyvolania sú v riadku „Lekár nebol zadaný“.` : 'Pri vyvolaniach zatiaľ nebol zadaný lekár – nastavte ho v Zozname tlačidlom Lekár.'}</p>
       </section></div>`;
   }
