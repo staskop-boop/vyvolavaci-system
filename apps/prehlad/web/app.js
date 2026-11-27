@@ -6,7 +6,9 @@
   'use strict';
   const { api, connect, fmtTime, fmtDay, esc } = window.AdNa;
   const $ = (s, r = document) => r.querySelector(s);
-  const S = { user: null, staff: null, conn: null, today: null, todayErr: null, week: null, lastAt: 0, statsTimer: null };
+  const S = { user: null, staff: null, conn: null, today: null, todayErr: null, week: null, lastAt: 0, statsTimer: null,
+    // obdobie tabuľky lekárov (správca): dnes / tyzden / mesiac / rok / vlastne – pamätá sa v telefóne
+    period: (() => { try { return JSON.parse(localStorage.getItem('adna-prehlad-obdobie')) || { p: 'dnes' }; } catch { return { p: 'dnes' }; } })(), weekErr: null };
   const view = $('#view');
 
   const fmtMin = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}` : `${m} min`);
@@ -29,7 +31,7 @@
   function showLogin(msg) {
     if (S.conn) { S.conn.stop(); S.conn = null; }
     clearInterval(S.statsTimer);
-    S.user = null; S.staff = null; S.today = null; S.todayErr = null; S.week = null;   // po odhlásení nič z predchádzajúceho konta
+    S.user = null; S.staff = null; S.today = null; S.todayErr = null; S.week = null; S.weekErr = null;   // po odhlásení nič z predchádzajúceho konta
     $('#topbar').hidden = true;
     view.innerHTML = `<section class="card login">
       <img class="login-logo" src="adna-logo.png" alt="AdNa s.r.o.">
@@ -84,9 +86,9 @@
       try { S.today = await api('/api/staff/today-stats'); S.todayErr = null; } catch (e) { if (e.status === 401) return showLogin('Prihlásenie vypršalo. Prihláste sa znova.'); S.todayErr = e.status === 403 ? null : e.message; }
     }
     if (S.user.role === 'admin') {
-      const now = new Date(); const dow = (now.getDay() + 6) % 7;
-      const mon = isoDay(new Date(now.getTime() - dow * 86400000)), to = isoDay(now);
-      try { S.week = await api(`/api/admin/stats?from=${mon}&to=${to}&groupBy=doctor`); } catch { S.week = null; }
+      const { from, to } = periodRange();
+      try { S.week = await api(`/api/admin/stats?from=${from}&to=${to}&groupBy=doctor`); S.weekErr = null; }
+      catch (e) { S.week = null; S.weekErr = e.message; }
     }
     render();
   }
@@ -95,6 +97,7 @@
   function render() {
     const st = S.staff;
     if (!st || !S.user) return;
+    if (document.activeElement && document.activeElement.matches && document.activeElement.matches('#view input[type=date]')) return;
     const y = window.scrollY;
     const ts = st.tickets || [];
     const w = ts.filter((t) => t.status === 'waiting'), c = ts.filter((t) => t.status === 'called');
@@ -196,13 +199,60 @@
       : '<p class="hint">Dnes ešte nikto nebol vyvolaný.</p>'}</section>`;
   }
 
+  // ---------- lekári za obdobie (len správca) ----------
+  const STATS_START = '2026-11-23';   // ostrý štart štatistík
+  const PERIODS = [['dnes', 'Dnes'], ['tyzden', 'Týždeň'], ['mesiac', 'Mesiac'], ['rok', 'Rok'], ['vlastne', 'Od – do']];
+  function periodRange() {
+    const now = new Date(), today = isoDay(now), P = S.period || { p: 'dnes' };
+    let from = today, to = today;
+    if (P.p === 'tyzden') from = isoDay(new Date(now.getTime() - ((now.getDay() + 6) % 7) * 86400000));
+    else if (P.p === 'mesiac') from = today.slice(0, 8) + '01';
+    else if (P.p === 'rok') from = today.slice(0, 5) + '01-01';
+    else if (P.p === 'vlastne') { from = P.from || today; to = P.to || today; if (to > today) to = today; if (from > to) from = to; }
+    if (from < STATS_START) from = STATS_START;
+    if (to < from) to = from;
+    return { from, to };
+  }
+  function setPeriod(p) {
+    S.period = p;
+    try { localStorage.setItem('adna-prehlad-obdobie', JSON.stringify(p)); } catch {}
+    S.week = null; render(); loadStats();
+  }
+  view.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-period]');
+    if (!b) return;
+    const p = b.dataset.period;
+    if (p === 'vlastne') { const r = periodRange(); setPeriod({ p, from: S.period.from || r.from, to: S.period.to || r.to }); }
+    else setPeriod({ p });
+  });
+  view.addEventListener('change', (e) => {
+    if (!e.target.matches('input[data-od], input[data-do]')) return;
+    const from = view.querySelector('input[data-od]').value, to = view.querySelector('input[data-do]').value;
+    if (from && to) { e.target.blur(); setPeriod({ p: 'vlastne', from: from <= to ? from : to, to: from <= to ? to : from }); }
+  });
+
   function renderWeek() {
-    const d = S.week;
-    if (!d || !d.total || !d.total.patients) return '';
-    const rows = d.doctors.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.days}</td>
-      <td class="num">${fmtMin(r.avgWait)}</td><td class="num">${diffText(r.avgDocDiff)}</td><td class="num">${fmtMin(r.avgExam)}</td></tr>`).join('');
-    return `<section class="card"><h2>Tento týždeň podľa lekárov</h2><p class="hint">${esc(fmtDay(d.from))} – ${esc(fmtDay(d.to))} · pacientov spolu: ${d.total.patients}, ukončených: ${d.total.done}</p>
-      <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Dní</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+    if (!S.user || S.user.role !== 'admin') return '';
+    const P = S.period || { p: 'dnes' }, { from, to } = periodRange(), d = S.week, today = isoDay(new Date());
+    const title = { dnes: 'Lekári dnes', tyzden: 'Lekári tento týždeň', mesiac: 'Lekári tento mesiac', rok: 'Lekári tento rok', vlastne: 'Lekári za obdobie' }[P.p] || 'Lekári';
+    const chips = PERIODS.map(([k, l]) => `<button type="button" class="chip${P.p === k ? ' chip-on' : ''}" data-period="${k}" aria-pressed="${P.p === k}">${l}</button>`).join('');
+    const custom = P.p === 'vlastne' ? `<div class="range"><label>Od <input type="date" data-od min="${STATS_START}" max="${today}" value="${esc(from)}"></label>
+      <label>Do <input type="date" data-do min="${STATS_START}" max="${today}" value="${esc(to)}"></label></div>` : '';
+    let rows = d && d.from === from && d.to === to ? d.doctors.slice() : null;
+    // dnes ukáž aj lekárov zadaných pri ambulanciách, ktorí ešte nemali pacienta
+    if (rows && P.p === 'dnes' && S.staff && S.staff.doctors) {
+      for (const n of Object.values(S.staff.doctors)) if (n && !rows.some((r) => r.doctor === n)) rows.push({ doctor: n, patients: 0, done: 0, days: 0 });
+    }
+    const oneDay = from === to;
+    const body = S.weekErr ? `<p class="banner warn" role="alert">⚠ Štatistiky sa nepodarilo načítať: ${esc(S.weekErr)}</p>`
+      : !rows ? '<p class="hint">Načítavam…</p>'
+      : !rows.length ? '<p class="hint">Za toto obdobie nie sú žiadni pacienti.</p>'
+      : `<p class="hint">${oneDay ? esc(fmtDay(from)) : `${esc(fmtDay(from))} – ${esc(fmtDay(to))}`} · pacientov spolu: ${d.total.patients}, ukončených: ${d.total.done}</p>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Ukonč.</th>${oneDay ? '' : '<th class="num">Dní</th>'}<th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.done ?? '–'}</td>${oneDay ? '' : `<td class="num">${r.days ?? '–'}</td>`}
+        <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDocDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td></tr>`).join('')}
+      </tbody></table></div><p class="hint">Čakanie = priemerné čakanie, Mešk. = oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára. Štatistiky sa počítajú od 23. 11. 2026.</p>`;
+    return `<section class="card" id="lekari"><h2>${title}</h2><div class="chips" role="group" aria-label="Obdobie">${chips}</div>${custom}${body}</section>`;
   }
 
   document.addEventListener('visibilitychange', () => { if (!document.hidden && S.user) { loadStats(); render(); } });
