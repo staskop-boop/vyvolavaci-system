@@ -262,6 +262,7 @@
       : !rows ? '<p class="hint">Načítavam…</p>'
       : !rows.length ? '<p class="hint">Za toto obdobie nie sú žiadni pacienti.</p>'
       : `<p class="hint">${oneDay ? esc(fmtDay(from)) : `${esc(fmtDay(from))} – ${esc(fmtDay(to))}`} · u lekárov: <b>${d.total.patients}</b> pacientov (ukončených ${d.total.done})${d.nurseOnly ? ` + <b>${d.nurseOnly}</b> len u sestry (k lekárovi nešli) = <b>${d.total.patients + d.nurseOnly}</b> v ambulanciách spolu` : ''}</p>
+      ${d.nurseOnly && d.nurseOnlyReasons && d.nurseOnlyReasons.length ? `<p class="hint nurse-only">Len u sestry – prečo: ${d.nurseOnlyReasons.map((x) => `${esc(x.reason)} <b>${x.count}</b>`).join(' · ')}</p>` : ''}
       <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Ukonč.</th>${oneDay ? '' : '<th class="num">Dní</th>'}<th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th>${anyForgot ? '<th class="num">Zabudnuté</th>' : ''}</tr></thead><tbody>
       ${rows.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.done ?? '–'}</td>${oneDay ? '' : `<td class="num">${r.days ?? '–'}</td>`}
         <td class="num">${r.patients ? fmtMin(r.avgWait) : '–'}</td><td class="num">${r.patients ? diffText(r.avgDocDiff) : '–'}</td><td class="num">${r.patients ? fmtMin(r.avgExam) : '–'}</td>${anyForgot ? `<td class="num">${r.forgot ? `<b class="late">⚠ ${r.forgot}</b>` : '0'}</td>` : ''}</tr>`).join('')}

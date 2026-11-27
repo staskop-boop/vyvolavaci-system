@@ -114,6 +114,18 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
 
     // 4. ukončený / neprítomný / vrátiť
     await row(A, 'tbl-called', 'A001').getByRole('button', { name: 'Ukončený' }).click();
+    // 2026-11-27 (Pali): pacient nebol u lekára → povinný dôvod
+    await A.locator('.reason-list').waitFor();
+    await A.click('#m-ok');
+    await A.locator('#m-err', { hasText: 'Vyberte dôvod' }).waitFor();
+    assert.equal(await row(A, 'tbl-finished', 'A001').count(), 0, 'bez dôvodu sa neukončí');
+    await A.locator('.reason-opt', { hasText: 'Iný dôvod' }).click();
+    await A.locator('#m-reason-text').waitFor();
+    await A.click('#m-ok');
+    await A.locator('#m-err', { hasText: 'iný dôvod' }).waitFor();
+    await A.locator('.reason-opt', { hasText: 'Omyl' }).click();
+    assert.ok(await A.locator('.reason-other').isHidden(), 'text len pri inom dôvode');
+    await A.click('#m-ok');
     await row(A, 'tbl-finished', 'A001').getByText('Ukončený').waitFor();
     await A.selectOption('#room', { label: 'Ambulancia č. 2' });
     await row(A, 'tbl-waiting', 'A002').getByRole('button', { name: 'Vyvolať' }).click();
@@ -273,6 +285,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await row(A, 'tbl-called', 'K9').locator('.ident-pill').waitFor({ state: 'detached' });
     await row(A, 'tbl-called', 'K9').locator('.type-pill', { hasText: 'Kontrola po CLaCS' }).waitFor();
     await row(A, 'tbl-called', 'K9').getByRole('button', { name: 'Ukončený' }).click();
+    await A.locator('.reason-opt', { hasText: 'Omyl' }).click(); await A.click('#m-ok');   // nebol u lekára → dôvod
     ok('typ a identifikátor pacienta: ponuka typov, zadanie, úprava, odstránenie; obrazovka ich nemá');
 
     // 10d. (2026-11-18) voľba „ide k sestre / ide k lekárovi“ pri pridaní, v tabuľke aj v ✎ Upraviť
@@ -339,6 +352,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     ok('prepínač pohľadu Len sestra / Sestra aj lekár / Len lekár');
     await shot(A, '15-vybaveny-v-rade-lekara');
     await row(A, 'tbl-doctor', 'L5').getByRole('button', { name: 'Ukončený' }).click();
+    await A.locator('.reason-opt', { hasText: 'Omyl' }).click(); await A.click('#m-ok');   // nebol u lekára → dôvod
     await toastWith(A, /L5: Ukončený/);
     await row(A, 'tbl-doctor', 'L5').waitFor({ state: 'detached' });
     ok('voľba „ide k sestre / ide k lekárovi“: pri pridaní, v tabuľke čakajúcich aj v úprave');
@@ -447,7 +461,10 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     assert.equal(await A.evaluate(() => [...document.querySelectorAll('.now-pair > .card')].map((c) => c.scrollWidth - c.clientWidth).join('/')), '0/0', 'karta Práve v ambulancii nepretŕča');
     await grpRow('now-nurse').getByRole('button', { name: /Ukončený/ }).click();
     await row(A, 'tbl-finished', tn).waitFor();
-    await row(A, 'tbl-called', tn2).getByRole('button', { name: /Ukončený/ }).click();
+    await row(A, 'tbl-called', tn2).getByRole('button', { name: /Ukončený bez lekára/ }).click();
+    await A.locator('.reason-opt', { hasText: 'Zabudla prekliknúť k lekárovi' }).click();
+    await shot(A, '27-dovod-bez-lekara');
+    await A.click('#m-ok');
     await row(A, 'tbl-finished', tn2).waitFor();
     // história: priebeh hovorí, kto vyvolal a kto kam poslal
     await A.click('.tab[data-view=history]');
@@ -455,6 +472,7 @@ const row = (page, table, code) => page.locator(`#${table} tr`, { hasText: code 
     await hr.getByText('Vyvolaný sestrou (Daniela Fetyková) – Ambulancia č. 1').waitFor();
     for (const txt of ['Pridaný sestrou', 'Registrácia (lístok)'].slice(0, 0).concat(['Poslaný k lekárovi sestrou', 'Vyvolaný lekárom (MUDr. Pavel Staško)', 'Poslaný k sestre lekárom', 'Vrátený od sestry späť k lekárovi', 'Ukončený sestrou (po lekárovi)']))
       assert.ok(await hr.getByText(txt).count(), 'v histórii chýba: ' + txt);
+    await A.locator('#hist-detail tr', { hasText: tn2 }).first().getByText(/dôvod: Zabudla prekliknúť k lekárovi/).waitFor();
     await shot(A, '22-historia-priebeh');
     await A.click('.tab[data-view=queue]');
     ok('dva kroky: sestra a lekár ráno, vyvolanie k sestre, „K lekárovi“, rad „Čakajú na lekára“, vyvolanie k lekárovi, „K sestre na ukončenie“ a „Ukončený“ u sestry');

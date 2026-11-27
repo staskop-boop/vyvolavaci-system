@@ -43,7 +43,7 @@
   }
 
   /** Jednoduché modálne okno. Vráti Promise s hodnotou z onOk alebo null pri zrušení. */
-  function modal({ title, body, okText = 'Potvrdiť', okClass = 'btn-primary', cancelText = 'Zrušiť', onOk }) {
+  function modal({ title, body, okText = 'Potvrdiť', okClass = 'btn-primary', cancelText = 'Zrušiť', onOk, onOpen }) {
     return new Promise((resolve) => {
       const root = document.getElementById('modal-root');
       root.innerHTML = `<div class="modal-back"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
@@ -69,6 +69,7 @@
       root.querySelector('#m-cancel').onclick = () => close(null);
       root.querySelector('#m-ok').onclick = ok;
       root.querySelector('.modal-back').addEventListener('mousedown', (e) => { if (e.target.classList.contains('modal-back')) close(null); });
+      if (onOpen) onOpen(root);
       const first = root.querySelector('.m-body input, .m-body textarea, .m-body select') || root.querySelector('#m-ok');
       setTimeout(() => first.focus(), 0);
     });
@@ -742,7 +743,7 @@
       case 'to-final': return act(() => api(`/api/staff/tickets/${id}/to-final`, { body: {} }), `${code}: k sestre na ukončenie`);
       case 'back-to-doctor': return act(() => api(`/api/staff/tickets/${id}/back-to-doctor`, { body: {} }), `${code}: späť k lekárovi`);
       case 'to-doctor-direct': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: { direct: true } }), `${code}: priamo k lekárovi`);
-      case 'done': return act(() => api(`/api/staff/tickets/${id}/done`, { body: {} }), `${code}: Ukončený`);
+      case 'done': return doneTicket(t);
       case 'absent': return act(() => api(`/api/staff/tickets/${id}/absent`, { body: {} }), `${code}: Neprítomný`);
       case 'requeue': {
         const ok = await confirmDialog('Vrátiť medzi čakajúcich?', `Číslo ${code} sa vráti do zoznamu čakajúcich podľa pôvodného času príchodu${t && t.status === 'called' ? ' a zmizne z obrazovky v čakárni' : ''}.`, 'Vrátiť');
@@ -1074,6 +1075,51 @@
       : `${res.ticket.code}: ambulancia opravená na ${res.ticket.roomName}`, 'ok');
   }
 
+  /** Treba pri ukončení dôvod? – pacient nebol u lekára (u sestry, alebo v rade k lekárovi bez vyvolania). */
+  const needsDoneReason = (t) => !!t && t.stage !== 'final' && t.wasAtDoctor === false;
+  const doneReasons = () => (S.staff && S.staff.doneReasons) || [];
+  /** Text dôvodu z uloženej poznámky („omyl“, „ine: …“). */
+  function doneReasonText(note) {
+    if (!note) return '';
+    const i = String(note).indexOf(':'), id = (i < 0 ? note : note.slice(0, i)).trim(), txt = i < 0 ? '' : note.slice(i + 1).trim();
+    const r = doneReasons().find((x) => x.id === id);
+    if (!r) return '';
+    return r.id === 'ine' && txt ? `${r.label}: ${txt}` : r.label;
+  }
+
+  /**
+   * 2026-11-27 (Pali): ukončenie pacienta. Ak pacient nebol u lekára, sestra musí vybrať dôvod
+   * (zabudla prekliknúť k lekárovi, omyl, …) – uloží sa do histórie a štatistík.
+   */
+  async function doneTicket(t) {
+    if (!t) return;
+    if (!needsDoneReason(t) || !doneReasons().length) return act(() => api(`/api/staff/tickets/${t.id}/done`, { body: {} }), `${t.code}: Ukončený`);
+    const where = t.status === 'waiting' ? 'čaká na lekára, ale lekár ho ešte nevyvolal' : 'je u sestry a k lekárovi nebol poslaný';
+    const res = await modal({
+      title: `Ukončiť bez lekára – ${t.code}`,
+      okText: '✓ Ukončiť',
+      body: `<p>Pacient ${where}. <b>Vyberte, prečo ho ukončujete bez lekára</b> – dôvod sa uloží do histórie a štatistík.</p>
+        <div class="reason-list" role="radiogroup" aria-label="Dôvod ukončenia bez lekára">${doneReasons().map((r) => `<label class="reason-opt">
+          <input type="radio" name="m-reason" value="${esc(r.id)}"><span><b>${esc(r.label)}</b>${r.hint ? `<small>${esc(r.hint)}</small>` : ''}</span></label>`).join('')}</div>
+        <div class="field reason-other" hidden><label for="m-reason-text">Aký dôvod?</label><input id="m-reason-text" maxlength="200" autocomplete="off" placeholder="napr. išiel na pohotovosť"></div>
+        <p class="hint">Ak bol pacient u lekára a len ste zabudli prekliknúť, vyberte prvú možnosť. Pri omyle sa dá pacient vrátiť v zozname Ukončení (↩ Vrátiť).</p>`,
+      onOk: async (root) => {
+        if (S.conn !== 'online') throw new Error('Nie je spojenie so serverom.');
+        const picked = root.querySelector('input[name="m-reason"]:checked');
+        if (!picked) throw new Error('Vyberte dôvod ukončenia bez lekára.');
+        const reasonText = root.querySelector('#m-reason-text').value.trim();
+        if (picked.value === 'ine' && !reasonText) throw new Error('Napíšte, aký je iný dôvod.');
+        return api(`/api/staff/tickets/${t.id}/done`, { body: { reason: picked.value, reasonText: picked.value === 'ine' ? reasonText : undefined } });
+      },
+      onOpen: (root) => root.querySelectorAll('input[name="m-reason"]').forEach((x) => x.addEventListener('change', () => {
+        const other = root.querySelector('.reason-other');
+        other.hidden = x.value !== 'ine' || !x.checked;
+        if (!other.hidden) root.querySelector('#m-reason-text').focus();
+      })),
+    });
+    if (res && res.ticket) toast(`${res.ticket.code}: Ukončený bez lekára`, 'ok');
+  }
+
   /** 2026-11-17: identifikátor aj pre vyvolaného pacienta (úprava čakajúceho je v ✎ Upraviť). */
   async function noteTicket(t) {
     if (!t) return;
@@ -1167,7 +1213,8 @@
       case 'to_final': return 'Poslaný k sestre lekárom – na ukončenie';
       case 'final_back': return 'Vrátený od sestry späť k lekárovi';
       case 'done': { const st = lastStage(), c = wasCalled();
-        return st === 'final' ? 'Ukončený sestrou (po lekárovi)' : st === 'doctor' ? (c ? 'Ukončený u lekára' : 'Ukončený v rade k lekárovi (bez vyvolania)') : st === 'nurse' ? 'Ukončený sestrou (bez lekára)' : 'Ukončený'; }
+        return (st === 'final' ? 'Ukončený sestrou (po lekárovi)' : st === 'doctor' ? (c ? 'Ukončený u lekára' : 'Ukončený v rade k lekárovi (bez vyvolania)') : st === 'nurse' ? 'Ukončený sestrou (bez lekára)' : 'Ukončený')
+          + (doneReasonText(e.note) ? ` <span class="ev-note ev-reason">– dôvod: ${esc(doneReasonText(e.note))}${e.nurse || e.doctor ? who(e.nurse || e.doctor) : ''}</span>` : ''); }
       case 'absent': { const st = lastStage(); return 'Neprítomný' + (st === 'doctor' ? ' (pri lekárovi)' : st ? ' (pri sestre)' : ''); }
       default: return esc(EV_TEXT[e.type] || e.type) + (e.note && (e.type === 'day_closed' || e.type === 'moved' || e.type === 'edited' || e.type === 'auto_done') ? ` <span class="ev-note">(${esc(e.note)})</span>` : '');
     }
@@ -1481,6 +1528,7 @@
         ${grp !== 'nurse' ? '<th class="num">Ø mešk. k lekárovi</th><th class="num">Max. k lekárovi</th><th class="num">K lekárovi &gt; 15 min</th>' : ''}
         <th class="num">${G.exam}</th>${grp === 'room' ? '<th class="num">Ø u sestry</th><th class="num">Ø čak. na lekára</th><th class="num">Ø u lekára</th>' : ''}<th class="num" title="Pacient ostal neukončený a server ho po 2 hodinách ukončil sám">Zabudnuté ukončenie</th></tr></thead>
         <tbody>${r.doctors.map((d) => row(d)).join('')}${r.doctors.length > 1 ? row({ ...t, doctor: 'Spolu' }, 'total') : ''}</tbody></table></div>
+        ${r.nurseOnly ? `<p class="nurse-only"><b>+ ${r.nurseOnly} len u sestry</b> (k lekárovi nešli, lekárom sa nepočítajú)${(r.nurseOnlyReasons || []).length ? ' – prečo: ' + r.nurseOnlyReasons.map((x) => `${esc(x.reason)} <b>${x.count}</b>`).join(' · ') : ''}</p>` : ''}
         <p class="hint">${r.twoStepSince ? `Od ${esc(fmtDay(r.twoStepSince))} má návšteva dva kroky – najprv sestra (čas objednania = vstup k sestre), potom lekár.
           Lekárovi sa počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho. <b>Meškanie k sestre</b> = vstup pacienta k sestre oproti termínu, <b>meškanie k lekárovi</b> = vyvolanie lekárom oproti termínu (ak pacient prišiel neskôr, od príchodu) – to je meškanie, ktoré pacient reálne pocíti. Priemer zahŕňa aj pacientov vzatých skôr (predstih ho znižuje), preto pozri aj maximum a počet nad 15 min.
           Pacient ukončený len u sestry sa lekárovi nepočíta. ` : ''}Staršie dni: čakanie = od príchodu (lístok/kartička) po prvé vyvolanie. Meškanie = prvé vyvolanie oproti plánovanému času (ak pacient prišiel neskôr, počíta sa od príchodu) – rovnako ako na TV.

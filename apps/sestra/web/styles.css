@@ -282,6 +282,16 @@ td.nw, td.code { white-space: nowrap; }
 .bad { color: var(--adna-danger); font-weight: 700; }
 .daylist button.active { border-color: var(--red); background: var(--blush); }
 .ev-note { color: var(--adna-warn); font-style: italic; }
+/* 2026-11-27: dôvod ukončenia bez lekára */
+.ev-reason { color: var(--adna-text); font-style: normal; font-weight: 600; }
+.reason-list { display: grid; gap: 8px; margin: 14px 0 10px; }
+.reason-opt { display: flex; gap: 12px; align-items: flex-start; padding: 11px 14px; border: 1.5px solid var(--adna-border); border-radius: 12px; cursor: pointer; background: #fff; }
+.reason-opt:hover { border-color: var(--adna-primary); }
+.reason-opt:has(input:checked) { border-color: var(--adna-primary); background: #fdf2f4; box-shadow: inset 4px 0 0 var(--adna-primary); }
+.reason-opt input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--adna-primary); flex: none; }
+.reason-opt b { display: block; font-size: 16px; }
+.reason-opt small { display: block; color: var(--adna-muted); font-size: 13px; margin-top: 1px; }
+.reason-other { margin-bottom: 8px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .section-title h2 { margin: 0; }
 .offline-cover .needs-online { pointer-events: none; }
@@ -506,3 +516,4 @@ select.amb-pill[class*=rc] option, select.amb-pill.any option { background: #fff
 .ev-list .ev-t.t-green, .ev-t.t-green { color: #14602F; }
 .ev-list .ev-t.t-amber, .ev-t.t-amber { color: #9A5B00; }
 .ev-list .ev-t.t-red, .ev-t.t-red { color: var(--adna-danger); font-weight: 800; }
+.nurse-only { margin: 10px 0 4px; }

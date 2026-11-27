@@ -33,7 +33,7 @@ test('neskorý príchod nezvýši sklz ambulancie; čakanie po termíne áno', a
   assert.ok(d.clinicDelayMinutes <= 6);
 
   clock.setOffset(40 * 60000);
-  await staff.post(`/api/staff/tickets/${id('6')}/done`, {});
+  await staff.post(`/api/staff/tickets/${id('6')}/done`, { reason: 'len-sestra' });
   assert.equal((await staff.post(`/api/staff/tickets/${id('5')}/call`, { roomId: room })).status, 200);
   d = (await staff.get('/api/display/state')).data;
   r = d.rooms.find((x) => x.id === room).lastCallDelayMinutes;
@@ -45,7 +45,7 @@ test('po „ukončený“ ambulancia na TV nikoho nevyšetruje', async () => {
   const room = st.rooms[0].id;
   let d = (await staff.get('/api/display/state')).data;
   assert.equal(d.rooms.find((x) => x.id === room).current, '5');
-  await staff.post(`/api/staff/tickets/${st.tickets.find((x) => x.code === '5').id}/done`, {});
+  await staff.post(`/api/staff/tickets/${st.tickets.find((x) => x.code === '5').id}/done`, { reason: 'len-sestra' });
   d = (await staff.get('/api/display/state')).data;
   const r = d.rooms.find((x) => x.id === room);
   assert.equal(r.current, null);
