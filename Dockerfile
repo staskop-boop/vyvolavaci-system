@@ -17,6 +17,7 @@ COPY server/scripts ./scripts
 COPY apps/sestra/web /app/apps/sestra/web
 COPY apps/tablet/web /app/apps/tablet/web
 COPY apps/tv/web /app/apps/tv/web
+COPY apps/prehlad/web /app/apps/prehlad/web
 COPY shared /app/shared
 
 RUN mkdir -p /data && chown -R node:node /data

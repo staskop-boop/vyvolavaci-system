@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Na diaľku vždy HTTPS (vyvolavaci.adna.sk). Nešifrované HTTP je povolené len pre adresy v lokálnej sieti
+     ambulancie (napr. http://10.160.1.16:8080), keď je telefón priamo v Wi-Fi ambulancie. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.160.1.16</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

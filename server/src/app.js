@@ -275,10 +275,12 @@ function createServer(opts = {}) {
   versionedIndex('/sestra', path.join(config.appsDir, 'sestra', 'web'));
   versionedIndex('/tablet', path.join(config.appsDir, 'tablet', 'web'));
   versionedIndex('/obrazovka', path.join(config.appsDir, 'tv', 'web'));
+  versionedIndex('/prehlad', path.join(config.appsDir, 'prehlad', 'web'));   // 2026-11-27: prehľad na diaľku (mobil, Android appka)
   mount('/shared', config.sharedDir);
   mount('/sestra', path.join(config.appsDir, 'sestra', 'web'));
   mount('/tablet', path.join(config.appsDir, 'tablet', 'web'));
   mount('/obrazovka', path.join(config.appsDir, 'tv', 'web'));
+  mount('/prehlad', path.join(config.appsDir, 'prehlad', 'web'));
   app.get('/', (req, res) => res.redirect('/shared/index.html'));
 
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
