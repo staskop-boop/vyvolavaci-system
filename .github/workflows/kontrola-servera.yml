@@ -17,6 +17,9 @@ jobs:
           for f in stasko czetoova kubikova kudela koval roskovicova; do
             echo "fotka $f: $(curl -s -o /dev/null -w '%{http_code}' -m 20 https://vyvolavaci.adna.sk/obrazovka/assets/doctors/$f.jpg)"
           done
+          # 2026-11-27: Prehľad na diaľku (appka AdNa Prehľad) a obnova hesla správcu
+          echo "Prehľad /prehlad/: $(curl -s -o /dev/null -w '%{http_code}' -m 20 https://vyvolavaci.adna.sk/prehlad/)"
+          echo "Obnova hesla – kľúč servera: $(curl -s -m 20 https://vyvolavaci.adna.sk/api/public/obnova-kluc | jq -c '{fingerprint, posledna}' 2>/dev/null || echo 'nie je (stará verzia)')"
           echo "Sestra – verzia na serveri: $(curl -fsS -m 20 https://vyvolavaci.adna.sk/sestra/sw.js | grep -o "adna-sestra-v[0-9]*")"
           echo "Sestra – tlačidlo zobraziť heslo: $(echo "$SESTRA" | grep -c "pw-toggle") · hromadné kontá: $(echo "$SESTRA" | grep -c "btn-bulk-users")"
           echo "Sestra – výber/zmena ambulancie (PR #29): $(echo "$SESTRA" | grep -c "moveTicket")"
