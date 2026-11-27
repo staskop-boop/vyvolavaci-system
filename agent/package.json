@@ -1,0 +1,16 @@
+{
+  "name": "adna-vrp2-agent",
+  "version": "1.0.0",
+  "description": "Lokálny agent AdNa pre VRP2 Finančnej správy SR – vystaví doklad k platbe potvrdenej v aplikácii Sestra a vytlačí ho na recepcii",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "src/index.js",
+  "bin": { "adna-vrp2-agent": "src/index.js" },
+  "scripts": {
+    "start": "node src/index.js spustit",
+    "prihlasenie": "node src/index.js prihlasenie",
+    "kontrola": "node src/index.js kontrola",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
+  },
+  "engines": { "node": ">=22.13" }
+}

@@ -506,3 +506,44 @@ select.amb-pill[class*=rc] option, select.amb-pill.any option { background: #fff
 .ev-list .ev-t.t-green, .ev-t.t-green { color: #14602F; }
 .ev-list .ev-t.t-amber, .ev-t.t-amber { color: #9A5B00; }
 .ev-list .ev-t.t-red, .ev-t.t-red { color: var(--adna-danger); font-weight: 800; }
+
+/* 2026-11-27 (Pali): platba pacienta a pokladničný doklad VRP2 */
+.dash > .a-fin-area { grid-area: finished; display: grid; gap: 20px; min-width: 0; }
+.modal.modal-wide { max-width: 860px; }
+.pay-choice, .pay-regs, .pay-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.pay-reg { display: flex; flex-direction: column; gap: 2px; border: 2px solid var(--adna-border); border-radius: 14px; padding: 12px 14px; cursor: pointer; background: #fff; position: relative; }
+.pay-reg input { position: absolute; opacity: 0; }
+.pay-reg b { font-size: 18px; }
+.pay-reg span { color: var(--grey); font-size: 14px; }
+.pay-reg.on { border-color: var(--red); background: #fff5f5; box-shadow: inset 0 0 0 1px var(--red); }
+.pay-reg.on b::before { content: "● "; color: var(--red); }
+.pay-reg:focus-within { outline: 3px solid rgba(188,26,33,.35); outline-offset: 2px; }
+.pay-company { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; background: #111; color: #fff; border-radius: 14px; padding: 14px 16px; margin: 12px 0; }
+.pay-company .hint { display: block; color: #cfcfcf; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.pay-company b { font-size: 18px; }
+.pay-company #f-company { font-size: 22px; }
+.pay-sim { display: inline-block; background: #ffd24a; color: #111; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; vertical-align: middle; }
+.pay-live { display: inline-block; background: var(--red); color: #fff; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; }
+.pay-items { width: 100%; margin: 6px 0; }
+.pay-items td, .pay-items th { padding: 6px 8px; vertical-align: middle; }
+.pay-items tr.on { background: #fff8e8; }
+.pay-items .num, #tbl-receipts .num { text-align: right; white-space: nowrap; }
+.pay-miss { color: var(--adna-danger); font-weight: 700; }
+.pay-total { display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid #111; margin-top: 10px; padding-top: 10px; font-size: 18px; }
+.pay-total b { font-size: 30px; font-family: var(--font-display); }
+.pay-cash { display: grid; gap: 8px; border: 1px solid var(--adna-border); border-radius: 14px; padding: 14px; margin-top: 8px; }
+.pay-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.pay-row.big b { font-size: 24px; font-family: var(--font-display); }
+.pay-line { font-size: 13px; margin-top: 4px; color: var(--black); }
+.pay-line.warn { color: #8a4b00; font-weight: 700; }
+.pay-line.ok { color: #14602F; }
+.pay-line .pay-sum { display: block; color: var(--grey); font-weight: 400; }
+.pay-flag { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 6px; padding: 1px 7px; }
+.pay-flag.ok { background: #DDF3E3; color: #14602F; }
+.pay-flag.no { background: var(--adna-danger-bg); color: var(--adna-danger); }
+.pay-hist { margin-top: 6px; padding: 6px 10px; border-left: 4px solid #111; background: #f6f6f6; color: var(--black); }
+.pay-events { margin: 6px 0 0 18px; font-size: 13px; }
+#sec-billing table { width: 100%; }
+#sec-billing h3 { margin-top: 18px; }
+#sec-billing td input[type=text], #sec-billing td input:not([type]) { width: 100%; }
+@media (max-width: 720px) { .pay-choice, .pay-regs, .pay-methods, .pay-company { grid-template-columns: 1fr; } }

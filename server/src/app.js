@@ -14,6 +14,7 @@ const clock = require('./clock');
 const log = require('./log');
 const { News } = require('./news');
 const { Weather } = require('./weather');
+const { Billing, BillingError } = require('./billing');
 
 const COOKIE = 'adna_session';
 
@@ -43,6 +44,8 @@ function createServer(opts = {}) {
   const database = opts.db || db.open(opts.dbFile || config.dbFile);
   const store = new Store(database);
   const auth = new Auth(database);
+  const billing = new Billing(database, store);
+  store.billing = billing;
   const news = new News(() => store.getSettings(), { fetch: opts.newsFetch });
   if (opts.news !== false) news.start();
   const weather = new Weather(() => store.getSettings(), { fetch: opts.weatherFetch });
@@ -56,7 +59,9 @@ function createServer(opts = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', config.trustProxy);
-  app.use(express.json({ limit: '32kb' }));
+  const json32 = express.json({ limit: '32kb' });
+  // import cenníka z exportu VRP2 môže mať stovky riadkov – vlastný limit pri danej adrese
+  app.use((req, res, next) => (req.path === '/api/admin/billing/price-import' ? next() : json32(req, res, next)));
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -183,7 +188,7 @@ function createServer(opts = {}) {
   app.post('/api/staff/tickets/:id/cancel', requireNurse, (req, res) => res.json(store.cancelTicket(id(req), req.user.id)));
   app.post('/api/staff/tickets/:id/planned', requireNurse, (req, res) => res.json(store.setPlanned(id(req), req.body?.plannedTime, req.user.id)));
   app.get('/api/staff/days', requireStaff, (req, res) => res.json({ days: store.days() }));
-  app.get('/api/staff/history', requireStaff, (req, res) => res.json(store.history(req.query.day, seesNote(req.user))));
+  app.get('/api/staff/history', requireStaff, (req, res) => res.json({ ...store.history(req.query.day, seesNote(req.user)), payments: billing.forDay(String(req.query.day)) }));
   app.post('/api/staff/close-past-day', requireNurse, (req, res) => res.json(store.closePastDay(req.body?.day, req.user.id)));
 
   // ---------- administrácia ----------
@@ -254,6 +259,53 @@ function createServer(opts = {}) {
     res.json(await printer.checkPrinter(s.printer));
   }));
 
+  // ---------- platba pacienta a doklad VRP2 (2026-11-27) ----------
+  // sestra: formulár Ukončiť pacienta, potvrdenie platby, doklady na doriešenie, opakovaná tlač
+  app.get('/api/staff/tickets/:id/finish-form', requireNurse, (req, res) => res.json(billing.formInfo(id(req), req.user)));
+  app.post('/api/staff/tickets/:id/finish', requireNurse, (req, res) => {
+    const r = billing.finish(id(req), req.body || {}, req.user);
+    res.status(r.duplicate ? 200 : 201).json(r);
+  });
+  app.get('/api/staff/receipts', requireNurse, (req, res) => res.json({ items: billing.openList({ roomId: req.user.role === 'admin' ? null : req.user.roomId }) }));
+  app.get('/api/staff/payments/:id', requireStaff, (req, res) => {
+    const p = billing.getPaymentRow(id(req));
+    if (!p) throw new AppError(404, 'NOT_FOUND', 'Platba neexistuje.');
+    res.json({ payment: billing.paymentOut(p, { withEvents: true }) });
+  });
+  app.post('/api/staff/payments/:id/reprint', requireNurse, (req, res) => res.json(billing.reprint(id(req), req.user)));
+  // poverený správca: pokladnice, agenti, cenník, mapovanie výkonov, riešenie nejednoznačných prípadov
+  app.get('/api/admin/billing', requireAdmin, (req, res) => res.json(billing.adminState()));
+  app.put('/api/admin/billing/config', requireAdmin, (req, res) => res.json(billing.setConfig(req.body, req.user)));
+  app.post('/api/admin/billing/companies', requireAdmin, (req, res) => res.status(201).json(billing.saveCompany(null, req.body)));
+  app.put('/api/admin/billing/companies/:id', requireAdmin, (req, res) => res.json(billing.saveCompany(id(req), req.body)));
+  app.post('/api/admin/billing/agents', requireAdmin, (req, res) => res.status(201).json(billing.createAgent(req.body, req.user)));
+  app.put('/api/admin/billing/agents/:id', requireAdmin, (req, res) => res.json(billing.updateAgent(id(req), req.body, req.user)));
+  app.post('/api/admin/billing/registers', requireAdmin, (req, res) => res.status(201).json(billing.saveRegister(null, req.body || {}, req.user)));
+  app.put('/api/admin/billing/registers/:id', requireAdmin, (req, res) => res.json(billing.saveRegister(id(req), req.body || {}, req.user)));
+  app.post('/api/admin/billing/registers/:id/mode', requireAdmin, (req, res) => res.json(billing.setRegisterMode(id(req), req.body?.mode, req.body?.confirm, req.user)));
+  app.post('/api/admin/billing/registers/:id/test-print', requireAdmin, (req, res) => res.status(201).json(billing.testPrint(id(req), req.user)));
+  app.get('/api/admin/billing/print-jobs/:id', requireAdmin, (req, res) => res.json({ print: billing.printJob(id(req)) }));
+  app.post('/api/admin/billing/price-items', requireAdmin, (req, res) => res.status(201).json(billing.savePriceItem(null, req.body || {}, req.user)));
+  app.put('/api/admin/billing/price-items/:id', requireAdmin, (req, res) => res.json(billing.savePriceItem(id(req), req.body || {}, req.user)));
+  app.post('/api/admin/billing/price-import', requireAdmin, express.json({ limit: '600kb' }), (req, res) => res.json(billing.importPriceItems(req.body?.companyId, req.body?.text, req.user)));
+  app.post('/api/admin/billing/procedures', requireAdmin, (req, res) => res.status(201).json(billing.saveProcedure(null, req.body || {}, req.user)));
+  app.put('/api/admin/billing/procedures/:id', requireAdmin, (req, res) => res.json(billing.saveProcedure(id(req), req.body || {}, req.user)));
+  app.delete('/api/admin/billing/procedures/:id', requireAdmin, (req, res) => res.json(billing.deleteProcedure(id(req), req.user)));
+  app.post('/api/admin/payments/:id/resolve', requireAdmin, (req, res) => res.json(billing.resolve(id(req), req.body || {}, req.user)));
+
+  // lokálny agent VRP2 – vlastný token (Authorization: Bearer vrpa_…), žiadne cookies, žiadne údaje o pacientovi
+  const requireAgent = (req, res, next) => {
+    const a = billing.authAgent(req.headers.authorization);
+    if (!a) return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Neplatný token agenta.' } });
+    req.agent = a;
+    next();
+  };
+  app.post('/api/agent/heartbeat', requireAgent, (req, res) => res.json(billing.heartbeat(req.agent, req.body || {})));
+  app.post('/api/agent/claim', requireAgent, (req, res) => res.json(billing.claim(req.agent, req.body || {})));
+  app.post('/api/agent/payments/:id/submitting', requireAgent, (req, res) => res.json(billing.markSubmitting(req.agent, id(req), req.body || {})));
+  app.post('/api/agent/payments/:id/result', requireAgent, (req, res) => res.json(billing.reportResult(req.agent, id(req), req.body || {})));
+  app.post('/api/agent/print-jobs/:id/result', requireAgent, (req, res) => res.json(billing.printResult(req.agent, id(req), req.body || {})));
+
   app.use('/api', (req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Neznáma adresa API.' } }));
 
   // ---------- statické aplikácie ----------
@@ -284,7 +336,7 @@ function createServer(opts = {}) {
   app.get('/', (req, res) => res.redirect('/shared/index.html'));
 
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-    if (err instanceof AppError) return res.status(err.status).json({ error: { code: err.code, message: err.message } });
+    if (err instanceof AppError || err instanceof BillingError) return res.status(err.status).json({ error: { code: err.code, message: err.message } });
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Neplatný formát požiadavky.' } });
     log.error('Neočakávaná chyba', { path: req.path, err: String(err && err.stack || err).slice(0, 800) });
     res.status(500).json({ error: { code: 'INTERNAL', message: 'Nastala chyba servera. Skúste to znova.' } });
@@ -374,7 +426,7 @@ function createServer(opts = {}) {
     });
   }
 
-  return { app, server, store, auth, news, weather, db: database, close };
+  return { app, server, store, auth, billing, news, weather, db: database, close };
 }
 
 module.exports = { createServer };

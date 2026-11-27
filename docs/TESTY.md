@@ -35,6 +35,7 @@ samy pripoja, stav je zachovaný, ďalšie číslo je A004 → žiadne chyby Jav
 | Aplikácia | Príkaz | Výsledok |
 |---|---|---|
 | SESTRA | `node apps/sestra/test/e2e.js` | **14/14** – prvotné nastavenie, prihlásenie, živé aktualizácie, všetky akcie, konflikt dvoch sestier, obnovenie stránky, reštart servera, nastavenia, opakovaná tlač, upozornenie na zlyhanú tlač, história, ukončenie dňa |
+| SESTRA – platba | `node apps/sestra/test/e2e-platba.js` | **9/9** – nastavenie pokladníc a cenníka, návšteva bez úhrady, karta (zamietnutá → schválená, dvojklik), hotovosť so zaokrúhlením a výdavkom, obnovenie stránky, chyba tlače a kópia, história, skúšobná tlač; beží so skutočným procesom agenta a **simulátorom VRP2** |
 | TABLET | `ADNA_URL=… ADNA_SETUP_CODE=… node apps/tablet/test/e2e.js` | **14/14** – trojitý dotyk = 1 číslo, automatický návrat, stratená odpoveď → rovnaké číslo, výpadok → chyba a opakovanie s rovnakým `requestId`, všetky stavy tlače, offline indikátor |
 | TV | `node apps/tv/test/e2e.js` | **11/11** – uvítanie, vyvolanie so zvukom, zopakovanie, história, stiahnutie omylom vyvolaného, obnovenie stránky bez opakovania zvuku, výpadok/obnova, zablokovaný zvuk → tlačidlo ovládané klávesom Enter, vypnutý zvuk |
 

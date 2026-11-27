@@ -1,0 +1,14 @@
+# Linux (systemd, používateľská služba): ~/.config/systemd/user/adna-vrp2-agent.service
+#   systemctl --user enable --now adna-vrp2-agent
+[Unit]
+Description=AdNa – lokálny agent VRP2
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/vyvolavaci-system/agent
+ExecStart=/usr/bin/node src/index.js spustit --konfiguracia %h/.config/adna-vrp2-agent/konfiguracia.json
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,25 @@
+{
+  "_poznamka": "Skopírujte do %ProgramData%\\AdNa\\vrp2-agent\\konfiguracia.json (Windows) a vyplňte. Token agenta vytvorí správca v aplikácii Sestra → Nastavenia → Pokladnice VRP2. Súbor nikdy nedávajte do repozitára.",
+  "nazov": "Recepcia 1",
+  "server": "https://vyvolavaci.adna.sk",
+  "token": "vrpa_…",
+  "rezim": "sim",
+  "ostryRezimPovoleny": false,
+  "data": "C:\\ProgramData\\AdNa\\vrp2-agent\\data",
+  "vrp2": {
+    "url": "https://vrp2.financnasprava.sk/",
+    "profil": "C:\\ProgramData\\AdNa\\vrp2-agent\\profil-prehliadaca",
+    "ovladanie": "C:\\ProgramData\\AdNa\\vrp2-agent\\vrp2-ovladanie.json"
+  },
+  "simulator": {
+    "pokladnice": [
+      { "code": "SIM0000000000000001", "companyName": "AdNa s.r.o.", "ico": "", "workplace": "Recepcia" }
+    ],
+    "aktivna": "SIM0000000000000001"
+  },
+  "tlac": {
+    "typ": "windows",
+    "sumatra": "C:\\Program Files\\SumatraPDF\\SumatraPDF.exe",
+    "sirkaMm": 80
+  }
+}

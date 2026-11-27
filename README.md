@@ -69,6 +69,7 @@ Server vypíše adresy a **inštalačný kód** (uloží ho aj do `server/data/S
 ```
 server/            Node.js server (Express, ws, vstavaný node:sqlite) + testy + skripty pre Windows/Linux
 apps/sestra/       webová aplikácia Sestra + inštalátor pre Windows
+agent/             lokálny agent VRP2 pre PC recepcie (doklad k platbe pacienta, tlač) + simulátor VRP2
 apps/tv/           obrazovka v čakárni (web), mini PC skripty, Android TV obal (záloha)
 apps/tablet/       tablet v čakárni (web) + Android obal (kiosk)
 shared/            spoločné štýly a klient API
@@ -86,6 +87,8 @@ tests/             integračný test celého toku
   node apps/tv/test/e2e-v2.js     # kartičky, plánované časy, Na rade
   node apps/tv/test/e2e-v21.js    # dve ambulancie, lekár, smer, meškanie, mimoriadny oznam
   node apps/sestra/test/e2e.js
+  node apps/sestra/test/e2e-platba.js   # platba pacienta a doklad (simulátor VRP2)
+  (cd agent && npm test)                # lokálny agent VRP2
   node apps/tablet/test/e2e.js
   node tests/integracia.js        # celý tok tablet → tlač → sestra → TV
   ```
@@ -99,7 +102,7 @@ tests/             integračný test celého toku
 
 [Inštalácia](docs/INSTALACIA.md) · [Nasadenie s doménou](docs/NASADENIE.md) · [Testy](docs/TESTY.md) ·
 [Situácie a výpadky](docs/SITUACIE.md) · [Obmedzenia](docs/OBMEDZENIA.md) ·
-[Internet a bezpečnosť](docs/INTERNET-A-BEZPECNOST.md) · [Akceptačný test](docs/AKCEPTACNY-TEST.md) · [Dizajn](docs/DIZAJN.md)
+[Internet a bezpečnosť](docs/INTERNET-A-BEZPECNOST.md) · [Platba pacienta a doklad VRP2](docs/POKLADNICA-VRP2.md) · [Akceptačný test](docs/AKCEPTACNY-TEST.md) · [Dizajn](docs/DIZAJN.md)
 
 ## Pred ostrou prevádzkou
 

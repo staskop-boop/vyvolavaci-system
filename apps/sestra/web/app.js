@@ -3,6 +3,7 @@
   'use strict';
   const { api, connect, esc, fmtTime, fmtDateTime, fmtDay, fmtWait, STATUS_TEXT, PRINT_TEXT } = window.AdNa;
 
+  const POK = window.AdNaPokladnica;   // 2026-11-27: platba pacienta a doklad VRP2 (pokladnica.js)
   const $view = document.getElementById('view');
   const $topbar = document.getElementById('topbar');
   const $conn = document.getElementById('conn');
@@ -340,6 +341,7 @@
           const first = !S.staff;
           S.staff = m.state;
           pickRoom();
+          loadReceipts();
           if (S.view === 'queue') renderQueue();
           else if (first) go(S.view);
           else liveStatsSoon();
@@ -347,6 +349,34 @@
       },
     });
     go(S.view);
+  }
+
+  // 2026-11-27: „Doklady na doriešenie“ – načíta sa pri každej zmene stavu, len keď sú platby zapnuté alebo niečo čaká
+  const billingOn = () => !!(S.staff && S.staff.billing && S.staff.billing.enabled);
+  const payOf = (t) => (S.staff && S.staff.billing && S.staff.billing.payments[t.id]) || null;
+  const payCtx = { toast, handleError, modal, confirm: (...a) => confirmDialog(...a) };
+  let receiptsBusy = false;
+  async function loadReceipts() {
+    const b = S.staff && S.staff.billing;
+    if (!b || S.user.doctorName || (!b.enabled && !b.openCount)) { if (S.receipts && S.receipts.length) { S.receipts = []; if (S.view === 'queue') renderQueue(); } return; }
+    if (receiptsBusy) return;
+    receiptsBusy = true;
+    try {
+      const items = (await api('/api/staff/receipts')).items;
+      const changed = JSON.stringify(items) !== JSON.stringify(S.receipts || []);
+      S.receipts = items;
+      if (changed && S.view === 'queue' && !document.getElementById('modal-root').children.length) renderQueue();
+    } catch {} finally { receiptsBusy = false; }
+  }
+  /** Ukončenie vyvolaného pacienta sestrou: pri zapnutých platbách formulár s voľbou Bez priamej úhrady / Platba pacienta. */
+  async function finishTicket(t) {
+    if (!t) return null;
+    const plain = () => act(() => api(`/api/staff/tickets/${t.id}/done`, { body: {} }), `${t.code}: Ukončený`);
+    if (!billingOn() || S.user.doctorName || t.status !== 'called') return plain();
+    if (S.conn !== 'online') { toast('Nie je spojenie so serverom. Akciu nemožno vykonať.', 'error'); return null; }
+    const r = await POK.finishDialog(t, payCtx);
+    if (r === 'done') return plain();
+    return r;
   }
 
   function go(view) {
@@ -574,13 +604,13 @@
     // 2026-11-18 (Pali): ukončení a neprítomní dole na celú šírku so všetkými údajmi
     const tm = (v) => (v ? esc(fmtTime(v)) : '<span class="hint">—</span>');
     const finRows = finished.slice(0, 60).map((t) => `<tr data-ticket="${t.id}">
-      <td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span></td>
+      <td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${POK.payLine(payOf(t))}</td>
       <td class="f-pat">${hasPriv(t) ? identPill(t) : '<span class="hint">—</span>'}</td>
       <td>${t.roomName || t.homeRoomName ? ambPill(t.roomName ? t.roomId : t.homeRoomId, t.roomName || t.homeRoomName) : ''}</td>
       <td class="nw">${t.plannedAt ? `<b>${esc(fmtTime(t.plannedAt))}</b>` : '<span class="hint">—</span>'}</td>
       <td class="nw">${tm(t.createdAt)}</td><td class="nw">${tm(t.nurseCalledAt)}</td><td class="nw">${tm(t.toDoctorAt)}</td>
       <td class="nw">${tm(t.stage === 'doctor' || t.stage === 'final' ? t.calledAt : null)}</td><td class="nw">${tm(t.finalAt)}</td><td class="nw"><b>${tm(t.finishedAt)}</b></td>
-      <td class="actions"><div class="acts"><button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>
+      <td class="actions"><div class="acts">${payOf(t) ? '' : `<button class="btn btn-sm btn-ghost needs-online" data-act="requeue" data-id="${t.id}" ${dis} title="Vrátiť medzi čakajúcich">↩ Vrátiť</button>`}
         ${nurse && t.status !== 'cancelled' ? `<button class="btn btn-sm needs-online" data-act="move-room" data-id="${t.id}" ${dis} title="Opraviť ambulanciu, v ktorej pacient bol (aj v štatistikách)">⇄ Ambulancia</button>` : ''}</div></td></tr>`).join('');
 
     // ďalší na rade – veľká karta s hlavnou akciou
@@ -673,10 +703,11 @@
         <section class="card q-doctor">${docSection()}</section>
       </div>
 
+      <div class="a-fin-area">${nurse ? POK.receiptsSection(S.receipts, S.user.role === 'admin') : ''}
       <section class="card a-finished"><div class="section-title"><h2>Ukončení a neprítomní (${finished.length})</h2><span class="hint">omylom ukončeného vrátite tlačidlom Vrátiť</span></div>
         ${finished.length ? `<div class="fin-wrap"><table id="tbl-finished"><thead><tr><th>Číslo</th><th>Stav</th><th>Pacient</th><th>Ambulancia</th><th title="Čas, na ktorý bol pacient objednaný">Termín</th><th>Príchod</th><th title="Kedy pacienta vyvolala sestra">U sestry</th><th title="Odkedy čakal na lekára">K lekárovi</th><th title="Kedy pacienta vyvolal lekár">U lekára</th><th title="Kedy ho lekár poslal späť k sestre na ukončenie">Späť u sestry</th><th>Ukončený</th><th></th></tr></thead><tbody>${finRows}</tbody></table></div>`
           : '<div class="empty">Zatiaľ nikto.</div>'}
-      </section></div>`;
+      </section></div></div>`;
     const fin2 = document.querySelector('.fin-wrap');
     if (fin2) fin2.scrollTop = finScroll;
     window.scrollTo(0, scroll);
@@ -723,6 +754,13 @@
 
   // akcie v zozname (delegovanie udalostí)
   $view.addEventListener('click', async (e) => {
+    const pb = e.target.closest('button[data-pay-act]');
+    if (pb) {
+      const pid = Number(pb.dataset.payId);
+      if (pb.dataset.payAct === 'reprint') { pb.disabled = true; await POK.reprint(pid, payCtx); }
+      if (pb.dataset.payAct === 'resolve') await POK.resolveDialog(pid, payCtx);
+      return loadReceipts();
+    }
     const b = e.target.closest('button[data-act]');
     if (!b || !S.staff) return;
     const id = Number(b.dataset.id);
@@ -736,7 +774,7 @@
       case 'to-final': return act(() => api(`/api/staff/tickets/${id}/to-final`, { body: {} }), `${code}: k sestre na ukončenie`);
       case 'back-to-doctor': return act(() => api(`/api/staff/tickets/${id}/back-to-doctor`, { body: {} }), `${code}: späť k lekárovi`);
       case 'to-doctor-direct': return act(() => api(`/api/staff/tickets/${id}/to-doctor`, { body: { direct: true } }), `${code}: priamo k lekárovi`);
-      case 'done': return act(() => api(`/api/staff/tickets/${id}/done`, { body: {} }), `${code}: Ukončený`);
+      case 'done': return finishTicket(t);
       case 'absent': return act(() => api(`/api/staff/tickets/${id}/absent`, { body: {} }), `${code}: Neprítomný`);
       case 'requeue': {
         const ok = await confirmDialog('Vrátiť medzi čakajúcich?', `Číslo ${code} sa vráti do zoznamu čakajúcich podľa pôvodného času príchodu${t && t.status === 'called' ? ' a zmizne z obrazovky v čakárni' : ''}.`, 'Vrátiť');
@@ -1170,6 +1208,11 @@
     if (!S.historyDay) { document.getElementById('hist-detail').innerHTML = '<div class="empty">Žiadne záznamy.</div>'; return; }
     try {
       const h = await api('/api/staff/history?day=' + encodeURIComponent(S.historyDay));
+      const payBy = {};
+      for (const p of h.payments || []) payBy[p.ticketId] = p;
+      const payHist = (p) => (p ? `<div class="pay-hist"><b>Úhrada ${esc(window.AdNaPeniaze.fmtEur(p.payableCents))}</b> ${p.method === 'cash' ? 'v hotovosti' : 'kartou'} · ${esc(p.companyName)} · potvrdila ${esc(p.confirmedBy || '–')} ${esc(fmtTime(p.confirmedAt))}
+        <br>${p.items.map((i) => `${esc(i.name)} ${i.qty} × ${esc(window.AdNaPeniaze.fmtEur(i.unitCents))}`).join('; ')}
+        <br>${p.receipt ? `${p.simulated ? 'SIMULÁCIA – nefiskalizované · ' : ''}doklad ID <b>${esc(p.receipt.id)}</b>${p.receipt.number ? ` · č. ${esc(p.receipt.number)}` : ''}` : ''} ${esc(p.status.text)}</div>` : '');
       const evBy = {};
       for (const e of h.events) (evBy[e.ticketId] = evBy[e.ticketId] || []).push(e);
       // 2026-11-24 (Pali): filter podľa ambulancie a semafor pri časoch vyvolania – zelená v čase (do 5 min), oranžová 6–15 min, červená tučne nad 15 min
@@ -1190,7 +1233,7 @@
       };
       const rows = shown.map((t) => `<tr><td class="code">${esc(t.code)}</td><td><span class="badge b-${t.status}">${esc(STATUS_TEXT[t.status])}</span>${hasPriv(t) ? ' ' + identPill(t) : ''}</td>
         <td>${esc(fmtTime(t.createdAt))}</td><td>${t.roomName || t.homeRoomName ? ambPill(t.roomName ? t.roomId : t.homeRoomId, t.roomName || t.homeRoomName) : ''}</td><td>${printBadge(t.print)}</td>
-        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `${evTime(t, e, arr.slice(0, k))} ${ambColorText(evLine(e, arr.slice(0, k)))}`).join('<br>')}</td></tr>`).join('');
+        <td class="hint ev-list">${(evBy[t.id] || []).map((e, k, arr) => `${evTime(t, e, arr.slice(0, k))} ${ambColorText(evLine(e, arr.slice(0, k)))}`).join('<br>')}${payHist(payBy[t.id])}</td></tr>`).join('');
       const openPast = h.day !== (S.staff && S.staff.day) ? h.tickets.filter((t) => t.status === 'waiting' || t.status === 'called').length : 0;
       document.getElementById('hist-detail').innerHTML = `<div class="section-title"><h2>${esc(fmtDay(h.day))}</h2>
         <span class="hint">${shown.length} čísel${S.histRoom ? ` z ${h.tickets.length}` : ''}</span></div>
@@ -1591,6 +1634,8 @@
         <div class="hint" id="tv-news-last"></div>
       </form>
 
+      <section class="card stack" id="sec-billing"><h2>Platby pacientov a pokladnice VRP2</h2><div class="center-msg">Načítava sa…</div></section>
+
       <form class="card stack" id="f-printer"><h2>Tlačiareň lístkov (sieťová ESC/POS)</h2>
         <p class="hint">Server posiela lístok priamo na sieťovú termálnu tlačiareň s podporou ESC/POS (TCP, zvyčajne port 9100). Tlačiareň musí mať pevnú IP adresu.</p>
         <label class="check"><input type="checkbox" id="p-enabled" ${p.enabled ? 'checked' : ''}> Tlačiť lístky</label>
@@ -1631,6 +1676,7 @@
       </section>
     </div>`;
     refreshAdminBadges();
+    POK.renderAdmin(document.getElementById('sec-billing'), payCtx);
 
     const saveSettings = async (patch, msg) => {
       try { await api('/api/admin/settings', { method: 'PUT', body: patch }); toast(msg, 'ok'); }
