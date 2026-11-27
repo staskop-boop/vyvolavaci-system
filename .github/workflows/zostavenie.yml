@@ -16,6 +16,9 @@ jobs:
         working-directory: server
       - run: npm test
         working-directory: server
+      # lokálny agent VRP2 – beží iba proti simulátoru, do ostrej VRP2 sa testy nikdy nepripájajú
+      - run: npm test
+        working-directory: agent
 
   docker:
     runs-on: ubuntu-latest

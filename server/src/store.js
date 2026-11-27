@@ -1000,7 +1000,13 @@ class Store extends EventEmitter {
   }
   done(id, userId) { return this.transition(id, 'done', ['waiting', 'called'], userId, 'done'); }
   absent(id, userId) { return this.transition(id, 'absent', ['waiting', 'called'], userId, 'absent'); }
-  requeue(id, userId) { return this.transition(id, 'waiting', ['called', 'absent', 'done'], userId, 'requeue'); }
+  requeue(id, userId) {
+    // 2026-11-27: návšteva s prijatou platbou sa nevracia – platba a doklad by inak viseli na neukončenej návšteve
+    if (this.db.prepare('SELECT 1 FROM payments WHERE ticket_id = ?').get(Number(id))) {
+      throw conflict('Návšteva má zaevidovanú platbu pacienta – nedá sa vrátiť medzi čakajúcich. Pri omyle kontaktujte správcu.');
+    }
+    return this.transition(id, 'waiting', ['called', 'absent', 'done'], userId, 'requeue');
+  }
 
   /** Uzavrie neukončené čísla staršieho dňa (čakajúce a vyvolané → Neprítomný). Dnešok sa uzatvára cez closeDay. */
   closePastDay(day, userId) {
@@ -1161,6 +1167,8 @@ class Store extends EventEmitter {
       dayEnd: this.dayEnd(),
       printer: { enabled: s.printer.enabled, lastStatus: lp.status, lastMessage: lp.message, lastCheckedAt: lp.checkedAt },
       previousDayOpen: prev ? { day: prev.day, count: prev.n } : null,
+      // 2026-11-27: platby pacientov a stav dokladov VRP2 (bez osobných údajov)
+      billing: this.billing ? this.billing.staffSummary(day) : { enabled: false, payments: {}, openCount: 0 },
     };
   }
 

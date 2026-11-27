@@ -269,3 +269,38 @@ Pacient ide najprv k sestre (plánovaný čas = čas vstupu k sestre), sestra ho
 * Štatistiky `GET /api/admin/stats?groupBy=doctor|nurse|room`: lekárovi sa pri dvoch krokoch počíta čakanie od „K lekárovi“ po jeho vyvolanie a čas u neho
   (meškanie oproti termínu nie); sestre čakanie od príchodu, meškanie oproti termínu a čas u nej. Nové polia `avgNurse`, `avgDoctorWait`, `avgDoctor`,
   `toDoctor`, `direct`, `twoStepSince`. Pacient ukončený len u sestry sa lekárovi nepočíta.
+
+## Verzia 4 – platba pacienta a doklad VRP2 (2026-11-27)
+
+Popis pre ľudí: [POKLADNICA-VRP2.md](POKLADNICA-VRP2.md). Sumy sú vždy celé centy (`…Cents`). Funkcia je vypnutá, kým ju
+správca nezapne; ostrý režim pokladnice sa nasadením nikdy nezapne sám.
+
+**Sestra (cookie, rola sestry)**
+
+* `GET /api/staff/tickets/:id/finish-form` – spoločnosti, pokladnica pracoviska, výkony s cenami a upozornenia
+  (chýbajúca cena, priradenie, pokladnica, agent, relácia, tlačiareň).
+* `POST /api/staff/tickets/:id/finish` – iba platená návšteva: `{ opId, registerId, lines, method: "cash" | "card",
+  receivedCents, paymentConfirmed: true, cardApproved: true (pri karte), expectedPayableCents }`. V jednej transakcii ukončí
+  návštevu, zapíše platbu s nemennou kópiou údajov a založí úlohu pre agenta. Rovnaké `opId` vráti pôvodný výsledok; druhá
+  platba k tej istej návšteve je odmietnutá (`409`). Návšteva bez priamej úhrady sa ukončuje pôvodnou akciou ako doteraz.
+* `GET /api/staff/receipts` – doklady na doriešenie. `GET /api/staff/payments/:id` – detail s priebehom.
+  `POST /api/staff/payments/:id/reprint` – kópia už vydaného dokladu (nový doklad nevznikne).
+* `POST /api/staff/tickets/:id/requeue` vráti `409`, ak má návšteva platbu.
+
+**Správca** – `GET /api/admin/billing`, `PUT …/config`, `POST|PUT …/companies`, `…/agents` (token `vrpa_…` sa vráti iba pri
+vytvorení, v databáze je len odtlačok), `…/registers`, `POST …/registers/:id/mode` (ostrý režim vyžaduje potvrdenie `OSTRÁ`),
+`POST …/registers/:id/test-print`, `…/price-items`, `POST …/price-import`, `…/procedures`,
+`POST /api/admin/payments/:id/resolve` – `{ action: "retry" | "confirm-issued" | "confirm-missing", receiptId, note, confirm: "NEVYDANÝ" }`.
+
+**Agent (`Authorization: Bearer vrpa_…`)**
+
+* `POST /api/agent/heartbeat` – režim, stav relácie VRP2, aktívna pokladnica, tlačiareň.
+* `POST /api/agent/claim` – jedna úloha: `issue`, `verify` (odoslanie sa už začalo – nikdy nový doklad) alebo `print`.
+  Úloha obsahuje iba interné číslo platby, pokladnicu, spoločnosť, položky, sumy a platidlo – žiadne údaje o pacientovi.
+* `POST /api/agent/payments/:id/submitting` – trvalý záznam pred vystavením; bez neho agent doklad nevystaví.
+* `POST /api/agent/payments/:id/result` – `issued | mismatch | failed | needs_session | not_submitted | unverified`.
+* `POST /api/agent/print-jobs/:id/result` – `sent | printed | failed`.
+
+Stav dokladu: `queued → claimed → submitting → issued`, odbočky `needs_session`, `mismatch`, `failed` (nič sa neodoslalo,
+možno opakovať) a `unverified` (odoslanie sa začalo – rozhodne poverená osoba). Návrat zo `submitting` do fronty bez
+rozhodnutia správcu zakazuje spúšťač v databáze.
