@@ -145,7 +145,7 @@
       const badge = isClosed ? '<span class="pill pill-grey">Dnes neordinuje</span>'
         : atDoc.length ? '<span class="pill pill-red">Pacient u lekára</span>'
         : atNurse.length || atFinal.length ? '<span class="pill pill-blush">Pacient u sestry</span>' : '<span class="pill pill-ok">Voľná</span>';
-      const who = (list, label) => list.map((t) => `<li><b class="code">${esc(t.code)}</b> ${label} <span class="hint">od ${fmtTime(t.calledAt)} (${fmtMin(minsSince(t.calledAt))})</span></li>`).join('');
+      const who = (list, label) => list.map((t) => `<li>Pacient č. <b class="code">${esc(t.code)}</b> – ${label} <span class="hint">od ${fmtTime(t.calledAt)} (${fmtMin(minsSince(t.calledAt))})</span></li>`).join('');
       const people = [st.doctors?.[r.id] && `Lekár: <b>${esc(st.doctors[r.id])}</b>`, st.nurses?.[r.id] && `Sestra: <b>${esc(st.nurses[r.id])}</b>`].filter(Boolean).join(' · ');
       return `<article class="room">
         <div class="room-head"><h3>${esc(r.name)}</h3>${badge}</div>

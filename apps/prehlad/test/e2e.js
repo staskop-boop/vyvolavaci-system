@@ -95,7 +95,7 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
       assert.match(t, /Ambulancie/);
       assert.match(t, /MUDr\. Kováč/);
       assert.match(t, /Bc\. Nováková/);
-      assert.match(t, /K1\s*u lekára/);
+      assert.match(t, /Pacient č\. K1 – u lekára/);
       assert.match(t, /Čakáreň/);
       assert.match(t, /K2/);
     });
@@ -112,7 +112,7 @@ async function step(name, fn) { await fn(); passed++; console.log('  ✓ ' + nam
       const s = await admin('/api/staff/state');
       const k2 = s.tickets.find((t) => t.code === 'K2');
       await admin(`/api/staff/tickets/${k2.id}/call`, { roomId: s.rooms[1].id });
-      await page.waitForFunction(() => /K2\s*u sestry/.test(document.querySelector('main').innerText), null, { timeout: 5000 });
+      await page.waitForFunction(() => /Pacient č\. K2 – u sestry/.test(document.querySelector('main').innerText), null, { timeout: 5000 });
     });
     await step('Pri výpadku servera upozornenie s ⚠', async () => {
       await new Promise((r) => { server.once('exit', r); server.kill('SIGKILL'); });

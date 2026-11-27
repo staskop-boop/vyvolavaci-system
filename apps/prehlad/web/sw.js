@@ -1,5 +1,5 @@
 // Service worker prehľadu: v pamäti len súbory aplikácie, nikdy údaje z API (údaje pacientov sa v telefóne neukladajú).
-const CACHE = 'adna-prehlad-v1';
+const CACHE = 'adna-prehlad-v2';
 const SHELL = ['/prehlad/', '/prehlad/index.html', '/prehlad/app.js', '/prehlad/styles.css', '/prehlad/icon.svg', '/prehlad/adna-logo.png',
   '/prehlad/manifest.webmanifest', '/shared/adna-client.js', '/shared/adna-theme.css'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
