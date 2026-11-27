@@ -1,0 +1,113 @@
+/* AdNa – Prehľad (mobil). Vzhľad podľa dizajn manuálu v3 (docs/dizajn-v3) a aplikácie Sestra.
+   Chyby majú vždy ⚠ a text – červená je farba značky, nie chyby. */
+:root {
+  --red: #BC1A21; --red-dark: #8E1219; --red-deep: #A3151B; --red-light: #D62B33;
+  --blush: #FFF4F4; --blush-border: #F3C9CB; --grey: #434242; --black: #1A1A1A;
+  --ok: #1E7B45; --ok-bg: #E3F4EA;
+  --font-display: "Plus Jakarta Sans", Inter, "Segoe UI", system-ui, sans-serif;
+  --font-body: Inter, "Segoe UI", system-ui, sans-serif;
+  --r-card: 22px; --r-tile: 16px;
+  --card-shadow: 0 14px 36px rgba(110,14,20,0.10), inset 0 0 0 1px rgba(188,26,33,0.12);
+}
+html { background: #f8f1f1; }
+body { font-family: var(--font-body); font-size: 16px; line-height: 1.45; background: transparent; min-height: 100vh; color: var(--black);
+  -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+button, input { font: inherit; }
+h1, h2, h3 { margin: 0; line-height: 1.2; font-family: var(--font-display); font-weight: 800; }
+h1 { font-size: 22px; }
+h2 { font-size: 18px; margin-bottom: 12px; }
+h3 { font-size: 17px; }
+.hint { color: #5d5b5b; font-size: 14px; margin: 4px 0 0; }
+
+.bg-band { position: fixed; inset: 0 0 auto 0; height: 220px; z-index: -1;
+  background: radial-gradient(120% 140% at 85% -20%, var(--red-light) 0%, rgba(214,43,51,0) 55%), linear-gradient(180deg, var(--red-deep) 0%, var(--red) 45%, rgba(188,26,33,0) 100%); }
+
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 auto; max-width: 900px; padding: calc(8px + env(safe-area-inset-top)) 14px 8px; background: rgba(255,255,255,0.97);
+  border-radius: 0 0 var(--r-card) var(--r-card); box-shadow: 0 12px 30px rgba(110,14,20,0.18), inset 0 0 0 1px rgba(188,26,33,0.14); }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-logo { height: 40px; width: auto; display: block; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+.brand-title { font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.brand-sub { color: var(--grey); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topright { display: flex; align-items: center; gap: 6px; }
+
+.conn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.conn::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.conn-online { color: var(--ok); background: var(--ok-bg); }
+.conn-connecting { color: var(--adna-warn); background: var(--adna-warn-bg); }
+.conn-offline { color: var(--adna-danger); background: var(--adna-danger-bg); }
+.conn-offline::before { display: none; }
+
+main { max-width: 900px; margin: 0 auto; padding: 14px 12px calc(24px + env(safe-area-inset-bottom)); outline: none; }
+main > * + * { margin-top: 12px; }
+.center-msg { text-align: center; color: #fff; padding: 80px 0; font-size: 18px; font-weight: 600; }
+
+.card { background: #fff; border: 2px solid rgba(255,255,255,0.9); border-radius: var(--r-card); box-shadow: var(--card-shadow); padding: 16px; }
+.head-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px solid var(--adna-border); border-radius: 12px;
+  padding: 10px 16px; font-weight: 700; cursor: pointer; background: #fff; color: var(--black); text-decoration: none; text-align: center; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, input:focus-visible { outline: 3px solid var(--black); outline-offset: 2px; }
+.btn:disabled { opacity: .45; }
+.btn-primary { background: var(--red); color: #fff; border-color: var(--red); box-shadow: 0 6px 16px rgba(188,26,33,0.22); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--grey); }
+.btn-sm { padding: 6px 10px; font-size: 14px; border-radius: 10px; }
+.btn-block { width: 100%; margin-top: 14px; padding: 14px; font-size: 17px; }
+
+/* prihlásenie */
+.login { max-width: 420px; margin: 40px auto 0; padding: 24px 20px; }
+.login-logo { height: 70px; display: block; margin: 0 auto 14px; }
+.login h1 { text-align: center; }
+.login .hint { text-align: center; margin-bottom: 14px; }
+.login label { display: block; font-weight: 700; font-size: 15px; margin-top: 12px; }
+.login input { display: block; width: 100%; margin-top: 6px; padding: 12px 14px; border: 1.5px solid var(--adna-border); border-radius: 12px; font-size: 17px; background: #fff; }
+.pw-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.pw-row input { margin-top: 0; flex: 1; }
+.err { color: var(--adna-danger); background: var(--adna-danger-bg); border: 1px solid #efb7b0; border-radius: 12px; padding: 10px 12px; font-weight: 600; margin: 12px 0 0; }
+
+.banner { border-radius: 16px; padding: 12px 14px; font-weight: 600; }
+.banner.warn { background: var(--adna-danger-bg); color: var(--adna-danger); border: 1px solid #efb7b0; }
+.banner.info { background: var(--blush); border: 1px solid var(--blush-border); }
+
+/* dlaždice */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.kpi { background: var(--blush); border: 1px solid var(--blush-border); border-radius: var(--r-tile); padding: 10px 12px; display: flex; flex-direction: column; }
+.kpi b { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.1; color: var(--red); font-variant-numeric: tabular-nums; }
+.kpi span { font-weight: 600; font-size: 14px; }
+.kpi small { color: #5d5b5b; font-size: 13px; }
+.kpi-ok b { color: var(--ok); }
+.kpi-soft { background: #faf6f6; border-color: #eee2e2; }
+.kpi-soft b { color: var(--black); font-size: 22px; }
+
+/* ambulancie */
+.rooms { display: grid; gap: 10px; }
+@media (min-width: 700px) { .rooms { grid-template-columns: 1fr 1fr; } }
+.room { border: 1.5px solid #eee2e2; border-radius: var(--r-tile); padding: 12px 14px; }
+.room-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.room-people { margin: 6px 0 0; font-size: 14px; }
+.room-now { list-style: none; margin: 8px 0 0; padding: 0; }
+.room-now li { padding: 4px 0; }
+.room-nums { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 14px; }
+.room-nums b { font-size: 16px; }
+.code { font-family: var(--font-display); font-weight: 800; color: var(--red); font-size: 18px; }
+.pill { display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.pill-red { background: var(--red); color: #fff; }
+.pill-blush { background: var(--blush); color: var(--red-dark); border: 1px solid var(--blush-border); }
+.pill-ok { background: var(--ok-bg); color: var(--ok); }
+.pill-grey { background: #eee; color: var(--grey); }
+.pill-dark { background: var(--black); color: #fff; }
+.late { color: var(--red-dark); font-weight: 700; }
+.ok { color: var(--ok); font-weight: 700; }
+.count { display: inline-block; background: var(--red); color: #fff; border-radius: 999px; padding: 0 9px; font-size: 15px; vertical-align: 2px; }
+.tag { display: inline-block; font-size: 12px; background: #f1f1f1; border-radius: 6px; padding: 1px 6px; color: var(--grey); }
+
+/* tabuľky */
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 10px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #5d5b5b; padding: 6px; border-bottom: 2px solid var(--blush-border); }
+.tbl td { padding: 8px 6px; border-bottom: 1px solid #f1e6e6; vertical-align: top; }
+.tbl .num { text-align: right; white-space: nowrap; }
+.foot { text-align: center; }

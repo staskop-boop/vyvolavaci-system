@@ -26,7 +26,7 @@ jobs:
           docker build -t adna-server .
           docker run -d --name adna -p 8080:8080 adna-server
           for i in $(seq 1 20); do curl -fsS -o /dev/null http://127.0.0.1:8080/sestra/ && break; sleep 1; done
-          for p in sestra/ tablet/ obrazovka/ shared/adna-theme.css; do curl -fsS -o /dev/null "http://127.0.0.1:8080/$p"; done
+          for p in sestra/ tablet/ obrazovka/ prehlad/ prehlad/app.js shared/adna-theme.css; do curl -fsS -o /dev/null "http://127.0.0.1:8080/$p"; done
           docker exec adna test -f /data/SETUP-KOD.txt
           docker logs adna | tail -5
 
@@ -130,7 +130,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [tablet, tv]
+        app: [tablet, tv, prehlad]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

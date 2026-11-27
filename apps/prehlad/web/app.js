@@ -1,0 +1,210 @@
+// AdNa – Prehľad: živý stav ambulancie na diaľku (mobil, Android appka „AdNa Prehľad“). Len na čítanie –
+// nič nevyvoláva ani nemení. 2026-11-27 (Pali): „chcem mať prehľad o aktuálnom stave ambulancie, aj keď nie som tam“.
+// Ochrana údajov: zobrazujú sa len poradové čísla, typ návštevy a časy – identifikátor pacienta (meno/poznámka sestry)
+// sa na diaľku nezobrazuje a v telefóne sa nič neukladá (service worker drží len súbory aplikácie).
+(function () {
+  'use strict';
+  const { api, connect, fmtTime, fmtDay, esc } = window.AdNa;
+  const $ = (s, r = document) => r.querySelector(s);
+  const S = { user: null, staff: null, conn: null, today: null, todayErr: null, week: null, lastAt: 0, statsTimer: null };
+  const view = $('#view');
+
+  const fmtMin = (m) => (m == null ? '–' : m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ' ' + (m % 60) + ' min' : ''}` : `${m} min`);
+  const minsSince = (iso) => (iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : null);
+  const isoDay = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bratislava' }).format(d);
+  const err = (m) => `<p class="err" role="alert">⚠ ${esc(m)}</p>`;
+
+  // ---------- prihlásenie ----------
+  async function start() {
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+    try { S.user = (await api('/api/auth/me')).user; }
+    catch (e) { if (e.status === 401) return showLogin(); return showFatal(e.message); }
+    showApp();
+  }
+  function showFatal(msg) {
+    $('#topbar').hidden = true;
+    view.innerHTML = `<section class="card login">${err(msg)}<button class="btn btn-primary" id="retry">Skúsiť znova</button></section>`;
+    $('#retry').onclick = start;
+  }
+  function showLogin(msg) {
+    if (S.conn) { S.conn.stop(); S.conn = null; }
+    clearInterval(S.statsTimer);
+    S.user = null; S.staff = null; S.today = null; S.todayErr = null; S.week = null;   // po odhlásení nič z predchádzajúceho konta
+    $('#topbar').hidden = true;
+    view.innerHTML = `<section class="card login">
+      <img class="login-logo" src="adna-logo.png" alt="AdNa s.r.o.">
+      <h1>Prehľad ambulancie</h1>
+      <p class="hint">Prihláste sa rovnakým kontom ako v aplikácii Sestra.</p>
+      ${msg ? err(msg) : ''}
+      <form id="login-form" autocomplete="on">
+        <label>Meno konta<input id="un" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+        <label>Heslo<span class="pw-row"><input id="pw" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="btn btn-sm" id="pw-toggle" aria-label="Zobraziť heslo">Zobraziť</button></span></label>
+        <div id="login-err"></div>
+        <button class="btn btn-primary btn-block" id="btn-login">Prihlásiť sa</button>
+      </form></section>`;
+    $('#pw-toggle').onclick = () => { const p = $('#pw'); const show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('#pw-toggle').textContent = show ? 'Skryť' : 'Zobraziť'; };
+    $('#login-form').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const b = $('#btn-login'); b.disabled = true; $('#login-err').innerHTML = '';
+      try {
+        S.user = (await api('/api/auth/login', { body: { username: $('#un').value.trim(), password: $('#pw').value, deviceLabel: 'Prehľad (mobil)' } })).user;
+        showApp();
+      } catch (e) { $('#login-err').innerHTML = err(e.message); b.disabled = false; }
+    };
+    $('#un').focus();
+  }
+  $('#btn-logout').onclick = async () => { try { await api('/api/auth/logout', { body: {} }); } catch {} showLogin(); };
+
+  // ---------- živé údaje ----------
+  function showApp() {
+    $('#topbar').hidden = false;
+    $('#brand-sub').textContent = S.user.doctorName || S.user.nurseName || S.user.username;
+    view.innerHTML = '<div class="center-msg">Načítava sa…</div>';
+    S.conn = connect('staff', {
+      onMessage: (m) => { if (m.type === 'staff.state') { S.staff = m.state; S.lastAt = Date.now(); render(); statsSoon(); } },
+      onStatus: (s) => {
+        const c = $('#conn');
+        c.className = 'conn conn-' + s;
+        c.textContent = s === 'online' ? 'Živé údaje' : s === 'connecting' ? 'Pripája sa…' : '⚠ Bez spojenia';
+        if (s === 'offline' && S.staff) render();
+      },
+      onUnauthorized: () => showLogin('Prihlásenie vypršalo. Prihláste sa znova.'),
+    });
+    loadStats();
+    clearInterval(S.statsTimer);
+    S.statsTimer = setInterval(() => { if (!document.hidden) { loadStats(); render(); } }, 60000);
+  }
+  let statsT = null;
+  function statsSoon() { clearTimeout(statsT); statsT = setTimeout(loadStats, 1500); }
+  async function loadStats() {
+    if (!S.user) return;
+    // dnešné štatistiky – sestra a správca (lekárske konto ich nemá, vidí len živý stav)
+    if (!S.user.doctorName) {
+      try { S.today = await api('/api/staff/today-stats'); S.todayErr = null; } catch (e) { if (e.status === 401) return showLogin('Prihlásenie vypršalo. Prihláste sa znova.'); S.todayErr = e.status === 403 ? null : e.message; }
+    }
+    if (S.user.role === 'admin') {
+      const now = new Date(); const dow = (now.getDay() + 6) % 7;
+      const mon = isoDay(new Date(now.getTime() - dow * 86400000)), to = isoDay(now);
+      try { S.week = await api(`/api/admin/stats?from=${mon}&to=${to}&groupBy=doctor`); } catch { S.week = null; }
+    }
+    render();
+  }
+
+  // ---------- vykreslenie ----------
+  function render() {
+    const st = S.staff;
+    if (!st || !S.user) return;
+    const y = window.scrollY;
+    const ts = st.tickets || [];
+    const w = ts.filter((t) => t.status === 'waiting'), c = ts.filter((t) => t.status === 'called');
+    const wn = w.filter((t) => (t.stage || 'nurse') === 'nurse'), wd = w.filter((t) => t.stage === 'doctor');
+    const oldest = (list, f) => { const xs = list.map(f).filter(Boolean).sort(); return xs.length ? minsSince(xs[0]) : null; };
+    const offline = $('#conn').classList.contains('conn-offline');
+    const kpi = (n, label, sub, cls = '') => `<div class="kpi ${cls}"><b>${n}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+    view.innerHTML = `
+      ${offline ? `<div class="banner warn" role="alert">⚠ Spojenie so serverom je prerušené – údaje nižšie môžu byť staré (naposledy ${fmtTime(new Date(S.lastAt).toISOString())}). Obnovuje sa automaticky.</div>` : ''}
+      <section class="card head-card">
+        <div><h1>${esc(fmtDay(st.day))}</h1><p class="hint">Aktualizované ${fmtTime(st.serverTime)} · obnovuje sa samo</p></div>
+        ${st.dayEnd ? `<span class="pill pill-dark">Deň ukončený o ${fmtTime(st.dayEnd.at)}</span>` : ''}
+      </section>
+      ${st.announcement ? `<div class="banner info">Oznam na TV: ${esc(st.announcement.text || '')}</div>` : ''}
+      <section class="card"><h2>Práve teraz</h2><div class="kpis">
+        ${kpi(wn.length, 'čaká na sestru', wn.length ? 'najdlhšie ' + fmtMin(oldest(wn, (t) => t.createdAt)) : '')}
+        ${kpi(c.filter((t) => t.stage !== 'doctor' && t.stage !== 'final').length, 'u sestry')}
+        ${kpi(wd.length, 'čaká na lekára', wd.length ? 'najdlhšie ' + fmtMin(oldest(wd, (t) => t.toDoctorAt)) : '')}
+        ${kpi(c.filter((t) => t.stage === 'doctor').length, 'u lekára')}
+        ${kpi(c.filter((t) => t.stage === 'final').length, 'na ukončení')}
+        ${kpi(st.counts.done || 0, 'ukončených dnes', '', 'kpi-ok')}
+        ${st.counts.absent ? kpi(st.counts.absent, 'neprišli / odišli') : ''}
+      </div></section>
+      ${renderRooms(st, w, c)}
+      ${renderWaiting(st, w)}
+      ${renderToday()}
+      ${renderWeek()}
+      ${S.user.role === 'admin' ? '<p class="foot"><a class="btn" href="/sestra/">Otvoriť plnú aplikáciu Sestra (história, štatistiky za obdobie)</a></p>' : ''}
+      <p class="foot hint">Prehľad je len na čítanie. Identifikátory pacientov sa tu nezobrazujú.</p>`;
+    window.scrollTo(0, y);
+  }
+
+  function renderRooms(st, w, c) {
+    const rooms = (st.rooms || []).filter((r) => r.active);
+    if (!rooms.length) return '';
+    const closed = st.roomsClosed || [];
+    const rid = (t) => t.roomId ?? t.homeRoomId;
+    const now = Date.now();
+    const late = (t) => { if (!t.plannedAt) return null; return Math.round((now - Math.max(new Date(t.plannedAt).getTime(), new Date(t.createdAt).getTime() || 0)) / 60000); };
+    const card = (r) => {
+      const W = w.filter((t) => rid(t) === r.id || (rid(t) == null && rooms.length === 1));
+      const C = c.filter((t) => t.roomId === r.id);
+      const atNurse = C.filter((t) => t.stage !== 'doctor' && t.stage !== 'final'), atDoc = C.filter((t) => t.stage === 'doctor'), atFinal = C.filter((t) => t.stage === 'final');
+      const wn = W.filter((t) => (t.stage || 'nurse') === 'nurse'), wd = W.filter((t) => t.stage === 'doctor');
+      const ls = [...W, ...atNurse].map(late).filter((x) => x != null);
+      const mx = ls.length ? Math.max(...ls) : null;
+      const isClosed = closed.includes(r.id);
+      const badge = isClosed ? '<span class="pill pill-grey">Dnes neordinuje</span>'
+        : atDoc.length ? '<span class="pill pill-red">Pacient u lekára</span>'
+        : atNurse.length || atFinal.length ? '<span class="pill pill-blush">Pacient u sestry</span>' : '<span class="pill pill-ok">Voľná</span>';
+      const who = (list, label) => list.map((t) => `<li><b class="code">${esc(t.code)}</b> ${label} <span class="hint">od ${fmtTime(t.calledAt)} (${fmtMin(minsSince(t.calledAt))})</span></li>`).join('');
+      const people = [st.doctors?.[r.id] && `Lekár: <b>${esc(st.doctors[r.id])}</b>`, st.nurses?.[r.id] && `Sestra: <b>${esc(st.nurses[r.id])}</b>`].filter(Boolean).join(' · ');
+      return `<article class="room">
+        <div class="room-head"><h3>${esc(r.name)}</h3>${badge}</div>
+        ${people ? `<p class="room-people">${people}</p>` : '<p class="room-people hint">Lekár a sestra dnes zatiaľ nezadaní</p>'}
+        ${C.length ? `<ul class="room-now">${who(atNurse, 'u sestry')}${who(atDoc, 'u lekára')}${who(atFinal, 'na ukončení u sestry')}</ul>` : ''}
+        <div class="room-nums">
+          <span><b>${wn.length}</b> čaká na sestru</span><span><b>${wd.length}</b> čaká na lekára</span>
+          <span>${mx == null ? 'meškanie –' : mx > 5 ? `<b class="late">⏱ mešká ${fmtMin(mx)}</b>` : '<b class="ok">v čase</b>'}</span>
+        </div></article>`;
+    };
+    return `<section class="card"><h2>Ambulancie</h2><div class="rooms">${rooms.map(card).join('')}</div></section>`;
+  }
+
+  function renderWaiting(st, w) {
+    if (!w.length) return '<section class="card"><h2>Čakáreň</h2><p class="hint">Nikto nečaká.</p></section>';
+    const order = (t) => (t.stage === 'doctor' ? '1' + (t.toDoctorAt || t.createdAt) : '0' + (t.plannedAt || t.createdAt));
+    const rows = [...w].sort((a, b) => order(a).localeCompare(order(b))).map((t) => {
+      const since = t.stage === 'doctor' ? t.toDoctorAt || t.createdAt : t.createdAt;
+      const l = t.plannedAt ? Math.round((Date.now() - Math.max(new Date(t.plannedAt).getTime(), new Date(t.createdAt).getTime())) / 60000) : null;
+      return `<tr><td><b class="code">${esc(t.code)}</b>${t.patientType ? `<br><span class="tag">${esc(t.patientType)}</span>` : ''}</td>
+        <td>${t.stage === 'doctor' ? 'na lekára' : 'na sestru'}<br><span class="hint">${esc(t.homeRoomName || t.roomName || '–')}</span></td>
+        <td class="num">${t.plannedAt ? fmtTime(t.plannedAt) : '–'}${l != null && l > 5 && t.stage !== 'doctor' ? `<br><span class="late">+${fmtMin(l)}</span>` : ''}</td>
+        <td class="num"><b>${fmtMin(minsSince(since))}</b></td></tr>`;
+    }).join('');
+    return `<section class="card"><h2>Čakáreň <span class="count">${w.length}</span></h2>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Číslo</th><th>Čaká</th><th class="num">Termín</th><th class="num">Čaká už</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }
+
+  function diffText(m) { return m == null ? '–' : m > 0 ? `<span class="late">+${fmtMin(m)}</span>` : m < 0 ? `<span class="ok">−${fmtMin(-m)}</span>` : 'v čase'; }
+  function renderToday() {
+    if (S.user.doctorName) return '';
+    if (S.todayErr) return `<section class="card"><h2>Dnes spolu</h2>${err(S.todayErr)}</section>`;
+    const d = S.today;
+    if (!d) return '';
+    const t = d.total || {};
+    const pct = t.planned ? Math.round((t.onTime / t.planned) * 100) + ' %' : '–';
+    const tile = (v, l) => `<div class="kpi kpi-soft"><b>${v}</b><span>${l}</span></div>`;
+    const rows = (d.rooms || []).map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${r.patients}</td><td class="num">${r.done}</td>
+      <td class="num">${fmtMin(r.avgWait)}</td><td class="num">${diffText(r.avgDocDiff ?? r.avgDiff)}</td><td class="num">${fmtMin(r.avgDoctor ?? r.avgExam)}</td></tr>`).join('');
+    return `<section class="card"><h2>Dnes spolu</h2>
+      ${t.patients ? `<div class="kpis">
+        ${tile(t.patients, 'vyvolaných pacientov')}${tile(t.done, 'ukončených')}
+        ${tile(fmtMin(t.avgWait), 'priem. čakanie na sestru')}${tile(fmtMin(t.avgDoctorWait), 'priem. čakanie na lekára')}
+        ${tile(fmtMin(t.avgNurse), 'priem. čas u sestry')}${tile(fmtMin(t.avgDoctor), 'priem. čas u lekára')}
+        ${tile(pct, 'načas k sestre (do 5 min)')}${tile(t.late15 || 0, 'meškanie viac ako 15 min')}
+      </div>
+      ${rows ? `<div class="scroll"><table class="tbl"><thead><tr><th>Ambulancia</th><th class="num">Pac.</th><th class="num">Hotovo</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div><p class="hint">Mešk. = priemer oproti termínu po vstup k lekárovi, U lek. = priemerný čas u lekára.</p>` : ''}`
+      : '<p class="hint">Dnes ešte nikto nebol vyvolaný.</p>'}</section>`;
+  }
+
+  function renderWeek() {
+    const d = S.week;
+    if (!d || !d.total || !d.total.patients) return '';
+    const rows = d.doctors.map((r) => `<tr><td>${esc(r.doctor)}</td><td class="num">${r.patients}</td><td class="num">${r.days}</td>
+      <td class="num">${fmtMin(r.avgWait)}</td><td class="num">${diffText(r.avgDocDiff)}</td><td class="num">${fmtMin(r.avgExam)}</td></tr>`).join('');
+    return `<section class="card"><h2>Tento týždeň podľa lekárov</h2><p class="hint">${esc(fmtDay(d.from))} – ${esc(fmtDay(d.to))} · pacientov spolu: ${d.total.patients}, ukončených: ${d.total.done}</p>
+      <div class="scroll"><table class="tbl"><thead><tr><th>Lekár</th><th class="num">Pac.</th><th class="num">Dní</th><th class="num">Čakanie</th><th class="num">Mešk.</th><th class="num">U lek.</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }
+
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.user) { loadStats(); render(); } });
+  start();
+})();

@@ -74,7 +74,7 @@ test('ambulancia pacienta: výber, zmena, zrušenie', async (t) => {
   });
 
   await t.test('úvodné stránky odkazujú na skripty s verziou (obchádza cache Cloudflare)', async () => {
-    for (const u of ['/sestra/', '/sestra/index.html', '/obrazovka/', '/tablet/']) {
+    for (const u of ['/sestra/', '/sestra/index.html', '/obrazovka/', '/tablet/', '/prehlad/']) {
       const res = await fetch(s.base + u);
       const html = await res.text();
       assert.equal(res.headers.get('cache-control'), 'no-cache', u);
