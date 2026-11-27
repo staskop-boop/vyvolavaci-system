@@ -3,8 +3,9 @@
 Živý prehľad pre vedenie ambulancie v mobile (2026-11-27, Pali). **Len na čítanie** – nič nevyvoláva ani nemení.
 
 * Web: `https://vyvolavaci.adna.sk/prehlad/` (v ambulancii aj `http://10.160.1.16:8080/prehlad/`).
-* Android appka **AdNa Prehľad** (`android/`) je okno na túto stránku (WebView); APK zostavuje GitHub Actions
-  (workflow „Zostavenie AdNa“ → Artifacts → `adna-prehlad-debug-apk`). Inštalácia mimo Google Play
+* Android appka **AdNa Prehľad** (`android/`) je okno na túto stránku (WebView). APK na stiahnutie priamo v telefóne:
+  https://github.com/staskop-boop/vyvolavaci-system/releases/download/prehlad-android/AdNa-Prehlad.apk
+  (workflow `prehlad-apk.yml`, pri zmene appky). Inštalácia mimo Google Play
   (povoliť „Inštalovať neznáme aplikácie“ pre prehliadač/Súbory). Adresu servera možno zmeniť na stránke pri výpadku.
 * Prihlásenie rovnakým kontom ako v aplikácii Sestra (meno + heslo, server stráži platnosť prihlásenia).
 
